@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Log in" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Log in" %}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">{% trans "Log in" %}</button>
+</form>
+<p><a href="{% url 'marketplace:signup' %}">{% trans "Don't have an account? Sign up" %}</a></p>
+{% endblock %}

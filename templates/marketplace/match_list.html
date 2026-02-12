@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Matches" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Your Matches" %}</h1>
+{% if page_obj %}
+<ul>
+    {% for match in page_obj %}
+    <li>
+        {% if user.role == "buyer" %}
+            {{ match.supply_lot.item_text }}
+        {% else %}
+            {{ match.demand_post.item_text }}
+        {% endif %}
+        — {{ match.created_at|date:"SHORT_DATE_FORMAT" }}
+        — <a href="{% url 'marketplace:thread_detail' match.thread.pk %}">{% trans "Message" %}</a>
+    </li>
+    {% endfor %}
+</ul>
+{% include "includes/_pagination.html" %}
+{% else %}
+<p>{% trans "No matches yet." %}</p>
+{% endif %}
+{% endblock %}

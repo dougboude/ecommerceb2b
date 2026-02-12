@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Demand Posts" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Your Demand Posts" %}</h1>
+<a href="{% url 'marketplace:demand_post_create' %}">{% trans "Create new" %}</a>
+{% if page_obj %}
+<ul>
+    {% for post in page_obj %}
+    <li><a href="{% url 'marketplace:demand_post_detail' post.pk %}">{{ post.item_text }}</a> — {{ post.get_status_display }}</li>
+    {% endfor %}
+</ul>
+{% include "includes/_pagination.html" %}
+{% else %}
+<p>{% trans "No demand posts yet." %}</p>
+{% endif %}
+{% endblock %}

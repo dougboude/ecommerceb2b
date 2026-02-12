@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Dashboard" %}</h1>
+
+{% if user.role == "buyer" %}
+    <section>
+        <h2>{% trans "Your Demand Posts" %}</h2>
+        {% if demand_posts %}
+        <ul>
+            {% for post in demand_posts %}
+            <li><a href="{% url 'marketplace:demand_post_detail' post.pk %}">{{ post.item_text }}</a> — {{ post.get_status_display }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>{% trans "No demand posts yet." %}</p>
+        {% endif %}
+        <a href="{% url 'marketplace:demand_post_create' %}">{% trans "Create demand post" %}</a>
+    </section>
+
+    <section>
+        <h2>{% trans "Recent Matches" %}</h2>
+        {% if matches %}
+        <ul>
+            {% for match in matches %}
+            <li>
+                {{ match.supply_lot.item_text }}
+                — <a href="{% url 'marketplace:thread_detail' match.thread.pk %}">{% trans "Message" %}</a>
+            </li>
+            {% endfor %}
+        </ul>
+        <a href="{% url 'marketplace:match_list' %}">{% trans "View all matches" %}</a>
+        {% else %}
+        <p>{% trans "No matches yet." %}</p>
+        {% endif %}
+    </section>
+
+{% else %}
+    <section>
+        <h2>{% trans "Your Supply Lots" %}</h2>
+        {% if supply_lots %}
+        <ul>
+            {% for lot in supply_lots %}
+            <li><a href="{% url 'marketplace:supply_lot_detail' lot.pk %}">{{ lot.item_text }}</a> — {{ lot.get_status_display }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>{% trans "No supply lots yet." %}</p>
+        {% endif %}
+        <a href="{% url 'marketplace:supply_lot_create' %}">{% trans "Create supply lot" %}</a>
+    </section>
+
+    <section>
+        <h2>{% trans "Recent Matches" %}</h2>
+        {% if matches %}
+        <ul>
+            {% for match in matches %}
+            <li>
+                {{ match.demand_post.item_text }}
+                — <a href="{% url 'marketplace:thread_detail' match.thread.pk %}">{% trans "Message" %}</a>
+            </li>
+            {% endfor %}
+        </ul>
+        <a href="{% url 'marketplace:match_list' %}">{% trans "View all matches" %}</a>
+        {% else %}
+        <p>{% trans "No matches yet." %}</p>
+        {% endif %}
+    </section>
+{% endif %}
+{% endblock %}

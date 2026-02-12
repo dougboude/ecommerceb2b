@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ lot.item_text }}{% endblock %}
+
+{% block content %}
+<h1>{{ lot.item_text }}</h1>
+<dl>
+    <dt>{% trans "Status" %}</dt><dd>{{ lot.get_status_display }}</dd>
+    <dt>{% trans "Category" %}</dt><dd>{{ lot.get_category_display|default:"-" }}</dd>
+    <dt>{% trans "Quantity" %}</dt><dd>{{ lot.quantity_value|default:"-" }} {{ lot.quantity_unit }}</dd>
+    <dt>{% trans "Available until" %}</dt><dd>{{ lot.available_until }}</dd>
+    <dt>{% trans "Location" %}</dt><dd>{{ lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</dd>
+    {% if lot.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>{{ lot.asking_price }} {{ lot.price_unit }}</dd>{% endif %}
+    {% if lot.shipping_options %}<dt>{% trans "Shipping" %}</dt><dd>{{ lot.shipping_options }}</dd>{% endif %}
+    {% if lot.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ lot.notes }}</dd>{% endif %}
+</dl>
+
+{% if lot.status == "active" %}
+<form method="post" action="{% url 'marketplace:supply_lot_withdraw' lot.pk %}">
+    {% csrf_token %}
+    <button type="submit">{% trans "Withdraw" %}</button>
+</form>
+{% endif %}
+
+<a href="{% url 'marketplace:supply_lot_list' %}">{% trans "Back to list" %}</a>
+{% endblock %}

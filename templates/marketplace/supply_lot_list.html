@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Supply Lots" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Your Supply Lots" %}</h1>
+<a href="{% url 'marketplace:supply_lot_create' %}">{% trans "Create new" %}</a>
+{% if page_obj %}
+<ul>
+    {% for lot in page_obj %}
+    <li><a href="{% url 'marketplace:supply_lot_detail' lot.pk %}">{{ lot.item_text }}</a> — {{ lot.get_status_display }}</li>
+    {% endfor %}
+</ul>
+{% include "includes/_pagination.html" %}
+{% else %}
+<p>{% trans "No supply lots yet." %}</p>
+{% endif %}
+{% endblock %}
