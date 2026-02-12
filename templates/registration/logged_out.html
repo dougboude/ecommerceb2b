@@ -4,5 +4,9 @@
 {% block title %}{% trans "Logged out" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "You have been logged out." %}</h1>
+<div class="auth-form">
+    <h1>{% trans "Logged out" %}</h1>
+    <p style="text-align:center;color:var(--color-text-muted);">{% trans "You have been successfully logged out." %}</p>
+    <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Log back in" %}</a></p>
+</div>
 {% endblock %}

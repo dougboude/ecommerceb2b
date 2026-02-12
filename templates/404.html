@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Not Found" %}{% endblock %}
+
+{% block content %}
+<div class="auth-form">
+    <h1>{% trans "Page Not Found" %}</h1>
+    <p style="text-align:center;color:var(--color-text-muted);">{% trans "The page you're looking for doesn't exist." %}</p>
+    <p class="auth-link"><a href="{% url 'marketplace:dashboard' %}">{% trans "Back to dashboard" %}</a></p>
+</div>
+{% endblock %}

@@ -6,21 +6,23 @@
 {% block content %}
 <h1>{% trans "Your Matches" %}</h1>
 {% if page_obj %}
-<ul>
+<ul class="item-list">
     {% for match in page_obj %}
     <li>
-        {% if user.role == "buyer" %}
-            {{ match.supply_lot.item_text }}
-        {% else %}
-            {{ match.demand_post.item_text }}
-        {% endif %}
-        — {{ match.created_at|date:"SHORT_DATE_FORMAT" }}
-        — <a href="{% url 'marketplace:thread_detail' match.thread.pk %}">{% trans "Message" %}</a>
+        <span>
+            {% if user.role == "buyer" %}
+                {{ match.supply_lot.item_text }}
+            {% else %}
+                {{ match.demand_post.item_text }}
+            {% endif %}
+            <span class="helptext">{{ match.created_at|date:"SHORT_DATE_FORMAT" }}</span>
+        </span>
+        <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
     </li>
     {% endfor %}
 </ul>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p>{% trans "No matches yet." %}</p>
+<p class="empty-state">{% trans "No matches yet." %}</p>
 {% endif %}
 {% endblock %}

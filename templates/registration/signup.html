@@ -4,11 +4,33 @@
 {% block title %}{% trans "Sign up" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Sign up" %}</h1>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">{% trans "Create account" %}</button>
-</form>
-<p><a href="{% url 'marketplace:login' %}">{% trans "Already have an account? Log in" %}</a></p>
+<div class="auth-form">
+    <h1>{% trans "Sign up" %}</h1>
+    <form method="post" id="signup-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% trans "Create account" %}</button>
+    </form>
+    <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Already have an account? Log in" %}</a></p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var role = document.getElementById('id_role');
+    var orgName = document.getElementById('id_org_name');
+    var orgType = document.getElementById('id_org_type');
+    if (!role || !orgName) return;
+    var orgNameRow = orgName.closest('p');
+    var orgTypeRow = orgType ? orgType.closest('p') : null;
+    function toggle() {
+        var show = role.value === 'buyer';
+        if (orgNameRow) orgNameRow.style.display = show ? '' : 'none';
+        if (orgTypeRow) orgTypeRow.style.display = show ? '' : 'none';
+    }
+    role.addEventListener('change', toggle);
+    toggle();
+})();
+</script>
 {% endblock %}

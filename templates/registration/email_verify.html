@@ -4,5 +4,9 @@
 {% block title %}{% trans "Verify your email" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Verify your email" %}</h1>
+<div class="auth-form">
+    <h1>{% trans "Check your email" %}</h1>
+    <p style="text-align:center;color:var(--color-text-muted);">{% trans "We sent a verification link to your email address. Please check your inbox and click the link to activate your account." %}</p>
+    <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Go to login" %}</a></p>
+</div>
 {% endblock %}

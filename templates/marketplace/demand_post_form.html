@@ -5,9 +5,11 @@
 
 {% block content %}
 <h1>{% trans "Create Demand Post" %}</h1>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">{% trans "Submit" %}</button>
-</form>
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% trans "Submit" %}</button>
+    </form>
+</div>
 {% endblock %}

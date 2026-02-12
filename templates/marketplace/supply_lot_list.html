@@ -5,15 +5,20 @@
 
 {% block content %}
 <h1>{% trans "Your Supply Lots" %}</h1>
-<a href="{% url 'marketplace:supply_lot_create' %}">{% trans "Create new" %}</a>
 {% if page_obj %}
-<ul>
+<ul class="item-list">
     {% for lot in page_obj %}
-    <li><a href="{% url 'marketplace:supply_lot_detail' lot.pk %}">{{ lot.item_text }}</a> — {{ lot.get_status_display }}</li>
+    <li>
+        <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}">{{ lot.item_text }}</a>
+        <span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>
+    </li>
     {% endfor %}
 </ul>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p>{% trans "No supply lots yet." %}</p>
+<p class="empty-state">{% trans "No supply lots yet." %}</p>
 {% endif %}
+<div class="actions">
+    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
+</div>
 {% endblock %}

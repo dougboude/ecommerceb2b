@@ -5,12 +5,12 @@
 
 {% block content %}
 <h1>{% trans "Conversation" %}</h1>
-<p>
+<p class="helptext">
     {% trans "Regarding:" %}
     {% if user.role == "buyer" %}
-        {{ thread.match.supply_lot.item_text }}
+        <strong>{{ thread.match.supply_lot.item_text }}</strong>
     {% else %}
-        {{ thread.match.demand_post.item_text }}
+        <strong>{{ thread.match.demand_post.item_text }}</strong>
     {% endif %}
 </p>
 
@@ -22,15 +22,19 @@
         <p>{{ msg.body }}</p>
     </div>
     {% empty %}
-    <p>{% trans "No messages yet. Start the conversation!" %}</p>
+    <p class="empty-state">{% trans "No messages yet. Start the conversation!" %}</p>
     {% endfor %}
 </div>
 
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">{% trans "Send" %}</button>
-</form>
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% trans "Send" %}</button>
+    </form>
+</div>
 
-<a href="{% url 'marketplace:match_list' %}">{% trans "Back to matches" %}</a>
+<div class="actions">
+    <a href="{% url 'marketplace:match_list' %}" class="btn btn-secondary">{% trans "Back to matches" %}</a>
+</div>
 {% endblock %}

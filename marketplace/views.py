@@ -3,7 +3,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.paginator import Paginator
-from django.http import HttpResponseForbidden
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -85,7 +85,7 @@ def dashboard_view(request):
 @login_required
 def demand_post_list(request):
     if request.user.role != Role.BUYER:
-        return HttpResponseForbidden()
+        raise PermissionDenied
     qs = DemandPost.objects.filter(created_by=request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -95,7 +95,7 @@ def demand_post_list(request):
 @login_required
 def demand_post_create(request):
     if request.user.role != Role.BUYER:
-        return HttpResponseForbidden()
+        raise PermissionDenied
     if request.method == "POST":
         form = DemandPostForm(request.POST)
         if form.is_valid():
@@ -136,7 +136,7 @@ def demand_post_toggle(request, pk):
 @login_required
 def supply_lot_list(request):
     if request.user.role != Role.SUPPLIER:
-        return HttpResponseForbidden()
+        raise PermissionDenied
     qs = SupplyLot.objects.filter(created_by=request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -146,7 +146,7 @@ def supply_lot_list(request):
 @login_required
 def supply_lot_create(request):
     if request.user.role != Role.SUPPLIER:
-        return HttpResponseForbidden()
+        raise PermissionDenied
     if request.method == "POST":
         form = SupplyLotForm(request.POST)
         if form.is_valid():
@@ -201,7 +201,7 @@ def match_list(request):
 def thread_detail(request, pk):
     thread = get_object_or_404(MessageThread, pk=pk)
     if request.user not in (thread.buyer, thread.supplier):
-        return HttpResponseForbidden()
+        raise PermissionDenied
     if request.method == "POST":
         form = MessageForm(request.POST)
         if form.is_valid():
