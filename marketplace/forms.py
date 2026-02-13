@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.utils.translation import gettext_lazy as _
 
+from .constants import COUNTRY_CHOICES, KM_PER_MILE, TIMEZONE_CHOICES
 from .models import (
     Cadence,
     Category,
@@ -15,7 +16,7 @@ from .models import (
 
 class SignupForm(UserCreationForm):
     role = forms.ChoiceField(choices=Role.choices, label=_("I am a"))
-    country = forms.CharField(max_length=2, label=_("Country code"))
+    country = forms.ChoiceField(choices=COUNTRY_CHOICES, label=_("Country"))
     # Buyer-only fields (shown/hidden via JS or validated server-side)
     org_name = forms.CharField(
         max_length=255, required=False, label=_("Organization name"),
@@ -52,6 +53,10 @@ class SignupForm(UserCreationForm):
 
 
 class DemandPostForm(forms.ModelForm):
+    location_country = forms.ChoiceField(
+        choices=COUNTRY_CHOICES, label=_("Country"),
+    )
+
     class Meta:
         model = DemandPost
         fields = [
@@ -69,8 +74,46 @@ class DemandPostForm(forms.ModelForm):
             "notes",
         ]
 
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.use_miles = user is not None and getattr(user, "distance_unit", "mi") == "mi"
+
+        # Quantity label for buyers
+        self.fields["quantity_value"].label = _("Minimum quantity")
+        self.fields["quantity_value"].help_text = _(
+            "The minimum amount you want to purchase."
+        )
+
+        # Radius unit based on user preference
+        if self.use_miles:
+            self.fields["radius_km"].label = _("Search radius (miles)")
+            if self.instance and self.instance.pk and self.instance.radius_km:
+                self.initial["radius_km"] = round(
+                    self.instance.radius_km / KM_PER_MILE
+                )
+        else:
+            self.fields["radius_km"].label = _("Search radius (km)")
+
+        # Shipping allowed clarity
+        self.fields["shipping_allowed"].label = _("Accept shipped items")
+        self.fields["shipping_allowed"].help_text = _(
+            "If checked, suppliers outside your local area can match "
+            "if they offer shipping."
+        )
+
+    def clean_radius_km(self):
+        value = self.cleaned_data.get("radius_km")
+        if value is not None and self.use_miles:
+            value = round(value * KM_PER_MILE)
+        return value
+
 
 class SupplyLotForm(forms.ModelForm):
+    location_country = forms.ChoiceField(
+        choices=COUNTRY_CHOICES, label=_("Country"),
+    )
+
     class Meta:
         model = SupplyLot
         fields = [
@@ -95,3 +138,11 @@ class SupplyLotForm(forms.ModelForm):
 
 class MessageForm(forms.Form):
     body = forms.CharField(widget=forms.Textarea, label=_("Message"))
+
+
+class ProfileForm(forms.ModelForm):
+    timezone = forms.ChoiceField(choices=TIMEZONE_CHOICES, label=_("Timezone"))
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "timezone", "distance_unit"]

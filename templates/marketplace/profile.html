@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Profile" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Profile" %}</h1>
+<dl>
+    <dt>{% trans "Email" %}</dt><dd>{{ user.email }}</dd>
+    <dt>{% trans "Role" %}</dt><dd>{{ user.get_role_display }}</dd>
+    <dt>{% trans "First name" %}</dt><dd>{{ user.first_name|default:"-" }}</dd>
+    <dt>{% trans "Last name" %}</dt><dd>{{ user.last_name|default:"-" }}</dd>
+    <dt>{% trans "Country" %}</dt><dd>{{ user.country }}</dd>
+    <dt>{% trans "Timezone" %}</dt><dd>{{ user.timezone }}</dd>
+    <dt>{% trans "Distance unit" %}</dt><dd>{{ user.get_distance_unit_display }}</dd>
+</dl>
+<div class="actions">
+    <a href="{% url 'marketplace:profile_edit' %}" class="btn btn-primary">{% trans "Edit profile" %}</a>
+    <a href="{% url 'marketplace:dashboard' %}" class="btn btn-secondary">{% trans "Back to dashboard" %}</a>
+</div>
+{% endblock %}

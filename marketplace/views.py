@@ -2,15 +2,15 @@ from django.contrib import messages as django_messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
-from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from django_ratelimit.decorators import ratelimit
 
-from .forms import DemandPostForm, MessageForm, SignupForm, SupplyLotForm
+from .forms import DemandPostForm, MessageForm, ProfileForm, SignupForm, SupplyLotForm
 from .matching import evaluate_demand_post, evaluate_supply_lot
 from .models import (
     DemandPost,
@@ -79,6 +79,28 @@ def dashboard_view(request):
 
 
 # ---------------------------------------------------------------------------
+# Profile
+# ---------------------------------------------------------------------------
+
+@login_required
+def profile_view(request):
+    return render(request, "marketplace/profile.html")
+
+
+@login_required
+def profile_edit(request):
+    if request.method == "POST":
+        form = ProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            django_messages.success(request, _("Profile updated."))
+            return redirect("marketplace:profile")
+    else:
+        form = ProfileForm(instance=request.user)
+    return render(request, "marketplace/profile_edit.html", {"form": form})
+
+
+# ---------------------------------------------------------------------------
 # DemandPost (buyer)
 # ---------------------------------------------------------------------------
 
@@ -97,7 +119,7 @@ def demand_post_create(request):
     if request.user.role != Role.BUYER:
         raise PermissionDenied
     if request.method == "POST":
-        form = DemandPostForm(request.POST)
+        form = DemandPostForm(request.POST, user=request.user)
         if form.is_valid():
             post = form.save(commit=False)
             post.created_by = request.user
@@ -107,8 +129,26 @@ def demand_post_create(request):
             django_messages.success(request, _("Demand post created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
-        form = DemandPostForm()
+        form = DemandPostForm(user=request.user)
     return render(request, "marketplace/demand_post_form.html", {"form": form})
+
+
+@login_required
+def demand_post_edit(request, pk):
+    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
+    if request.method == "POST":
+        form = DemandPostForm(request.POST, instance=post, user=request.user)
+        if form.is_valid():
+            form.save()
+            evaluate_demand_post(post)
+            django_messages.success(request, _("Demand post updated."))
+            return redirect("marketplace:demand_post_detail", pk=post.pk)
+    else:
+        form = DemandPostForm(instance=post, user=request.user)
+    return render(request, "marketplace/demand_post_form.html", {
+        "form": form,
+        "editing": True,
+    })
 
 
 @login_required
@@ -123,9 +163,11 @@ def demand_post_toggle(request, pk):
     post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
     if post.status == "active":
         post.status = "paused"
-    elif post.status == "paused":
+    elif post.status in ("paused", "fulfilled"):
         post.status = "active"
     post.save(update_fields=["status"])
+    if post.status == "active":
+        evaluate_demand_post(post)
     return redirect("marketplace:demand_post_detail", pk=post.pk)
 
 
@@ -162,6 +204,24 @@ def supply_lot_create(request):
 
 
 @login_required
+def supply_lot_edit(request, pk):
+    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
+    if request.method == "POST":
+        form = SupplyLotForm(request.POST, instance=lot)
+        if form.is_valid():
+            form.save()
+            evaluate_supply_lot(lot)
+            django_messages.success(request, _("Supply lot updated."))
+            return redirect("marketplace:supply_lot_detail", pk=lot.pk)
+    else:
+        form = SupplyLotForm(instance=lot)
+    return render(request, "marketplace/supply_lot_form.html", {
+        "form": form,
+        "editing": True,
+    })
+
+
+@login_required
 def supply_lot_detail(request, pk):
     lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
     return render(request, "marketplace/supply_lot_detail.html", {"lot": lot})
@@ -169,10 +229,15 @@ def supply_lot_detail(request, pk):
 
 @login_required
 @require_POST
-def supply_lot_withdraw(request, pk):
+def supply_lot_toggle(request, pk):
     lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
-    lot.status = "withdrawn"
+    if lot.status == "active":
+        lot.status = "withdrawn"
+    elif lot.status == "withdrawn":
+        lot.status = "active"
     lot.save(update_fields=["status"])
+    if lot.status == "active":
+        evaluate_supply_lot(lot)
     return redirect("marketplace:supply_lot_detail", pk=lot.pk)
 
 

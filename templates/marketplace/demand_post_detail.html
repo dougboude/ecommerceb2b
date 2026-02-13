@@ -8,23 +8,32 @@
 <dl>
     <dt>{% trans "Status" %}</dt><dd><span class="status status-{{ post.status }}">{{ post.get_status_display }}</span></dd>
     <dt>{% trans "Category" %}</dt><dd>{{ post.get_category_display|default:"-" }}</dd>
-    <dt>{% trans "Quantity" %}</dt><dd>{{ post.quantity_value|default:"-" }} {{ post.quantity_unit }}</dd>
+    <dt>{% trans "Minimum quantity" %}</dt><dd>{{ post.quantity_value|default:"-" }} {{ post.quantity_unit }}</dd>
     <dt>{% trans "Cadence" %}</dt><dd>{{ post.get_cadence_display }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}{% if post.location_region %}, {{ post.location_region }}{% endif %}</dd>
-    <dt>{% trans "Shipping allowed" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
+    <dt>{% trans "Accept shipped items" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
     {% if post.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ post.notes }}</dd>{% endif %}
 </dl>
 
 <div class="actions">
-    {% if post.status == "active" or post.status == "paused" %}
+    {% if post.status == "active" %}
     <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
         {% csrf_token %}
-        {% if post.status == "active" %}
         <button type="submit" class="btn btn-secondary">{% trans "Pause" %}</button>
-        {% else %}
-        <button type="submit" class="btn btn-primary">{% trans "Resume" %}</button>
-        {% endif %}
     </form>
+    {% elif post.status == "paused" %}
+    <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% trans "Resume" %}</button>
+    </form>
+    {% elif post.status == "fulfilled" %}
+    <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% trans "Reactivate" %}</button>
+    </form>
+    {% endif %}
+    {% if post.status != "expired" %}
+    <a href="{% url 'marketplace:demand_post_edit' post.pk %}" class="btn btn-secondary">{% trans "Edit" %}</a>
     {% endif %}
     <a href="{% url 'marketplace:demand_post_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>
 </div>

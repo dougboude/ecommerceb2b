@@ -18,10 +18,18 @@
 
 <div class="actions">
     {% if lot.status == "active" %}
-    <form method="post" action="{% url 'marketplace:supply_lot_withdraw' lot.pk %}">
+    <form method="post" action="{% url 'marketplace:supply_lot_toggle' lot.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-danger">{% trans "Withdraw" %}</button>
     </form>
+    {% elif lot.status == "withdrawn" %}
+    <form method="post" action="{% url 'marketplace:supply_lot_toggle' lot.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% trans "Reactivate" %}</button>
+    </form>
+    {% endif %}
+    {% if lot.status != "expired" %}
+    <a href="{% url 'marketplace:supply_lot_edit' lot.pk %}" class="btn btn-secondary">{% trans "Edit" %}</a>
     {% endif %}
     <a href="{% url 'marketplace:supply_lot_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>
 </div>

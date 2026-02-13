@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Create Demand Post" %}{% endblock %}
+{% block title %}{% if editing %}{% trans "Edit Demand Post" %}{% else %}{% trans "Create Demand Post" %}{% endif %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Create Demand Post" %}</h1>
+<h1>{% if editing %}{% trans "Edit Demand Post" %}{% else %}{% trans "Create Demand Post" %}{% endif %}</h1>
 <div class="card">
     <form method="post">
         {% csrf_token %}

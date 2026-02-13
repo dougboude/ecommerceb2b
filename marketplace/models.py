@@ -44,6 +44,11 @@ class SupplyStatus(models.TextChoices):
     WITHDRAWN = "withdrawn", _("Withdrawn")
 
 
+class DistanceUnit(models.TextChoices):
+    MI = "mi", _("Miles")
+    KM = "km", _("Kilometers")
+
+
 # ---------------------------------------------------------------------------
 # User
 # ---------------------------------------------------------------------------
@@ -54,6 +59,15 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role.choices)
     country = models.CharField(_("country"), max_length=2)
     email_verified = models.BooleanField(default=False)
+    timezone = models.CharField(
+        _("timezone"), max_length=63, default="UTC",
+    )
+    distance_unit = models.CharField(
+        _("distance unit"),
+        max_length=2,
+        choices=DistanceUnit.choices,
+        default=DistanceUnit.MI,
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
