@@ -1,9 +1,9 @@
-import uuid
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+
+from .constants import UNIT_CHOICES
 
 
 # ---------------------------------------------------------------------------
@@ -25,10 +25,17 @@ class Category(models.TextChoices):
     OTHER = "other", _("Other")
 
 
-class Cadence(models.TextChoices):
+class Frequency(models.TextChoices):
     ONE_TIME = "one_time", _("One-time")
     RECURRING = "recurring", _("Recurring")
     SEASONAL = "seasonal", _("Seasonal")
+
+
+class ShippingScope(models.TextChoices):
+    LOCAL_ONLY = "local_only", _("Local only")
+    DOMESTIC = "domestic", _("Domestic")
+    NORTH_AMERICA = "north_america", _("North America")
+    INTERNATIONAL = "international", _("International")
 
 
 class DemandStatus(models.TextChoices):
@@ -135,11 +142,13 @@ class DemandPost(LocationMixin):
         choices=Category.choices,
         blank=True,
     )
-    quantity_value = models.DecimalField(
-        _("quantity"), max_digits=12, decimal_places=2, null=True, blank=True,
+    quantity_value = models.PositiveIntegerField(
+        _("quantity"), null=True, blank=True,
     )
-    quantity_unit = models.CharField(_("unit"), max_length=50, blank=True)
-    cadence = models.CharField(max_length=10, choices=Cadence.choices)
+    quantity_unit = models.CharField(
+        _("unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
+    )
+    frequency = models.CharField(max_length=10, choices=Frequency.choices)
     radius_km = models.PositiveIntegerField(null=True, blank=True)
     shipping_allowed = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
@@ -175,16 +184,25 @@ class SupplyLot(LocationMixin):
         choices=Category.choices,
         blank=True,
     )
-    quantity_value = models.DecimalField(
-        _("quantity"), max_digits=12, decimal_places=2, null=True, blank=True,
+    quantity_value = models.PositiveIntegerField(
+        _("quantity"), null=True, blank=True,
     )
-    quantity_unit = models.CharField(_("unit"), max_length=50, blank=True)
+    quantity_unit = models.CharField(
+        _("unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
+    )
     available_until = models.DateTimeField(_("available until"))
-    shipping_options = models.TextField(_("shipping options"), blank=True)
+    shipping_scope = models.CharField(
+        _("shipping scope"),
+        max_length=20,
+        choices=ShippingScope.choices,
+        default=ShippingScope.LOCAL_ONLY,
+    )
     asking_price = models.DecimalField(
         _("asking price"), max_digits=12, decimal_places=2, null=True, blank=True,
     )
-    price_unit = models.CharField(_("price unit"), max_length=50, blank=True)
+    price_unit = models.CharField(
+        _("price unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
+    )
     notes = models.TextField(blank=True)
     status = models.CharField(
         max_length=10,

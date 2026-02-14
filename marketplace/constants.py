@@ -245,6 +245,70 @@ COUNTRY_CHOICES = [
     ("ZW", _("Zimbabwe")),
 ]
 
+UNIT_CHOICES = [
+    ("Weight", (
+        ("lb", _("Pounds (lb)")),
+        ("oz", _("Ounces (oz)")),
+        ("kg", _("Kilograms (kg)")),
+        ("g", _("Grams (g)")),
+        ("ton_short", _("Short tons")),
+        ("ton_metric", _("Metric tons")),
+    )),
+    ("Volume", (
+        ("gal", _("Gallons (gal)")),
+        ("qt", _("Quarts (qt)")),
+        ("l", _("Liters (L)")),
+        ("ml", _("Milliliters (mL)")),
+        ("fl_oz", _("Fluid ounces (fl oz)")),
+        ("bbl", _("Barrels (bbl)")),
+    )),
+    ("Length", (
+        ("ft", _("Feet (ft)")),
+        ("yd", _("Yards (yd)")),
+        ("m", _("Meters (m)")),
+        ("in", _("Inches (in)")),
+        ("cm", _("Centimeters (cm)")),
+    )),
+    ("Agriculture", (
+        ("bu", _("Bushels (bu)")),
+        ("bale", _("Bales")),
+        ("cord", _("Cords")),
+    )),
+    ("Count", (
+        ("each", _("Each")),
+        ("dz", _("Dozen (dz)")),
+        ("gross", _("Gross")),
+        ("pk", _("Pack")),
+        ("pair", _("Pair")),
+    )),
+    ("Container", (
+        ("case", _("Case")),
+        ("crate", _("Crate")),
+        ("box", _("Box")),
+        ("carton", _("Carton")),
+        ("bag", _("Bag")),
+        ("sack", _("Sack")),
+        ("pallet", _("Pallet")),
+        ("bundle", _("Bundle")),
+    )),
+    ("Textile", (
+        ("bolt", _("Bolt")),
+        ("roll", _("Roll")),
+    )),
+    ("Lumber", (
+        ("bd_ft", _("Board feet (bd ft)")),
+        ("sheet", _("Sheet")),
+        ("cu_yd", _("Cubic yards")),
+        ("cu_m", _("Cubic meters")),
+    )),
+    ("General", (
+        ("unit", _("Unit")),
+        ("load", _("Load")),
+        ("lot", _("Lot")),
+        ("other", _("Other")),
+    )),
+]
+
 TIMEZONE_CHOICES = sorted(
     [(tz, tz) for tz in sorted(zoneinfo.available_timezones())],
     key=lambda x: x[0],

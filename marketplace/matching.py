@@ -41,31 +41,59 @@ def _haversine_km(lat1, lng1, lat2, lng2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def location_compatible(supply_lot, demand_post):
-    if demand_post.shipping_allowed:
+NORTH_AMERICA_COUNTRIES = {"US", "CA", "MX"}
+
+
+def _within_radius(supply_lot, demand_post):
+    """Check proximity using coords, postal code, or locality fallback."""
+    if not demand_post.radius_km:
         return True
-    if supply_lot.location_country != demand_post.location_country:
-        return False
-    if demand_post.radius_km:
-        if (
-            supply_lot.location_lat is not None
-            and supply_lot.location_lng is not None
-            and demand_post.location_lat is not None
-            and demand_post.location_lng is not None
-        ):
-            dist = _haversine_km(
-                supply_lot.location_lat, supply_lot.location_lng,
-                demand_post.location_lat, demand_post.location_lng,
-            )
-            return dist <= demand_post.radius_km
-        if supply_lot.location_postal_code and demand_post.location_postal_code:
-            return supply_lot.location_postal_code == demand_post.location_postal_code
-        if supply_lot.location_locality and demand_post.location_locality:
-            return (
-                supply_lot.location_locality == demand_post.location_locality
-                and supply_lot.location_region == demand_post.location_region
-            )
+    if (
+        supply_lot.location_lat is not None
+        and supply_lot.location_lng is not None
+        and demand_post.location_lat is not None
+        and demand_post.location_lng is not None
+    ):
+        dist = _haversine_km(
+            supply_lot.location_lat, supply_lot.location_lng,
+            demand_post.location_lat, demand_post.location_lng,
+        )
+        return dist <= demand_post.radius_km
+    if supply_lot.location_postal_code and demand_post.location_postal_code:
+        return supply_lot.location_postal_code == demand_post.location_postal_code
+    if supply_lot.location_locality and demand_post.location_locality:
+        return (
+            supply_lot.location_locality == demand_post.location_locality
+            and supply_lot.location_region == demand_post.location_region
+        )
     return True
+
+
+def location_compatible(supply_lot, demand_post):
+    same_country = supply_lot.location_country == demand_post.location_country
+
+    if not demand_post.shipping_allowed:
+        if not same_country:
+            return False
+        return _within_radius(supply_lot, demand_post)
+
+    # Shipping allowed — check supplier's shipping scope
+    scope = getattr(supply_lot, "shipping_scope", "local_only")
+    if scope == "international":
+        return True
+    if scope == "north_america":
+        if (
+            supply_lot.location_country in NORTH_AMERICA_COUNTRIES
+            and demand_post.location_country in NORTH_AMERICA_COUNTRIES
+        ):
+            return True
+    if scope == "domestic":
+        if same_country:
+            return True
+    # local_only or scope didn't cover it — fall through to radius check
+    if not same_country:
+        return False
+    return _within_radius(supply_lot, demand_post)
 
 
 def _create_match(demand_post, supply_lot):

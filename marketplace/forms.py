@@ -4,9 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 from .constants import COUNTRY_CHOICES, KM_PER_MILE, TIMEZONE_CHOICES
 from .models import (
-    Cadence,
     Category,
     DemandPost,
+    Frequency,
     Organization,
     Role,
     SupplyLot,
@@ -64,7 +64,7 @@ class DemandPostForm(forms.ModelForm):
             "category",
             "quantity_value",
             "quantity_unit",
-            "cadence",
+            "frequency",
             "location_country",
             "location_locality",
             "location_region",
@@ -94,12 +94,13 @@ class DemandPostForm(forms.ModelForm):
                 )
         else:
             self.fields["radius_km"].label = _("Search radius (km)")
+        self.fields["radius_km"].help_text = _("Leave blank for worldwide")
 
         # Shipping allowed clarity
-        self.fields["shipping_allowed"].label = _("Accept shipped items")
+        self.fields["shipping_allowed"].label = _("Include shipped items")
         self.fields["shipping_allowed"].help_text = _(
-            "If checked, suppliers outside your local area can match "
-            "if they offer shipping."
+            "Allow matches from suppliers who can ship to your area, "
+            "even if they're outside your search radius."
         )
 
     def clean_radius_km(self):
@@ -126,7 +127,7 @@ class SupplyLotForm(forms.ModelForm):
             "location_locality",
             "location_region",
             "location_postal_code",
-            "shipping_options",
+            "shipping_scope",
             "asking_price",
             "price_unit",
             "notes",

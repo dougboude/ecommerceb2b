@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.contrib import messages as django_messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -65,16 +67,28 @@ def dashboard_view(request):
         context["demand_posts"] = DemandPost.objects.filter(
             created_by=user,
         ).order_by("-created_at")[:5]
-        context["matches"] = Match.objects.filter(
+        matches = Match.objects.filter(
             demand_post__created_by=user,
-        ).order_by("-created_at")[:5]
+        ).select_related(
+            "demand_post", "supply_lot", "thread",
+        ).order_by("-created_at")[:10]
+        grouped = defaultdict(list)
+        for m in matches:
+            grouped[m.demand_post].append(m)
+        context["grouped_matches"] = dict(grouped)
     else:
         context["supply_lots"] = SupplyLot.objects.filter(
             created_by=user,
         ).order_by("-created_at")[:5]
-        context["matches"] = Match.objects.filter(
+        matches = Match.objects.filter(
             supply_lot__created_by=user,
-        ).order_by("-created_at")[:5]
+        ).select_related(
+            "demand_post", "supply_lot", "thread",
+        ).order_by("-created_at")[:10]
+        grouped = defaultdict(list)
+        for m in matches:
+            grouped[m.supply_lot].append(m)
+        context["grouped_matches"] = dict(grouped)
     return render(request, "marketplace/dashboard.html", context)
 
 
@@ -249,12 +263,24 @@ def supply_lot_toggle(request, pk):
 def match_list(request):
     user = request.user
     if user.role == Role.BUYER:
-        qs = Match.objects.filter(demand_post__created_by=user)
+        qs = Match.objects.filter(
+            demand_post__created_by=user,
+        ).select_related("demand_post", "supply_lot", "thread")
     else:
-        qs = Match.objects.filter(supply_lot__created_by=user)
-    paginator = Paginator(qs, PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    return render(request, "marketplace/match_list.html", {"page_obj": page_obj})
+        qs = Match.objects.filter(
+            supply_lot__created_by=user,
+        ).select_related("demand_post", "supply_lot", "thread")
+    matches = qs.order_by("-created_at")
+    grouped = defaultdict(list)
+    if user.role == Role.BUYER:
+        for m in matches:
+            grouped[m.demand_post].append(m)
+    else:
+        for m in matches:
+            grouped[m.supply_lot].append(m)
+    return render(request, "marketplace/match_list.html", {
+        "grouped_matches": dict(grouped),
+    })
 
 
 # ---------------------------------------------------------------------------

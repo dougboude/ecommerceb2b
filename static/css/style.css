@@ -332,9 +332,11 @@ dd { font-size: 0.9rem; }
     letter-spacing: 0.025em;
 }
 
-.status-active  { background: #ecfdf5; color: #065f46; }
-.status-paused  { background: #fffbeb; color: #92400e; }
-.status-expired { background: #f3f4f6; color: #6b7280; }
+.status-active    { background: #ecfdf5; color: #065f46; }
+.status-paused    { background: #fffbeb; color: #92400e; }
+.status-expired   { background: #f3f4f6; color: #6b7280; }
+.status-fulfilled { background: #eff6ff; color: #1e40af; }
+.status-withdrawn { background: #fef2f2; color: #991b1b; }
 
 /* --- Empty state --- */
 .empty-state {
@@ -353,6 +355,95 @@ dd { font-size: 0.9rem; }
 
 /* --- Org fields toggle (signup) --- */
 .org-fields[hidden] { display: none; }
+
+/* --- Card Grid / Tiles --- */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.tile {
+    display: block;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-sm);
+}
+
+.tile:nth-child(even) {
+    background: #fafbfc;
+}
+
+.tile:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+}
+
+.tile-title {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    font-size: 0.95rem;
+}
+
+.tile-meta {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-top: 0.15rem;
+}
+
+.tile .status {
+    margin-bottom: 0.35rem;
+}
+
+/* --- Match Groups --- */
+.match-group {
+    margin-bottom: 1rem;
+}
+
+.match-group-header {
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.match-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border-light);
+    border-top: none;
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-surface);
+}
+
+.match-card:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.match-card:nth-child(odd) {
+    background: #fafbfc;
+}
+
+.match-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.match-card-details strong {
+    font-size: 0.9rem;
+}
 
 /* --- Responsive --- */
 @media (max-width: 600px) {

@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{{ post.item_text }}{% endblock %}
+{% block title %}{% trans "Looking for:" %} {{ post.item_text }}{% endblock %}
 
 {% block content %}
-<h1>{{ post.item_text }}</h1>
+<h1>{% trans "Looking for:" %} {{ post.item_text }}</h1>
 <dl>
     <dt>{% trans "Status" %}</dt><dd><span class="status status-{{ post.status }}">{{ post.get_status_display }}</span></dd>
     <dt>{% trans "Category" %}</dt><dd>{{ post.get_category_display|default:"-" }}</dd>
-    <dt>{% trans "Minimum quantity" %}</dt><dd>{{ post.quantity_value|default:"-" }} {{ post.quantity_unit }}</dd>
-    <dt>{% trans "Cadence" %}</dt><dd>{{ post.get_cadence_display }}</dd>
+    <dt>{% trans "Minimum quantity" %}</dt><dd>{{ post.quantity_value|default:"-" }} {{ post.get_quantity_unit_display }}</dd>
+    <dt>{% trans "Frequency" %}</dt><dd>{{ post.get_frequency_display }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}{% if post.location_region %}, {{ post.location_region }}{% endif %}</dd>
-    <dt>{% trans "Accept shipped items" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
+    <dt>{% trans "Include shipped items" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
     {% if post.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ post.notes }}</dd>{% endif %}
 </dl>
 
