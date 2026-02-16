@@ -92,9 +92,9 @@ Violation of these rules is a **critical bug**.
 - item_text (string, required)
 - category (enum, optional):  
   `food_fresh | food_shelf | botanical | animal_product | material | equipment | other`
-- quantity_value (number)
-- quantity_unit (string, free text)
-- cadence (`one_time | recurring | seasonal`)
+- quantity_value (positive integer)
+- quantity_unit (predefined choices — see `UNIT_CHOICES` in `constants.py`)
+- frequency (`one_time | recurring | seasonal`)
 - location:
   - country (required)
   - locality (city/town)
@@ -112,13 +112,13 @@ Violation of these rules is a **critical bug**.
 - created_by_user_id
 - item_text (string, required)
 - category (same enum as DemandPost)
-- quantity_value
-- quantity_unit
+- quantity_value (positive integer)
+- quantity_unit (predefined choices — see `UNIT_CHOICES` in `constants.py`)
 - available_until (datetime, required)
 - location (same structure as DemandPost)
-- shipping_options (free text)
+- shipping_scope (enum: `local_only | domestic | north_america | international`, default `local_only`)
 - asking_price (number | null)
-- price_unit (string | null)
+- price_unit (predefined choices — see `UNIT_CHOICES` in `constants.py`)
 - notes (text)
 - status (`active | expired | withdrawn`)
 - created_at
@@ -162,10 +162,15 @@ for each new SupplyLot S:
 ```
 
 ### Location Compatibility
-- If `D.shipping_allowed == true` → location always compatible  
-- Else:
+- If `D.shipping_allowed == false`:
   - Country must match
   - If `radius_km` is set → distance ≤ radius_km
+- If `D.shipping_allowed == true` → check supplier's `shipping_scope`:
+  - `international` → always compatible
+  - `north_america` → both in {US, CA, MX}
+  - `domestic` → same country
+  - `local_only` → fall through to radius/country check
+- If `radius_km` is null → no distance constraint (worldwide)
 
 ### Quantity Rules
 - Quantity mismatch must NOT block a match  
@@ -218,7 +223,7 @@ for each new SupplyLot S:
 - All user-facing text uses translation keys
 - Country is required everywhere
 - Postal codes are strings
-- No hardcoded unit lists
+- Unit fields use a predefined choice list (`UNIT_CHOICES` in `constants.py`) organized by category
 - All timestamps stored in UTC
 
 ---

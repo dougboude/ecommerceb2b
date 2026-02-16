@@ -86,9 +86,9 @@ Store as structured fields (not a single text blob):
 Fields (minimum):
 - `item_text` (required)
 - `category` (optional enum): `food_fresh | food_shelf | botanical | animal_product | material | equipment | other`
-- `quantity_value` (optional number)
-- `quantity_unit` (optional string)
-- `cadence` (required enum): `one_time | recurring | seasonal`
+- `quantity_value` (optional positive integer)
+- `quantity_unit` (optional, predefined choices from `UNIT_CHOICES`)
+- `frequency` (required enum): `one_time | recurring | seasonal`
 - `location_country` (required) + other location subfields
 - `radius_km` (optional number)
 - `shipping_allowed` (required boolean)
@@ -104,13 +104,13 @@ Expiration:
 Fields (minimum):
 - `item_text` (required)
 - `category` (optional enum as above)
-- `quantity_value` (optional number)
-- `quantity_unit` (optional string)
+- `quantity_value` (optional positive integer)
+- `quantity_unit` (optional, predefined choices from `UNIT_CHOICES`)
 - `available_until` (required datetime)
 - location subfields (country required)
-- `shipping_options` (optional free text)
+- `shipping_scope` (required enum: `local_only | domestic | north_america | international`, default `local_only`)
 - `asking_price` (optional number)
-- `price_unit` (optional string)
+- `price_unit` (optional, predefined choices from `UNIT_CHOICES`)
 - `notes` (optional text)
 - `status` enum: `active | expired | withdrawn`
 - timestamps: `created_at`
@@ -171,13 +171,18 @@ Matching is deterministic and simple (no ML).
 - OR substring match (either direction)
 
 ### Location compatibility (must match build spec intent)
-- If `DemandPost.shipping_allowed == true` → compatible (skip location filtering)
-- Else:
+- If `DemandPost.shipping_allowed == false`:
   - `country` must match
   - If `radius_km` is set AND both sides have `lat/lng` → compute distance (Haversine) and enforce `<= radius_km`
   - If `radius_km` is set but coordinates missing → fall back to:
     - `postal_code` equality if both present, else
     - (`locality` + `region`) equality if both present
+- If `DemandPost.shipping_allowed == true` → check supplier's `shipping_scope`:
+  - `international` → always compatible
+  - `north_america` → both in {US, CA, MX}
+  - `domestic` → same country
+  - `local_only` → fall through to same-country + radius check
+- If `radius_km` is null → no distance constraint (worldwide)
 
 Quantity mismatch must not block matches.
 
