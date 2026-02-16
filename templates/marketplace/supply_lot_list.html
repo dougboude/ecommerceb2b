@@ -9,8 +9,9 @@
 <div class="card-grid">
     {% for lot in page_obj %}
     <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}" class="tile">
-        <div class="tile-title">{{ lot.item_text }}</div>
+        <div class="tile-title">{{ lot.item_text }} #{{ lot.lot_number }}</div>
         <span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>
+        {% if lot.match_count %}<span class="match-badge">{{ lot.match_count }} {% trans "match" %}{{ lot.match_count|pluralize:"es" }}</span>{% endif %}
         {% if lot.quantity_value %}<div class="tile-meta">{{ lot.quantity_value }} {{ lot.get_quantity_unit_display }}</div>{% endif %}
         {% if lot.category %}<div class="tile-meta">{{ lot.get_category_display }}</div>{% endif %}
         <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>

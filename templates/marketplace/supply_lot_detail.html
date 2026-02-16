@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{{ lot.item_text }}{% endblock %}
+{% block title %}{{ lot.item_text }} #{{ lot.lot_number }}{% endblock %}
 
 {% block content %}
-<h1>{{ lot.item_text }}</h1>
+<h1>{{ lot.item_text }} #{{ lot.lot_number }}</h1>
 <dl>
     <dt>{% trans "Status" %}</dt><dd><span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span></dd>
     <dt>{% trans "Category" %}</dt><dd>{{ lot.get_category_display|default:"-" }}</dd>
     <dt>{% trans "Quantity" %}</dt><dd>{{ lot.quantity_value|default:"-" }} {{ lot.get_quantity_unit_display }}</dd>
-    <dt>{% trans "Available until" %}</dt><dd>{{ lot.available_until }}</dd>
+    <dt>{% trans "Available until" %}</dt><dd>{{ lot.available_until|date:"N j, Y" }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}{% if lot.location_region %}, {{ lot.location_region }}{% endif %}</dd>
     {% if lot.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>{{ lot.asking_price }} / {{ lot.get_price_unit_display }}</dd>{% endif %}
     <dt>{% trans "Shipping scope" %}</dt><dd>{{ lot.get_shipping_scope_display }}</dd>
+    <dt>{% trans "Matches" %}</dt><dd>{{ lot.match_count }}</dd>
     {% if lot.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ lot.notes }}</dd>{% endif %}
 </dl>
 

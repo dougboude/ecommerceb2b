@@ -75,6 +75,7 @@ Violation of these rules is a **critical bug**.
 - email (verified)
 - password_hash
 - role (`buyer` | `supplier`)
+- display_name (string, max 100 chars, default derived from email)
 - country (ISO string)
 - created_at
 
@@ -117,7 +118,7 @@ Violation of these rules is a **critical bug**.
 - available_until (datetime, required)
 - location (same structure as DemandPost)
 - shipping_scope (enum: `local_only | domestic | north_america | international`, default `local_only`)
-- asking_price (number | null)
+- asking_price (positive integer | null)
 - price_unit (predefined choices — see `UNIT_CHOICES` in `constants.py`)
 - notes (text)
 - status (`active | expired | withdrawn`)

@@ -6,6 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Count, F, Window
+from django.db.models.functions import RowNumber
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -24,6 +26,62 @@ from .models import (
 )
 
 PAGE_SIZE = 25
+
+
+# ---------------------------------------------------------------------------
+# Lot / post numbering helpers
+# ---------------------------------------------------------------------------
+
+def _build_lot_number_map(user):
+    """Return {lot_pk: sequential_number} partitioned by item_text."""
+    lots = (
+        SupplyLot.objects.filter(created_by=user)
+        .annotate(
+            row_num=Window(
+                expression=RowNumber(),
+                partition_by=[F("item_text")],
+                order_by=F("created_at").asc(),
+            )
+        )
+        .values_list("pk", "row_num")
+    )
+    return dict(lots)
+
+
+def _build_post_number_map(user):
+    """Return {post_pk: sequential_number} partitioned by item_text."""
+    posts = (
+        DemandPost.objects.filter(created_by=user)
+        .annotate(
+            row_num=Window(
+                expression=RowNumber(),
+                partition_by=[F("item_text")],
+                order_by=F("created_at").asc(),
+            )
+        )
+        .values_list("pk", "row_num")
+    )
+    return dict(posts)
+
+
+def _get_lot_number(lot):
+    """Get the sequential number for a single supply lot."""
+    earlier = SupplyLot.objects.filter(
+        created_by=lot.created_by,
+        item_text=lot.item_text,
+        created_at__lte=lot.created_at,
+    ).count()
+    return earlier
+
+
+def _get_post_number(post):
+    """Get the sequential number for a single demand post."""
+    earlier = DemandPost.objects.filter(
+        created_by=post.created_by,
+        item_text=post.item_text,
+        created_at__lte=post.created_at,
+    ).count()
+    return earlier
 
 
 # ---------------------------------------------------------------------------
@@ -64,31 +122,41 @@ def dashboard_view(request):
     user = request.user
     context = {}
     if user.role == Role.BUYER:
-        context["demand_posts"] = DemandPost.objects.filter(
+        posts = DemandPost.objects.filter(
             created_by=user,
-        ).order_by("-created_at")[:5]
+        ).annotate(match_count=Count("matches")).order_by("-created_at")[:5]
+        post_numbers = _build_post_number_map(user)
+        for p in posts:
+            p.post_number = post_numbers.get(p.pk, 1)
+        context["demand_posts"] = posts
         matches = Match.objects.filter(
             demand_post__created_by=user,
         ).select_related(
-            "demand_post", "supply_lot", "thread",
-        ).order_by("-created_at")[:10]
+            "demand_post", "supply_lot", "supply_lot__created_by", "thread",
+        ).order_by("-created_at")
         grouped = defaultdict(list)
         for m in matches:
             grouped[m.demand_post].append(m)
         context["grouped_matches"] = dict(grouped)
+        context["match_count"] = matches.count()
     else:
-        context["supply_lots"] = SupplyLot.objects.filter(
+        lots = SupplyLot.objects.filter(
             created_by=user,
-        ).order_by("-created_at")[:5]
+        ).annotate(match_count=Count("matches")).order_by("-created_at")[:5]
+        lot_numbers = _build_lot_number_map(user)
+        for lot in lots:
+            lot.lot_number = lot_numbers.get(lot.pk, 1)
+        context["supply_lots"] = lots
         matches = Match.objects.filter(
             supply_lot__created_by=user,
         ).select_related(
-            "demand_post", "supply_lot", "thread",
-        ).order_by("-created_at")[:10]
+            "demand_post", "demand_post__created_by", "supply_lot", "thread",
+        ).order_by("-created_at")
         grouped = defaultdict(list)
         for m in matches:
             grouped[m.supply_lot].append(m)
         context["grouped_matches"] = dict(grouped)
+        context["match_count"] = matches.count()
     return render(request, "marketplace/dashboard.html", context)
 
 
@@ -122,9 +190,14 @@ def profile_edit(request):
 def demand_post_list(request):
     if request.user.role != Role.BUYER:
         raise PermissionDenied
-    qs = DemandPost.objects.filter(created_by=request.user)
+    qs = DemandPost.objects.filter(created_by=request.user).annotate(
+        match_count=Count("matches"),
+    ).order_by("-created_at")
+    post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    for post in page_obj:
+        post.post_number = post_numbers.get(post.pk, 1)
     return render(request, "marketplace/demand_post_list.html", {"page_obj": page_obj})
 
 
@@ -167,7 +240,11 @@ def demand_post_edit(request, pk):
 
 @login_required
 def demand_post_detail(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
+    post = get_object_or_404(
+        DemandPost.objects.annotate(match_count=Count("matches")),
+        pk=pk, created_by=request.user,
+    )
+    post.post_number = _get_post_number(post)
     return render(request, "marketplace/demand_post_detail.html", {"post": post})
 
 
@@ -193,9 +270,14 @@ def demand_post_toggle(request, pk):
 def supply_lot_list(request):
     if request.user.role != Role.SUPPLIER:
         raise PermissionDenied
-    qs = SupplyLot.objects.filter(created_by=request.user)
+    qs = SupplyLot.objects.filter(created_by=request.user).annotate(
+        match_count=Count("matches"),
+    ).order_by("-created_at")
+    lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    for lot in page_obj:
+        lot.lot_number = lot_numbers.get(lot.pk, 1)
     return render(request, "marketplace/supply_lot_list.html", {"page_obj": page_obj})
 
 
@@ -237,7 +319,11 @@ def supply_lot_edit(request, pk):
 
 @login_required
 def supply_lot_detail(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
+    lot = get_object_or_404(
+        SupplyLot.objects.annotate(match_count=Count("matches")),
+        pk=pk, created_by=request.user,
+    )
+    lot.lot_number = _get_lot_number(lot)
     return render(request, "marketplace/supply_lot_detail.html", {"lot": lot})
 
 
@@ -265,11 +351,15 @@ def match_list(request):
     if user.role == Role.BUYER:
         qs = Match.objects.filter(
             demand_post__created_by=user,
-        ).select_related("demand_post", "supply_lot", "thread")
+        ).select_related(
+            "demand_post", "supply_lot", "supply_lot__created_by", "thread",
+        )
     else:
         qs = Match.objects.filter(
             supply_lot__created_by=user,
-        ).select_related("demand_post", "supply_lot", "thread")
+        ).select_related(
+            "demand_post", "demand_post__created_by", "supply_lot", "thread",
+        )
     matches = qs.order_by("-created_at")
     grouped = defaultdict(list)
     if user.role == Role.BUYER:
@@ -290,7 +380,18 @@ def match_list(request):
 @login_required
 @ratelimit(key="user", rate="30/10m", method="POST", block=True)
 def thread_detail(request, pk):
-    thread = get_object_or_404(MessageThread, pk=pk)
+    thread = get_object_or_404(
+        MessageThread.objects.select_related(
+            "match",
+            "match__supply_lot",
+            "match__supply_lot__created_by",
+            "match__demand_post",
+            "match__demand_post__created_by",
+            "buyer",
+            "supplier",
+        ),
+        pk=pk,
+    )
     if request.user not in (thread.buyer, thread.supplier):
         raise PermissionDenied
     if request.method == "POST":
@@ -304,9 +405,11 @@ def thread_detail(request, pk):
             return redirect("marketplace:thread_detail", pk=thread.pk)
     else:
         form = MessageForm()
-    msgs = thread.messages.all()
+    msgs = thread.messages.select_related("sender").all()
+    counterparty = thread.supplier if request.user == thread.buyer else thread.buyer
     return render(request, "marketplace/thread_detail.html", {
         "thread": thread,
         "messages_list": msgs,
         "form": form,
+        "counterparty": counterparty,
     })

@@ -13,8 +13,9 @@
         <div class="card-grid">
             {% for post in demand_posts %}
             <a href="{% url 'marketplace:demand_post_detail' post.pk %}" class="tile">
-                <div class="tile-title">{% trans "Looking for:" %} {{ post.item_text }}</div>
+                <div class="tile-title">{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</div>
                 <span class="status status-{{ post.status }}">{{ post.get_status_display }}</span>
+                {% if post.match_count %}<span class="match-badge">{{ post.match_count }} {% trans "match" %}{{ post.match_count|pluralize:"es" }}</span>{% endif %}
                 {% if post.quantity_value %}<div class="tile-meta">{{ post.quantity_value }} {{ post.get_quantity_unit_display }}</div>{% endif %}
                 {% if post.category %}<div class="tile-meta">{{ post.get_category_display }}</div>{% endif %}
                 <div class="tile-meta">{{ post.get_location_country_display|default:post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}</div>
@@ -28,25 +29,28 @@
     </section>
 
     <section>
-        <h2>{% trans "Matches" %}</h2>
+        <h2>{% trans "Matches" %} ({{ match_count }})</h2>
         {% if grouped_matches %}
-        {% for parent, matches in grouped_matches.items %}
-        <div class="match-group">
-            <div class="match-group-header">{% trans "Looking for:" %} {{ parent.item_text }}</div>
-            {% for match in matches %}
-            <div class="match-card">
-                <div class="match-card-details">
-                    <strong>{{ match.supply_lot.item_text }}</strong>
-                    {% if match.supply_lot.quantity_value %}<span class="tile-meta">{{ match.supply_lot.quantity_value }} {{ match.supply_lot.get_quantity_unit_display }}</span>{% endif %}
-                    <span class="tile-meta">{{ match.supply_lot.location_country }}{% if match.supply_lot.location_locality %}, {{ match.supply_lot.location_locality }}{% endif %}</span>
-                    {% if match.supply_lot.asking_price %}<span class="tile-meta">${{ match.supply_lot.asking_price }}/{{ match.supply_lot.get_price_unit_display }}</span>{% endif %}
-                    <span class="tile-meta">{{ match.supply_lot.get_shipping_scope_display }}</span>
+        <div class="matches-scroll">
+            {% for parent, matches in grouped_matches.items %}
+            <details class="match-group" open>
+                <summary class="match-group-header">{% trans "Looking for:" %} {{ parent.item_text }}</summary>
+                {% for match in matches %}
+                <div class="match-card">
+                    <div class="match-card-details">
+                        <strong>{{ match.supply_lot.item_text }}</strong>
+                        <span class="tile-meta">{% trans "From:" %} {{ match.supply_lot.created_by.display_name }}</span>
+                        {% if match.supply_lot.quantity_value %}<span class="tile-meta">{{ match.supply_lot.quantity_value }} {{ match.supply_lot.get_quantity_unit_display }}</span>{% endif %}
+                        <span class="tile-meta">{{ match.supply_lot.location_country }}{% if match.supply_lot.location_locality %}, {{ match.supply_lot.location_locality }}{% endif %}</span>
+                        {% if match.supply_lot.asking_price %}<span class="tile-meta">${{ match.supply_lot.asking_price }}/{{ match.supply_lot.get_price_unit_display }}</span>{% endif %}
+                        <span class="tile-meta">{{ match.supply_lot.get_shipping_scope_display }}</span>
+                    </div>
+                    <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
                 </div>
-                <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
-            </div>
+                {% endfor %}
+            </details>
             {% endfor %}
         </div>
-        {% endfor %}
         <a href="{% url 'marketplace:match_list' %}">{% trans "View all matches" %}</a>
         {% else %}
         <p class="empty-state">{% trans "No matches yet." %}</p>
@@ -60,8 +64,9 @@
         <div class="card-grid">
             {% for lot in supply_lots %}
             <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}" class="tile">
-                <div class="tile-title">{{ lot.item_text }}</div>
+                <div class="tile-title">{{ lot.item_text }} #{{ lot.lot_number }}</div>
                 <span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>
+                {% if lot.match_count %}<span class="match-badge">{{ lot.match_count }} {% trans "match" %}{{ lot.match_count|pluralize:"es" }}</span>{% endif %}
                 {% if lot.quantity_value %}<div class="tile-meta">{{ lot.quantity_value }} {{ lot.get_quantity_unit_display }}</div>{% endif %}
                 {% if lot.category %}<div class="tile-meta">{{ lot.get_category_display }}</div>{% endif %}
                 <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>
@@ -75,23 +80,26 @@
     </section>
 
     <section>
-        <h2>{% trans "Matches" %}</h2>
+        <h2>{% trans "Matches" %} ({{ match_count }})</h2>
         {% if grouped_matches %}
-        {% for parent, matches in grouped_matches.items %}
-        <div class="match-group">
-            <div class="match-group-header">{{ parent.item_text }}</div>
-            {% for match in matches %}
-            <div class="match-card">
-                <div class="match-card-details">
-                    <strong>{% trans "Looking for:" %} {{ match.demand_post.item_text }}</strong>
-                    {% if match.demand_post.quantity_value %}<span class="tile-meta">{{ match.demand_post.quantity_value }} {{ match.demand_post.get_quantity_unit_display }}</span>{% endif %}
-                    <span class="tile-meta">{{ match.demand_post.location_country }}{% if match.demand_post.location_locality %}, {{ match.demand_post.location_locality }}{% endif %}</span>
+        <div class="matches-scroll">
+            {% for parent, matches in grouped_matches.items %}
+            <details class="match-group" open>
+                <summary class="match-group-header">{{ parent.item_text }}</summary>
+                {% for match in matches %}
+                <div class="match-card">
+                    <div class="match-card-details">
+                        <strong>{% trans "Looking for:" %} {{ match.demand_post.item_text }}</strong>
+                        <span class="tile-meta">{% trans "From:" %} {{ match.demand_post.created_by.display_name }}</span>
+                        {% if match.demand_post.quantity_value %}<span class="tile-meta">{{ match.demand_post.quantity_value }} {{ match.demand_post.get_quantity_unit_display }}</span>{% endif %}
+                        <span class="tile-meta">{{ match.demand_post.location_country }}{% if match.demand_post.location_locality %}, {{ match.demand_post.location_locality }}{% endif %}</span>
+                    </div>
+                    <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
                 </div>
-                <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
-            </div>
+                {% endfor %}
+            </details>
             {% endfor %}
         </div>
-        {% endfor %}
         <a href="{% url 'marketplace:match_list' %}">{% trans "View all matches" %}</a>
         {% else %}
         <p class="empty-state">{% trans "No matches yet." %}</p>

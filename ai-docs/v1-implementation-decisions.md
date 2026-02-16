@@ -73,6 +73,10 @@ No OAuth/SSO, no MFA in V1.
 
 The build spec’s schemas are authoritative. The Django models must represent the same concepts and fields.
 
+### User
+Additional fields beyond build spec:
+- `display_name` (CharField, max_length=100, default="") — user-facing name; defaults to email prefix for existing users via data migration. `User.__str__` returns `display_name or email`.
+
 ### Common Location Structure
 Store as structured fields (not a single text blob):
 - `country` (required, string; ISO-ish value acceptable)
@@ -109,7 +113,7 @@ Fields (minimum):
 - `available_until` (required datetime)
 - location subfields (country required)
 - `shipping_scope` (required enum: `local_only | domestic | north_america | international`, default `local_only`)
-- `asking_price` (optional number)
+- `asking_price` (optional positive integer)
 - `price_unit` (optional, predefined choices from `UNIT_CHOICES`)
 - `notes` (optional text)
 - `status` enum: `active | expired | withdrawn`

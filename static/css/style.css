@@ -167,6 +167,7 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
+input[type="date"],
 input[type="datetime-local"],
 input[type="url"],
 select,
@@ -451,4 +452,48 @@ dd { font-size: 0.9rem; }
     dl { grid-template-columns: 1fr; }
     dt { margin-bottom: 0; }
     .auth-form { padding: 1.25rem; margin: 1rem; }
+    .card-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Match badge --- */
+.match-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    margin-top: 0.25rem;
+}
+
+/* --- Scrollable matches container --- */
+.matches-scroll {
+    max-height: 600px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+/* --- Collapsible match groups --- */
+details.match-group {
+    margin-bottom: 1rem;
+}
+
+details.match-group > summary.match-group-header {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+details.match-group > summary.match-group-header::before {
+    content: "\25B6";
+    font-size: 0.7rem;
+    transition: transform 0.15s;
+}
+
+details[open].match-group > summary.match-group-header::before {
+    transform: rotate(90deg);
 }

@@ -20,12 +20,14 @@
         <div class="match-card-details">
             {% if user.role == "buyer" %}
                 <strong>{{ match.supply_lot.item_text }}</strong>
+                <span class="tile-meta">{% trans "From:" %} {{ match.supply_lot.created_by.display_name }}</span>
                 {% if match.supply_lot.quantity_value %}<span class="tile-meta">{{ match.supply_lot.quantity_value }} {{ match.supply_lot.get_quantity_unit_display }}</span>{% endif %}
                 <span class="tile-meta">{{ match.supply_lot.location_country }}{% if match.supply_lot.location_locality %}, {{ match.supply_lot.location_locality }}{% endif %}</span>
                 {% if match.supply_lot.asking_price %}<span class="tile-meta">${{ match.supply_lot.asking_price }}/{{ match.supply_lot.get_price_unit_display }}</span>{% endif %}
                 <span class="tile-meta">{{ match.supply_lot.get_shipping_scope_display }}</span>
             {% else %}
                 <strong>{% trans "Looking for:" %} {{ match.demand_post.item_text }}</strong>
+                <span class="tile-meta">{% trans "From:" %} {{ match.demand_post.created_by.display_name }}</span>
                 {% if match.demand_post.quantity_value %}<span class="tile-meta">{{ match.demand_post.quantity_value }} {{ match.demand_post.get_quantity_unit_display }}</span>{% endif %}
                 <span class="tile-meta">{{ match.demand_post.location_country }}{% if match.demand_post.location_locality %}, {{ match.demand_post.location_locality }}{% endif %}</span>
             {% endif %}

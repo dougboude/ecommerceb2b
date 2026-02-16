@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Looking for:" %} {{ post.item_text }}{% endblock %}
+{% block title %}{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Looking for:" %} {{ post.item_text }}</h1>
+<h1>{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</h1>
 <dl>
     <dt>{% trans "Status" %}</dt><dd><span class="status status-{{ post.status }}">{{ post.get_status_display }}</span></dd>
     <dt>{% trans "Category" %}</dt><dd>{{ post.get_category_display|default:"-" }}</dd>
@@ -12,6 +12,7 @@
     <dt>{% trans "Frequency" %}</dt><dd>{{ post.get_frequency_display }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}{% if post.location_region %}, {{ post.location_region }}{% endif %}</dd>
     <dt>{% trans "Include shipped items" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
+    <dt>{% trans "Matches" %}</dt><dd>{{ post.match_count }}</dd>
     {% if post.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ post.notes }}</dd>{% endif %}
 </dl>
 

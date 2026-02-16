@@ -1,5 +1,8 @@
+from datetime import datetime, time
+
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .constants import COUNTRY_CHOICES, KM_PER_MILE, TIMEZONE_CHOICES
@@ -27,7 +30,7 @@ class SignupForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ("email", "password1", "password2", "role", "country")
+        fields = ("email", "display_name", "password1", "password2", "role", "country")
 
     def clean(self):
         cleaned = super().clean()
@@ -114,6 +117,10 @@ class SupplyLotForm(forms.ModelForm):
     location_country = forms.ChoiceField(
         choices=COUNTRY_CHOICES, label=_("Country"),
     )
+    available_until = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label=_("Available until"),
+    )
 
     class Meta:
         model = SupplyLot
@@ -132,9 +139,15 @@ class SupplyLotForm(forms.ModelForm):
             "price_unit",
             "notes",
         ]
-        widgets = {
-            "available_until": forms.DateTimeInput(attrs={"type": "datetime-local"}),
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.available_until:
+            self.initial["available_until"] = self.instance.available_until.date()
+
+    def clean_available_until(self):
+        date_val = self.cleaned_data["available_until"]
+        return timezone.make_aware(datetime.combine(date_val, time(23, 59, 59)))
 
 
 class MessageForm(forms.Form):
@@ -146,4 +159,4 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "timezone", "distance_unit"]
+        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit"]

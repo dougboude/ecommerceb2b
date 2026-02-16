@@ -32,10 +32,10 @@ class Frequency(models.TextChoices):
 
 
 class ShippingScope(models.TextChoices):
-    LOCAL_ONLY = "local_only", _("Local only")
-    DOMESTIC = "domestic", _("Domestic")
-    NORTH_AMERICA = "north_america", _("North America")
-    INTERNATIONAL = "international", _("International")
+    LOCAL_ONLY = "local_only", _("Local pickup only")
+    DOMESTIC = "domestic", _("Anywhere in my country")
+    NORTH_AMERICA = "north_america", _("US, Canada & Mexico")
+    INTERNATIONAL = "international", _("Worldwide")
 
 
 class DemandStatus(models.TextChoices):
@@ -65,6 +65,7 @@ class User(AbstractUser):
     email = models.EmailField(_("email address"), unique=True)
     role = models.CharField(max_length=10, choices=Role.choices)
     country = models.CharField(_("country"), max_length=2)
+    display_name = models.CharField(_("display name"), max_length=100, default="")
     email_verified = models.BooleanField(default=False)
     timezone = models.CharField(
         _("timezone"), max_length=63, default="UTC",
@@ -83,7 +84,7 @@ class User(AbstractUser):
         ordering = ["-date_joined"]
 
     def __str__(self):
-        return self.email
+        return self.display_name or self.email
 
 
 # ---------------------------------------------------------------------------
@@ -197,8 +198,8 @@ class SupplyLot(LocationMixin):
         choices=ShippingScope.choices,
         default=ShippingScope.LOCAL_ONLY,
     )
-    asking_price = models.DecimalField(
-        _("asking price"), max_digits=12, decimal_places=2, null=True, blank=True,
+    asking_price = models.PositiveIntegerField(
+        _("asking price"), null=True, blank=True,
     )
     price_unit = models.CharField(
         _("price unit"), max_length=20, choices=UNIT_CHOICES, blank=True,

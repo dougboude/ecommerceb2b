@@ -5,19 +5,29 @@
 
 {% block content %}
 <h1>{% trans "Conversation" %}</h1>
-<p class="helptext">
-    {% trans "Regarding:" %}
-    {% if user.role == "buyer" %}
-        <strong>{{ thread.match.supply_lot.item_text }}</strong>
-    {% else %}
-        <strong>{{ thread.match.demand_post.item_text }}</strong>
-    {% endif %}
-</p>
+<p class="helptext">{% trans "With:" %} <strong>{{ counterparty.display_name }}</strong></p>
+
+<section>
+    <h2>{% trans "Item details" %}</h2>
+    <dl>
+        {% if user.role == "buyer" %}
+        <dt>{% trans "Supply" %}</dt><dd>{{ thread.match.supply_lot.item_text }}</dd>
+        {% if thread.match.supply_lot.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ thread.match.supply_lot.quantity_value }} {{ thread.match.supply_lot.get_quantity_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Location" %}</dt><dd>{{ thread.match.supply_lot.location_country }}{% if thread.match.supply_lot.location_locality %}, {{ thread.match.supply_lot.location_locality }}{% endif %}</dd>
+        {% if thread.match.supply_lot.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>${{ thread.match.supply_lot.asking_price }}/{{ thread.match.supply_lot.get_price_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Shipping" %}</dt><dd>{{ thread.match.supply_lot.get_shipping_scope_display }}</dd>
+        {% else %}
+        <dt>{% trans "Demand" %}</dt><dd>{{ thread.match.demand_post.item_text }}</dd>
+        {% if thread.match.demand_post.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ thread.match.demand_post.quantity_value }} {{ thread.match.demand_post.get_quantity_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Location" %}</dt><dd>{{ thread.match.demand_post.location_country }}{% if thread.match.demand_post.location_locality %}, {{ thread.match.demand_post.location_locality }}{% endif %}</dd>
+        {% endif %}
+    </dl>
+</section>
 
 <div class="messages-list">
     {% for msg in messages_list %}
     <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}">
-        <strong>{{ msg.sender.email }}</strong>
+        <strong>{{ msg.sender.display_name }}</strong>
         <span>{{ msg.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         <p>{{ msg.body }}</p>
     </div>

@@ -32,3 +32,8 @@ If any planned work conflicts with a higher-authority document, **stop and ask t
 - Django ORM, Django built-in auth
 - Virtual environment: `.venv/bin/python`
 - Run Django commands with: `.venv/bin/python manage.py <command>`
+
+## Current Work-in-Progress
+
+**Read `ai-docs/v2.1-status.md` for detailed status of the V2.1 UX & Form Enhancements.**
+This file tracks what's done, what still needs testing, and any known issues.
