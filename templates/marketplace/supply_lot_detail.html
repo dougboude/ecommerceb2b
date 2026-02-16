@@ -17,6 +17,23 @@
     {% if lot.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ lot.notes }}</dd>{% endif %}
 </dl>
 
+{% if matches %}
+<section>
+    <h2>{% trans "Matches" %} ({{ lot.match_count }})</h2>
+    {% for match in matches %}
+    <div class="match-card">
+        <div class="match-card-details">
+            <strong>{% trans "Looking for:" %} {{ match.demand_post.item_text }}</strong>
+            <span class="tile-meta">{% trans "From:" %} {{ match.demand_post.created_by.display_name }}</span>
+            {% if match.demand_post.quantity_value %}<span class="tile-meta">{{ match.demand_post.quantity_value }} {{ match.demand_post.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ match.demand_post.location_country }}{% if match.demand_post.location_locality %}, {{ match.demand_post.location_locality }}{% endif %}</span>
+        </div>
+        <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
 <div class="actions">
     {% if lot.status == "active" %}
     <form method="post" action="{% url 'marketplace:supply_lot_toggle' lot.pk %}">

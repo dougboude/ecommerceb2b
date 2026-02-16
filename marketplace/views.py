@@ -6,7 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Window
+from django.db import models
+from django.db.models import Count, F, Q, Window
 from django.db.models.functions import RowNumber
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -18,14 +19,24 @@ from .forms import DemandPostForm, MessageForm, ProfileForm, SignupForm, SupplyL
 from .matching import evaluate_demand_post, evaluate_supply_lot
 from .models import (
     DemandPost,
+    DemandStatus,
     Match,
     Message,
     MessageThread,
     Role,
     SupplyLot,
+    SupplyStatus,
 )
 
 PAGE_SIZE = 25
+
+
+def _active_matches():
+    """Return Match queryset excluding withdrawn/expired lots and paused/fulfilled/expired posts."""
+    return Match.objects.filter(
+        supply_lot__status=SupplyStatus.ACTIVE,
+        demand_post__status=DemandStatus.ACTIVE,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -121,15 +132,22 @@ class MarketplaceLogoutView(LogoutView):
 def dashboard_view(request):
     user = request.user
     context = {}
+    active_match_filter = Count(
+        "matches",
+        filter=models.Q(
+            matches__supply_lot__status=SupplyStatus.ACTIVE,
+            matches__demand_post__status=DemandStatus.ACTIVE,
+        ),
+    )
     if user.role == Role.BUYER:
         posts = DemandPost.objects.filter(
             created_by=user,
-        ).annotate(match_count=Count("matches")).order_by("-created_at")[:5]
+        ).annotate(match_count=active_match_filter).order_by("-created_at")[:5]
         post_numbers = _build_post_number_map(user)
         for p in posts:
             p.post_number = post_numbers.get(p.pk, 1)
         context["demand_posts"] = posts
-        matches = Match.objects.filter(
+        matches = _active_matches().filter(
             demand_post__created_by=user,
         ).select_related(
             "demand_post", "supply_lot", "supply_lot__created_by", "thread",
@@ -142,12 +160,12 @@ def dashboard_view(request):
     else:
         lots = SupplyLot.objects.filter(
             created_by=user,
-        ).annotate(match_count=Count("matches")).order_by("-created_at")[:5]
+        ).annotate(match_count=active_match_filter).order_by("-created_at")[:5]
         lot_numbers = _build_lot_number_map(user)
         for lot in lots:
             lot.lot_number = lot_numbers.get(lot.pk, 1)
         context["supply_lots"] = lots
-        matches = Match.objects.filter(
+        matches = _active_matches().filter(
             supply_lot__created_by=user,
         ).select_related(
             "demand_post", "demand_post__created_by", "supply_lot", "thread",
@@ -190,8 +208,15 @@ def profile_edit(request):
 def demand_post_list(request):
     if request.user.role != Role.BUYER:
         raise PermissionDenied
+    active_match_count = Count(
+        "matches",
+        filter=Q(
+            matches__supply_lot__status=SupplyStatus.ACTIVE,
+            matches__demand_post__status=DemandStatus.ACTIVE,
+        ),
+    )
     qs = DemandPost.objects.filter(created_by=request.user).annotate(
-        match_count=Count("matches"),
+        match_count=active_match_count,
     ).order_by("-created_at")
     post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
@@ -240,12 +265,18 @@ def demand_post_edit(request, pk):
 
 @login_required
 def demand_post_detail(request, pk):
-    post = get_object_or_404(
-        DemandPost.objects.annotate(match_count=Count("matches")),
-        pk=pk, created_by=request.user,
-    )
+    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
     post.post_number = _get_post_number(post)
-    return render(request, "marketplace/demand_post_detail.html", {"post": post})
+    matches = _active_matches().filter(
+        demand_post=post,
+    ).select_related(
+        "supply_lot", "supply_lot__created_by", "thread",
+    ).order_by("-created_at")
+    post.match_count = matches.count()
+    return render(request, "marketplace/demand_post_detail.html", {
+        "post": post,
+        "matches": matches,
+    })
 
 
 @login_required
@@ -270,8 +301,15 @@ def demand_post_toggle(request, pk):
 def supply_lot_list(request):
     if request.user.role != Role.SUPPLIER:
         raise PermissionDenied
+    active_match_count = Count(
+        "matches",
+        filter=Q(
+            matches__supply_lot__status=SupplyStatus.ACTIVE,
+            matches__demand_post__status=DemandStatus.ACTIVE,
+        ),
+    )
     qs = SupplyLot.objects.filter(created_by=request.user).annotate(
-        match_count=Count("matches"),
+        match_count=active_match_count,
     ).order_by("-created_at")
     lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
@@ -319,12 +357,18 @@ def supply_lot_edit(request, pk):
 
 @login_required
 def supply_lot_detail(request, pk):
-    lot = get_object_or_404(
-        SupplyLot.objects.annotate(match_count=Count("matches")),
-        pk=pk, created_by=request.user,
-    )
+    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
     lot.lot_number = _get_lot_number(lot)
-    return render(request, "marketplace/supply_lot_detail.html", {"lot": lot})
+    matches = _active_matches().filter(
+        supply_lot=lot,
+    ).select_related(
+        "demand_post", "demand_post__created_by", "thread",
+    ).order_by("-created_at")
+    lot.match_count = matches.count()
+    return render(request, "marketplace/supply_lot_detail.html", {
+        "lot": lot,
+        "matches": matches,
+    })
 
 
 @login_required
@@ -349,13 +393,13 @@ def supply_lot_toggle(request, pk):
 def match_list(request):
     user = request.user
     if user.role == Role.BUYER:
-        qs = Match.objects.filter(
+        qs = _active_matches().filter(
             demand_post__created_by=user,
         ).select_related(
             "demand_post", "supply_lot", "supply_lot__created_by", "thread",
         )
     else:
-        qs = Match.objects.filter(
+        qs = _active_matches().filter(
             supply_lot__created_by=user,
         ).select_related(
             "demand_post", "demand_post__created_by", "supply_lot", "thread",
