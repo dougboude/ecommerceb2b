@@ -1,22 +1,25 @@
-# Session Status — Resume Point
+# Session Status — Resume Point (Canonical)
+
+**Last updated:** 2026-02-20
+
+This is the **single canonical handoff file** for all AI sessions.
+If you did work in this repo, update this file at the end of the session.
+Do not create new per-version status files.
 
 ## What was completed
-- All spec documents reviewed and validated for consistency
-- Django project fully built with all V1 application code
-- Python 3.12.8 installed via deadsnakes PPA on Ubuntu 22.04
-- Virtual environment created (.venv) with all dependencies installed
-- `manage.py check` passes (0 issues)
-- Migrations generated and applied (SQLite dev database)
-- All URL routes resolve correctly
+- V3 discovery/watchlist milestone implemented and pushed to `origin/main`.
+- Embedding service extracted to `services/embedding/` (FastAPI + UDS).
+- Vector search client updated to use sidecar service.
+- Watchlist + discover flows implemented; suggestions computed on the fly.
+- Skinnable CSS system introduced with two skins.
+- V3 spec and session docs added; CLAUDE instructions updated to include V3.
 
-## V1 Core Loop — Implemented
-1. **Models**: User (custom, email-based), Organization, DemandPost, SupplyLot, Match, MessageThread, Message
-2. **Matching**: normalize/overlaps/location_compatible + evaluate on post creation
-3. **Notifications**: Email sent to buyer on match creation (console backend in dev)
-4. **Views**: Signup, login/logout, dashboard, CRUD for demands/supply, match list, messaging
-5. **Templates**: All fleshed out with forms, data display, i18n
-6. **Admin**: All models registered in Django admin
-7. **Rate limiting**: Signup (5/h/IP), messages (30/10m/user)
+## Current State
+- Branch: `main` (ahead by recent milestone commit)
+- Latest commit: `080a80f` — “Implement V3 discovery/watchlist milestone”
+- Status: milestone reached, ready for next planning pass
+- Per-version status files removed; this is the only status tracker
 
-## First commit ready
-All code is written and verified. Initial commit should be made.
+## What’s Next (if continuing)
+- Consider adding basic tests for discover/watchlist flows.
+- Review email verification gate for posting (spec requirement not enforced).

@@ -4,6 +4,8 @@
 
 Before doing any work in this repository, read and internalize:
 
+0. `ai-docs/SESSION_STATUS.md` — canonical handoff log (update at end of session)
+
 1. `ai-docs/ai-constitution.md` — governance rules, scope control, stop conditions
 2. `ai-docs/v1-agent-build-spec.md` — authoritative product spec and data schemas
 3. `ai-docs/v1-implementation-decisions.md` — locked engineering decisions
@@ -91,7 +93,7 @@ EMBEDDING_SOCKET_PATH=/tmp/ecommerceb2b-embedding.sock uvicorn app:app --uds /tm
 
 ## Current Work-in-Progress
 
-**Read `ai-docs/v2.1-status.md` for detailed status of the V2.1 UX & Form Enhancements.**
+**Use `ai-docs/SESSION_STATUS.md` as the single source of truth for current status.**
 This file tracks what's done, what still needs testing, and any known issues.
 
 # Skinnable Theme System
