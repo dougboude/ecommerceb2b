@@ -1,9 +1,31 @@
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .constants import UNIT_CHOICES
+
+
+# ---------------------------------------------------------------------------
+# Custom User Manager (email-based auth)
+# ---------------------------------------------------------------------------
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email is required")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("role", "supplier")
+        extra_fields.setdefault("country", "US")
+        return self.create_user(email, password, **extra_fields)
 
 
 # ---------------------------------------------------------------------------
@@ -43,17 +65,36 @@ class DemandStatus(models.TextChoices):
     PAUSED = "paused", _("Paused")
     FULFILLED = "fulfilled", _("Fulfilled")
     EXPIRED = "expired", _("Expired")
+    DELETED = "deleted", _("Deleted")
 
 
 class SupplyStatus(models.TextChoices):
     ACTIVE = "active", _("Active")
     EXPIRED = "expired", _("Expired")
     WITHDRAWN = "withdrawn", _("Withdrawn")
+    DELETED = "deleted", _("Deleted")
+
+
+class WatchlistStatus(models.TextChoices):
+    STARRED = "starred", _("Starred")
+    WATCHING = "watching", _("Watching")
+    ARCHIVED = "archived", _("Archived")
+
+
+class WatchlistSource(models.TextChoices):
+    SUGGESTION = "suggestion", _("Suggestion")
+    SEARCH = "search", _("Search")
+    DIRECT = "direct", _("Direct")
 
 
 class DistanceUnit(models.TextChoices):
     MI = "mi", _("Miles")
     KM = "km", _("Kilometers")
+
+
+class Skin(models.TextChoices):
+    WARM_EDITORIAL = "warm-editorial", _("Warm Editorial")
+    SIMPLE_BLUE = "simple-blue", _("Simple Blue")
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +117,14 @@ class User(AbstractUser):
         choices=DistanceUnit.choices,
         default=DistanceUnit.MI,
     )
+    skin = models.CharField(
+        _("theme"),
+        max_length=20,
+        choices=Skin.choices,
+        default=Skin.WARM_EDITORIAL,
+    )
+
+    objects = UserManager()
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -220,25 +269,104 @@ class SupplyLot(LocationMixin):
 
 
 # ---------------------------------------------------------------------------
-# Match
+# WatchlistItem
 # ---------------------------------------------------------------------------
 
-class Match(models.Model):
-    demand_post = models.ForeignKey(
-        DemandPost, on_delete=models.CASCADE, related_name="matches",
+class WatchlistItem(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="watchlist_items",
     )
     supply_lot = models.ForeignKey(
-        SupplyLot, on_delete=models.CASCADE, related_name="matches",
+        SupplyLot, on_delete=models.CASCADE, related_name="watchlist_items",
+        null=True, blank=True,
+    )
+    demand_post = models.ForeignKey(
+        DemandPost, on_delete=models.CASCADE, related_name="watchlist_items",
+        null=True, blank=True,
+    )
+    status = models.CharField(
+        max_length=10, choices=WatchlistStatus.choices,
+        default=WatchlistStatus.WATCHING,
+    )
+    source = models.CharField(
+        max_length=10, choices=WatchlistSource.choices,
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    notified_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = [("demand_post", "supply_lot")]
-        ordering = ["-created_at"]
+        ordering = ["-updated_at"]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(supply_lot__isnull=False, demand_post__isnull=True)
+                    | models.Q(supply_lot__isnull=True, demand_post__isnull=False)
+                ),
+                name="watchlist_exactly_one_listing",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "supply_lot"],
+                condition=models.Q(supply_lot__isnull=False),
+                name="unique_user_supply_lot",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "demand_post"],
+                condition=models.Q(demand_post__isnull=False),
+                name="unique_user_demand_post",
+            ),
+        ]
 
     def __str__(self):
-        return f"Match #{self.pk}"
+        listing = self.supply_lot or self.demand_post
+        return f"Watchlist: {listing}"
+
+    @property
+    def listing(self):
+        return self.supply_lot or self.demand_post
+
+
+# ---------------------------------------------------------------------------
+# DismissedSuggestion
+# ---------------------------------------------------------------------------
+
+class DismissedSuggestion(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="dismissed_suggestions",
+    )
+    supply_lot = models.ForeignKey(
+        SupplyLot, on_delete=models.CASCADE,
+        null=True, blank=True,
+    )
+    demand_post = models.ForeignKey(
+        DemandPost, on_delete=models.CASCADE,
+        null=True, blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(supply_lot__isnull=False, demand_post__isnull=True)
+                    | models.Q(supply_lot__isnull=True, demand_post__isnull=False)
+                ),
+                name="dismissed_exactly_one_listing",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "supply_lot"],
+                condition=models.Q(supply_lot__isnull=False),
+                name="unique_dismissed_supply_lot",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "demand_post"],
+                condition=models.Q(demand_post__isnull=False),
+                name="unique_dismissed_demand_post",
+            ),
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -246,8 +374,8 @@ class Match(models.Model):
 # ---------------------------------------------------------------------------
 
 class MessageThread(models.Model):
-    match = models.OneToOneField(
-        Match, on_delete=models.CASCADE, related_name="thread",
+    watchlist_item = models.OneToOneField(
+        WatchlistItem, on_delete=models.CASCADE, related_name="thread",
     )
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,

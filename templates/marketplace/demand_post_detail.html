@@ -12,30 +12,52 @@
     <dt>{% trans "Frequency" %}</dt><dd>{{ post.get_frequency_display }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}{% if post.location_region %}, {{ post.location_region }}{% endif %}</dd>
     <dt>{% trans "Include shipped items" %}</dt><dd>{{ post.shipping_allowed|yesno }}</dd>
-    <dt>{% trans "Matches" %}</dt><dd>{{ post.match_count }}</dd>
     {% if post.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ post.notes }}</dd>{% endif %}
 </dl>
 
-{% if matches %}
+{% if is_owner and suggestions %}
 <section>
-    <h2>{% trans "Matches" %} ({{ post.match_count }})</h2>
-    {% for match in matches %}
-    <div class="match-card">
+    <h2>{% trans "Suggested Suppliers" %}</h2>
+    {% for listing in suggestions %}
+    <div class="match-card" data-href="{% url 'marketplace:supply_lot_detail' listing.pk %}">
         <div class="match-card-details">
-            <strong>{{ match.supply_lot.item_text }}</strong>
-            <span class="tile-meta">{% trans "From:" %} {{ match.supply_lot.created_by.display_name }}</span>
-            {% if match.supply_lot.quantity_value %}<span class="tile-meta">{{ match.supply_lot.quantity_value }} {{ match.supply_lot.get_quantity_unit_display }}</span>{% endif %}
-            <span class="tile-meta">{{ match.supply_lot.location_country }}{% if match.supply_lot.location_locality %}, {{ match.supply_lot.location_locality }}{% endif %}</span>
-            {% if match.supply_lot.asking_price %}<span class="tile-meta">${{ match.supply_lot.asking_price }}/{{ match.supply_lot.get_price_unit_display }}</span>{% endif %}
-            <span class="tile-meta">{{ match.supply_lot.get_shipping_scope_display }}</span>
+            <strong><a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }}</a></strong>
+            {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
+            {% if listing.quantity_value %}<span class="tile-meta">{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</span>
+            {% if listing.asking_price %}<span class="tile-meta">${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ listing.get_shipping_scope_display }}</span>
         </div>
-        <a href="{% url 'marketplace:thread_detail' match.thread.pk %}" class="btn btn-secondary btn-small">{% trans "Message" %}</a>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if listing.pk in watchlisted_pks %}
+                <span class="status status-active">{% trans "Saved" %}</span>
+            {% else %}
+                <form method="post" action="{% url 'marketplace:suggestion_save' %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="listing_type" value="supply_lot">
+                    <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                    <input type="hidden" name="next" value="{% url 'marketplace:demand_post_detail' post.pk %}">
+                    <button type="submit" class="btn btn-secondary btn-small">{% trans "Save" %}</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{% url 'marketplace:suggestion_dismiss' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:demand_post_detail' post.pk %}">
+                <button type="submit" class="btn btn-secondary btn-small">{% trans "Dismiss" %}</button>
+            </form>
+        </div>
     </div>
     {% endfor %}
 </section>
 {% endif %}
 
+{% if is_owner %}
 <div class="actions">
+    {% if post.status == "deleted" %}
+    <a href="{% url 'marketplace:demand_post_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>
+    {% else %}
     {% if post.status == "active" %}
     <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
         {% csrf_token %}
@@ -55,6 +77,9 @@
     {% if post.status != "expired" %}
     <a href="{% url 'marketplace:demand_post_edit' post.pk %}" class="btn btn-secondary">{% trans "Edit" %}</a>
     {% endif %}
+    <a href="{% url 'marketplace:demand_post_delete' post.pk %}" class="btn btn-danger">{% trans "Delete" %}</a>
     <a href="{% url 'marketplace:demand_post_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>
+    {% endif %}
 </div>
+{% endif %}
 {% endblock %}

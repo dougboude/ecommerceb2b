@@ -84,6 +84,8 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.i18n",
+                "marketplace.context_processors.skin",
+                "marketplace.context_processors.nav_section",
             ],
         },
     },
@@ -186,6 +188,16 @@ else:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# ---------------------------------------------------------------------------
+# Embedding service (sidecar over Unix Domain Socket)
+# ---------------------------------------------------------------------------
+EMBEDDING_SOCKET_PATH = os.environ.get(
+    "EMBEDDING_SOCKET_PATH", "/tmp/ecommerceb2b-embedding.sock"
+)
+EMBEDDING_SERVICE_TOKEN = os.environ.get(
+    "EMBEDDING_SERVICE_TOKEN", "dev-token-change-me"
+)
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True

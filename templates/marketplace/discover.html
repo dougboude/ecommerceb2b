@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Discover" %}{% endblock %}
+
+{% block content %}
+<h1>{% if user.role == "buyer" %}{% trans "Discover Suppliers" %}{% else %}{% trans "Find Buyers" %}{% endif %}</h1>
+
+<section>
+    <form method="post" action="{% url 'marketplace:discover' %}">
+        {% csrf_token %}
+        <p>{{ form.query.label_tag }} {{ form.query }}</p>
+        <div class="search-mode-row">
+            {{ form.search_mode }}
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <p>{{ form.category.label_tag }} {{ form.category }}</p>
+            <p>{{ form.location_country.label_tag }} {{ form.location_country }}</p>
+        </div>
+        <button type="submit" class="btn btn-primary">{% trans "Search" %}</button>
+        {% if searched %}<a href="{% url 'marketplace:discover_clear' %}" class="btn btn-secondary">{% trans "Clear" %}</a>{% endif %}
+    </form>
+</section>
+
+{% if searched %}
+    {% if results %}
+    <h2>{% trans "Results" %}</h2>
+    {% for listing in results %}
+    <div class="match-card" data-href="{% if user.role == 'buyer' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">
+        <div class="match-card-details">
+            <strong><a href="{% if user.role == 'buyer' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">{{ listing.item_text }}</a></strong>
+            {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
+            {% if listing.category %}<span class="tile-meta">{{ listing.get_category_display }}</span>{% endif %}
+            {% if listing.quantity_value %}<span class="tile-meta">{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</span>
+            {% if user.is_superuser and listing.search_distance != None %}<span class="tile-meta" style="color: #999; font-style: italic;">Distance: {{ listing.search_distance|floatformat:4 }}</span>{% endif %}
+            {% if user.role == "buyer" %}
+                {% if listing.asking_price %}<span class="tile-meta">${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</span>{% endif %}
+                <span class="tile-meta">{{ listing.get_shipping_scope_display }}</span>
+            {% else %}
+                {% if listing.frequency %}<span class="tile-meta">{{ listing.get_frequency_display }}</span>{% endif %}
+            {% endif %}
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if listing.pk in watchlisted_pks %}
+                <form method="post" action="{% url 'marketplace:discover_unsave' %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="listing_type" value="{% if user.role == 'buyer' %}supply_lot{% else %}demand_post{% endif %}">
+                    <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-small">{% trans "Unsave" %}</button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'marketplace:discover_save' %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="listing_type" value="{% if user.role == 'buyer' %}supply_lot{% else %}demand_post{% endif %}">
+                    <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-small">{% trans "Save" %}</button>
+                </form>
+            {% endif %}
+            <form method="post" action="{% url 'marketplace:discover_message' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="{% if user.role == 'buyer' %}supply_lot{% else %}demand_post{% endif %}">
+                <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                <button type="submit" class="btn btn-primary btn-small">{% trans "Message" %}</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="empty-state">{% trans "No results found. Try broadening your search." %}</p>
+    {% endif %}
+{% endif %}
+{% endblock %}

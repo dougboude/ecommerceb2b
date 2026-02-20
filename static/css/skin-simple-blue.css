@@ -66,6 +66,12 @@ nav a {
 
 nav a:hover { color: var(--color-primary); text-decoration: none; }
 
+nav a.nav-active {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 0.15rem;
+}
+
 nav form { margin-left: auto; }
 
 nav button {
@@ -200,6 +206,11 @@ input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
     color: var(--color-text-muted);
     margin-top: 0.25rem;
 }
+
+.search-mode-row { margin: 0.5rem 0; }
+.search-mode-row > div { display: flex; gap: 1.5rem; }
+.search-mode-row > div > div { display: flex; align-items: center; font-size: 0.9rem; }
+.search-mode-row input[type="radio"] { width: auto; margin: 0 0.3rem 0 0; }
 
 .errorlist {
     list-style: none;
@@ -338,6 +349,7 @@ dd { font-size: 0.9rem; }
 .status-expired   { background: #f3f4f6; color: #6b7280; }
 .status-fulfilled { background: #eff6ff; color: #1e40af; }
 .status-withdrawn { background: #fef2f2; color: #991b1b; }
+.status-deleted   { background: #991b1b; color: #fff; font-weight: 700; }
 
 /* --- Empty state --- */
 .empty-state {
@@ -436,6 +448,11 @@ dd { font-size: 0.9rem; }
     background: #fafbfc;
 }
 
+.match-card-inactive {
+    opacity: 0.7;
+    border-left-color: var(--color-text-muted);
+}
+
 .match-card-details {
     display: flex;
     flex-direction: column;
@@ -444,6 +461,32 @@ dd { font-size: 0.9rem; }
 
 .match-card-details strong {
     font-size: 0.9rem;
+}
+
+.match-card--watchlist {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.match-card-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--color-border-light);
+}
+
+.match-card-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.match-card-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 /* --- Responsive --- */
@@ -466,6 +509,33 @@ dd { font-size: 0.9rem; }
     color: #1e40af;
     border: 1px solid #bfdbfe;
     margin-top: 0.25rem;
+}
+
+/* --- Clickable cards --- */
+[data-href] { cursor: pointer; }
+
+/* --- Star toggle --- */
+.star-toggle {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  color: var(--color-text-muted);
+  transition: color 0.15s;
+}
+
+.star-toggle:hover {
+  color: #f7d83e;
+}
+
+.star-toggle--active {
+  color: #f7d83e;
+}
+
+.star-toggle--active:hover {
+  color: var(--color-text-muted);
 }
 
 /* --- Scrollable matches container --- */

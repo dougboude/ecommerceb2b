@@ -1,8 +1,15 @@
 {% load i18n %}
 <nav>
     {% if user.is_authenticated %}
-        <a href="{% url 'marketplace:dashboard' %}">{% trans "Dashboard" %}</a>
-        <a href="{% url 'marketplace:profile' %}">{% trans "Profile" %}</a>
+        <a href="{% url 'marketplace:dashboard' %}"{% if nav_section == "dashboard" %} class="nav-active"{% endif %}>{% trans "Dashboard" %}</a>
+        {% if user.role == "buyer" %}
+            <a href="{% url 'marketplace:demand_post_list' %}"{% if nav_section == "listings" %} class="nav-active"{% endif %}>{% trans "My Listings" %}</a>
+        {% else %}
+            <a href="{% url 'marketplace:supply_lot_list' %}"{% if nav_section == "listings" %} class="nav-active"{% endif %}>{% trans "My Listings" %}</a>
+        {% endif %}
+        <a href="{% url 'marketplace:discover' %}"{% if nav_section == "discover" %} class="nav-active"{% endif %}>{% trans "Discover" %}</a>
+        <a href="{% url 'marketplace:watchlist' %}"{% if nav_section == "watchlist" %} class="nav-active"{% endif %}>{% trans "Watchlist" %}</a>
+        <a href="{% url 'marketplace:profile' %}"{% if nav_section == "profile" %} class="nav-active"{% endif %}>{% trans "Profile" %}</a>
         <form method="post" action="{% url 'marketplace:logout' %}" style="display:inline;">
             {% csrf_token %}
             <button type="submit">{% trans "Log out" %}</button>

@@ -1,0 +1,737 @@
+/* ==========================================================================
+   Skin: Warm Editorial
+   Cream/coral/serif design with editorial headings and pill-shaped buttons.
+   ========================================================================== */
+
+/* =========================
+   1) DESIGN TOKENS (VARIABLES)
+   ========================= */
+:root {
+  /* Color: neutrals */
+  --bg: #f5efe8;
+  --surface: #fbf6f0;
+  --surface-2: #efe6dd;
+  --border: rgba(58, 31, 26, 0.15);
+
+  /* Color: ink */
+  --ink: #3a1f1a;
+  --ink-muted: rgba(58, 31, 26, 0.70);
+
+  /* Color: accents */
+  --accent-yellow: #f7d83e;
+  --accent-coral: #f45a3a;
+
+  /* Color: semantic */
+  --color-success: #2d6a4f;
+  --color-success-bg: #f0f7f0;
+  --color-success-border: #b7d9b7;
+  --color-warning: #92400e;
+  --color-warning-bg: #fdf6e3;
+  --color-warning-border: #f5d89a;
+  --color-danger: #c0392b;
+  --color-danger-bg: #fdf0ed;
+  --color-danger-border: #f0c4b8;
+  --color-info: #6b4c35;
+  --color-info-bg: #f5efe8;
+  --color-info-border: #d9c9b8;
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* Typography */
+  --font-serif: ui-serif, "Georgia", "Times New Roman", serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+
+  --h1: clamp(2.4rem, 4vw, 4.2rem);
+  --h2: clamp(1.8rem, 2.5vw, 2.6rem);
+  --h3: 1.4rem;
+  --body: 1rem;
+
+  /* Effects */
+  --shadow-1: 0 2px 10px rgba(58, 31, 26, 0.08);
+  --shadow-2: 0 4px 16px rgba(58, 31, 26, 0.12);
+
+  /* Spacing */
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Layout */
+  --container: 1120px;
+  --max-width: 800px;
+}
+
+/* =========================
+   2) RESETS
+   ========================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent-coral);
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+/* =========================
+   3) BASE TYPOGRAPHY & LAYOUT
+   ========================= */
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+main {
+  max-width: var(--max-width);
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+h1, h2, h3,
+.h1, .h2, .h3 {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+h1, .h1 {
+  font-size: var(--h1);
+  line-height: 0.95;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+h2, .h2 {
+  font-size: var(--h2);
+  line-height: 1.05;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+h2:first-child { margin-top: 0; }
+
+h3, .h3 {
+  font-size: var(--h3);
+  line-height: 1.15;
+}
+
+p, .body {
+  font-size: var(--body);
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+/* =========================
+   4) NAVBAR
+   ========================= */
+nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-1);
+}
+
+nav a {
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+nav a:hover { color: var(--accent-coral); text-decoration: none; }
+
+nav a.nav-active {
+  color: var(--accent-coral);
+  border-bottom: 2px solid var(--accent-coral);
+  padding-bottom: 0.15rem;
+}
+
+nav form { margin-left: auto; }
+
+nav button {
+  background: none;
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+nav button:hover { background: var(--surface-2); }
+
+/* =========================
+   5) DJANGO MESSAGES
+   ========================= */
+.messages {
+  list-style: none;
+  margin-bottom: 1rem;
+}
+
+.messages .message {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.messages .success { background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success-border); }
+.messages .error   { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid var(--color-danger-border); }
+.messages .warning { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid var(--color-warning-border); }
+.messages .info    { background: var(--color-info-bg); color: var(--color-info); border: 1px solid var(--color-info-border); }
+
+/* =========================
+   6) BUTTONS
+   ========================= */
+button, .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.97);
+  text-decoration: none;
+}
+
+/* Template class names (.btn-primary) */
+.btn-primary, button[type="submit"] {
+  background: var(--accent-coral);
+  color: #fff;
+}
+
+.btn-primary:hover, button[type="submit"]:hover {
+  background: #e04e30;
+  text-decoration: none;
+}
+
+.btn-secondary {
+  background: var(--accent-yellow);
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+
+.btn-secondary:hover { background: #e6c838; }
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.btn-danger:hover { background: #a93226; }
+
+.btn-small {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* BEM aliases (for any template using BEM convention) */
+.btn--primary { background: var(--accent-coral); color: #fff; }
+.btn--secondary { background: var(--accent-yellow); color: var(--ink); }
+.btn--ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+/* =========================
+   7) CARDS / PANELS
+   ========================= */
+section, .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-1);
+}
+
+/* =========================
+   8) FORMS
+   ========================= */
+form p {
+  margin-bottom: 0.75rem;
+}
+
+label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="url"],
+select,
+textarea,
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--surface);
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus, .input:focus {
+  border-color: rgba(244, 90, 58, 0.55);
+  box-shadow: 0 0 0 4px rgba(244, 90, 58, 0.15);
+}
+
+textarea { min-height: 100px; resize: vertical; }
+
+select { appearance: auto; }
+
+input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
+
+.helptext {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 0.25rem;
+}
+
+.search-mode-row { margin: 0.5rem 0; }
+.search-mode-row > div { display: flex; gap: 1.5rem; }
+.search-mode-row > div > div { display: flex; align-items: center; font-size: 0.9rem; }
+.search-mode-row input[type="radio"] { width: auto; margin: 0 0.3rem 0 0; }
+
+.errorlist {
+  list-style: none;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.errorlist li { margin-bottom: 0.25rem; }
+
+.errorlist.nonfield {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+/* =========================
+   9) AUTH FORM (login / signup)
+   ========================= */
+.auth-form {
+  max-width: 420px;
+  margin: 2rem auto;
+  background: var(--surface);
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+}
+
+.auth-form h1 { text-align: center; margin-bottom: 1.5rem; }
+
+.auth-form button[type="submit"] { width: 100%; margin-top: 0.5rem; }
+
+.auth-form .auth-link {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+}
+
+/* =========================
+   10) DEFINITION LISTS (detail pages)
+   ========================= */
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+  background: var(--surface);
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1rem;
+}
+
+dt { font-weight: 600; color: var(--ink-muted); font-size: 0.9rem; }
+dd { font-size: 0.9rem; }
+
+/* =========================
+   11) LISTS
+   ========================= */
+.item-list {
+  list-style: none;
+}
+
+.item-list li {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-list li:last-child { border-bottom: none; }
+
+/* =========================
+   12) STATUS BADGES
+   ========================= */
+.status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-active    { background: var(--color-success-bg); color: var(--color-success); }
+.status-paused    { background: var(--color-warning-bg); color: var(--color-warning); }
+.status-expired   { background: var(--surface-2); color: var(--ink-muted); }
+.status-fulfilled { background: var(--color-info-bg); color: var(--color-info); }
+.status-withdrawn { background: var(--color-danger-bg); color: var(--color-danger); }
+.status-deleted   { background: var(--color-danger); color: #fff; font-weight: 700; }
+
+/* =========================
+   13) CARD GRID & TILES
+   ========================= */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.tile {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: var(--shadow-1);
+}
+
+.tile:nth-child(even) {
+  background: var(--surface-2);
+}
+
+.tile:hover {
+  border-color: var(--accent-coral);
+  box-shadow: var(--shadow-2);
+  text-decoration: none;
+}
+
+.tile-title {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.tile-meta {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 0.15rem;
+}
+
+.tile .status {
+  margin-bottom: 0.35rem;
+}
+
+/* =========================
+   14) MATCH GROUPS & CARDS
+   ========================= */
+.match-group {
+  margin-bottom: 1rem;
+}
+
+.match-group-header {
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.match-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-left: 3px solid var(--accent-coral);
+  background: var(--surface);
+}
+
+.match-card:last-child {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.match-card:nth-child(odd) {
+  background: var(--surface-2);
+}
+
+.match-card-inactive {
+  opacity: 0.7;
+  border-left-color: var(--ink-muted);
+}
+
+.match-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.match-card-details strong {
+  font-size: 0.9rem;
+}
+
+.match-card--watchlist {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.match-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.match-card-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.match-card-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* =========================
+   15) MESSAGING (thread)
+   ========================= */
+.messages-list {
+  margin-bottom: 1rem;
+}
+
+.messages-list .message {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-lg);
+  max-width: 80%;
+}
+
+.messages-list .message.sent {
+  background: rgba(244, 90, 58, 0.08);
+  border: 1px solid rgba(244, 90, 58, 0.2);
+  margin-left: auto;
+}
+
+.messages-list .message.received {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.messages-list .message strong {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.messages-list .message span {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-left: 0.5rem;
+}
+
+.messages-list .message p { margin-top: 0.25rem; }
+
+/* =========================
+   16) PAGINATION
+   ========================= */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.pagination a {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.pagination a:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+/* =========================
+   17) MISC
+   ========================= */
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--ink-muted);
+}
+
+/* Action bar (buttons under detail views) */
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+/* Org fields toggle (signup) */
+.org-fields[hidden] { display: none; }
+
+/* Match badge */
+.match-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(244, 90, 58, 0.1);
+  color: var(--accent-coral);
+  border: 1px solid rgba(244, 90, 58, 0.25);
+  margin-top: 0.25rem;
+}
+
+/* Clickable cards */
+[data-href] { cursor: pointer; }
+
+/* Star toggle */
+.star-toggle {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  color: var(--ink-muted);
+  transition: color 0.15s;
+}
+
+.star-toggle:hover {
+  color: var(--accent-yellow);
+  transform: none;
+  filter: none;
+}
+
+.star-toggle--active {
+  color: var(--accent-yellow);
+}
+
+.star-toggle--active:hover {
+  color: var(--ink-muted);
+}
+
+/* Scrollable matches container */
+.matches-scroll {
+  max-height: 600px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+/* Collapsible match groups */
+details.match-group {
+  margin-bottom: 1rem;
+}
+
+details.match-group > summary.match-group-header {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+details.match-group > summary.match-group-header::before {
+  content: "\25B6";
+  font-size: 0.7rem;
+  transition: transform 0.15s;
+}
+
+details[open].match-group > summary.match-group-header::before {
+  transform: rotate(90deg);
+}
+
+/* =========================
+   18) RESPONSIVE
+   ========================= */
+@media (max-width: 600px) {
+  main { padding: 0 0.75rem; margin: 1rem auto; }
+  dl { grid-template-columns: 1fr; }
+  dt { margin-bottom: 0; }
+  .auth-form { padding: 1.25rem; margin: 1rem; }
+  .card-grid { grid-template-columns: 1fr; }
+}

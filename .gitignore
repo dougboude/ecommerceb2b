@@ -41,5 +41,8 @@ htmlcov/
 .coverage
 .coverage.*
 
+# ChromaDB vector store
+data/chroma/
+
 # Compiled translations
 *.mo

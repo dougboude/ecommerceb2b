@@ -150,6 +150,48 @@ class SupplyLotForm(forms.ModelForm):
         return timezone.make_aware(datetime.combine(date_val, time(23, 59, 59)))
 
 
+class DiscoverForm(forms.Form):
+    SEARCH_MODE_SIMILAR = "similar"
+    SEARCH_MODE_KEYWORD = "keyword"
+    SEARCH_MODE_CHOICES = [
+        (SEARCH_MODE_SIMILAR, _("Similar meaning")),
+        (SEARCH_MODE_KEYWORD, _("Contains these words")),
+    ]
+
+    query = forms.CharField(
+        max_length=200, label=_("Search"),
+        widget=forms.TextInput(attrs={"placeholder": _("What are you looking for?")}),
+    )
+    search_mode = forms.ChoiceField(
+        choices=SEARCH_MODE_CHOICES,
+        initial=SEARCH_MODE_SIMILAR,
+        widget=forms.RadioSelect,
+        label=_("Search mode"),
+    )
+    category = forms.ChoiceField(
+        choices=[("", _("All categories"))] + list(Category.choices),
+        required=False, label=_("Category"),
+    )
+    location_country = forms.ChoiceField(
+        choices=[("", _("Any country"))] + list(COUNTRY_CHOICES),
+        required=False, label=_("Country"),
+    )
+    radius = forms.ChoiceField(
+        choices=[
+            ("", _("Any distance")),
+            ("25", "25"),
+            ("50", "50"),
+            ("100", "100"),
+        ],
+        required=False, label=_("Radius"),
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if user and not self.is_bound:
+            self.fields["location_country"].initial = user.country
+
+
 class MessageForm(forms.Form):
     body = forms.CharField(widget=forms.Textarea, label=_("Message"))
 
@@ -159,4 +201,4 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit"]
+        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit", "skin"]

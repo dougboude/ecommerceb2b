@@ -282,8 +282,8 @@ Minimum automated tests:
 - Linux target
 - Container-friendly
 - Single Django service + database
+- **V3 addition:** Embedding sidecar process (`services/embedding/`) — FastAPI/uvicorn over Unix Domain Socket. Required for vector search (Discover page). Not needed for core V1 functionality.
 - Optional shared cache **only if** running multiple Django instances (not required in V1)
-- No background workers
 - No cron jobs
 
 ---

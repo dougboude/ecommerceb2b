@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Watchlist" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Your Watchlist" %}</h1>
+
+<section>
+    <h2>{% trans "Watching" %}</h2>
+    {% if watching %}
+    {% for item in watching %}
+    {% if item.status == "starred" %}
+        {% include "marketplace/_watchlist_card.html" with item=item show_unstar=True show_archive=True show_remove=True %}
+    {% else %}
+        {% include "marketplace/_watchlist_card.html" with item=item show_star=True show_archive=True show_remove=True %}
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    <p class="empty-state">{% trans "No items being watched." %}</p>
+    {% endif %}
+</section>
+
+{% if archived %}
+<details>
+    <summary style="cursor:pointer; font-weight:600; margin-bottom:0.5rem;">{% trans "Archived" %} ({{ archived|length }})</summary>
+    {% for item in archived %}
+    {% include "marketplace/_watchlist_card.html" with item=item show_unarchive=True inactive=True %}
+    {% endfor %}
+</details>
+{% endif %}
+
+<div class="actions" style="margin-top:1.5rem;">
+    <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover more" %}</a>
+</div>
+{% endblock %}

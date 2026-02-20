@@ -1,11 +1,39 @@
 import math
 import re
 
+from django.db.models import Q
 from django.utils import timezone
 
-from .models import DemandPost, Match, MessageThread, SupplyLot
+from .models import (
+    DemandPost,
+    DemandStatus,
+    DismissedSuggestion,
+    SupplyLot,
+    SupplyStatus,
+    WatchlistItem,
+)
 
-STOPWORDS = {"the", "a", "an", "and", "or", "of", "to", "for"}
+STOPWORDS = {
+    # Original
+    "the", "a", "an", "and", "or", "of", "to", "for",
+    # Function words
+    "in", "on", "at", "by", "with", "from", "is", "it", "we", "i", "my",
+    "our", "your", "this", "that", "are", "was", "be", "have", "has", "do",
+    "does", "not", "no", "but", "if", "so", "as", "up",
+    # Food/ag descriptors
+    "fresh", "organic", "farm", "natural", "local", "premium", "quality",
+    "best", "new", "good", "great", "fine", "pure", "raw", "real",
+    # Transactional
+    "need", "needed", "looking", "want", "wanted", "preferred", "available",
+    "sell", "selling", "buy", "buying", "offer", "offering", "seeking",
+    "source", "sourcing",
+    # Generic listing terms
+    "supply", "supplies", "lot", "lots", "item", "items", "product",
+    "products", "goods", "order", "orders",
+    # Sizing / qualifiers
+    "free", "range", "grade", "bulk", "wholesale", "retail", "small",
+    "large", "medium", "high", "low",
+}
 
 
 def normalize(text):
@@ -96,27 +124,11 @@ def location_compatible(supply_lot, demand_post):
     return _within_radius(supply_lot, demand_post)
 
 
-def _create_match(demand_post, supply_lot):
-    from .notifications import send_match_notification
-
-    match, created = Match.objects.get_or_create(
-        demand_post=demand_post,
-        supply_lot=supply_lot,
-    )
-    if created:
-        MessageThread.objects.get_or_create(
-            match=match,
-            defaults={
-                "buyer": demand_post.created_by,
-                "supplier": supply_lot.created_by,
-            },
-        )
-        send_match_notification(match)
-    return match, created
-
+# ---------------------------------------------------------------------------
+# Active listing querysets
+# ---------------------------------------------------------------------------
 
 def _active_demand_posts():
-    from django.db.models import Q
     now = timezone.now()
     return DemandPost.objects.filter(
         status="active",
@@ -133,21 +145,69 @@ def _active_supply_lots():
     )
 
 
-def evaluate_supply_lot(supply_lot):
-    supply_tokens = normalize(supply_lot.item_text)
-    if not supply_tokens:
-        return
-    for dp in _active_demand_posts():
-        demand_tokens = normalize(dp.item_text)
-        if overlaps(supply_tokens, demand_tokens) and location_compatible(supply_lot, dp):
-            _create_match(dp, supply_lot)
+# ---------------------------------------------------------------------------
+# Suggestion engine (on-the-fly, not stored)
+# ---------------------------------------------------------------------------
+
+def _excluded_supply_lot_ids(user):
+    """Get supply lot IDs dismissed by the user (excluded from suggestions)."""
+    return set(DismissedSuggestion.objects.filter(
+        user=user, supply_lot__isnull=False,
+    ).values_list("supply_lot_id", flat=True))
 
 
-def evaluate_demand_post(demand_post):
+def _excluded_demand_post_ids(user):
+    """Get demand post IDs dismissed by the user (excluded from suggestions)."""
+    return set(DismissedSuggestion.objects.filter(
+        user=user, demand_post__isnull=False,
+    ).values_list("demand_post_id", flat=True))
+
+
+def watchlisted_supply_lot_ids(user):
+    """Get supply lot IDs on the user's watchlist."""
+    return set(WatchlistItem.objects.filter(
+        user=user, supply_lot__isnull=False,
+    ).values_list("supply_lot_id", flat=True))
+
+
+def watchlisted_demand_post_ids(user):
+    """Get demand post IDs on the user's watchlist."""
+    return set(WatchlistItem.objects.filter(
+        user=user, demand_post__isnull=False,
+    ).values_list("demand_post_id", flat=True))
+
+
+def get_suggestions_for_post(demand_post, user, limit=5):
+    """Return suggested supply lots for a demand post (on the fly)."""
     demand_tokens = normalize(demand_post.item_text)
     if not demand_tokens:
-        return
+        return []
+    excluded = _excluded_supply_lot_ids(user)
+    results = []
     for sl in _active_supply_lots():
+        if sl.pk in excluded:
+            continue
         supply_tokens = normalize(sl.item_text)
         if overlaps(demand_tokens, supply_tokens) and location_compatible(sl, demand_post):
-            _create_match(demand_post, sl)
+            results.append(sl)
+            if len(results) >= limit:
+                break
+    return results
+
+
+def get_suggestions_for_lot(supply_lot, user, limit=5):
+    """Return suggested demand posts for a supply lot (on the fly)."""
+    supply_tokens = normalize(supply_lot.item_text)
+    if not supply_tokens:
+        return []
+    excluded = _excluded_demand_post_ids(user)
+    results = []
+    for dp in _active_demand_posts():
+        if dp.pk in excluded:
+            continue
+        demand_tokens = normalize(dp.item_text)
+        if overlaps(supply_tokens, demand_tokens) and location_compatible(supply_lot, dp):
+            results.append(dp)
+            if len(results) >= limit:
+                break
+    return results

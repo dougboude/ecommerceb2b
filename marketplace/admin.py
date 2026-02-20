@@ -3,12 +3,13 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import (
     DemandPost,
-    Match,
+    DismissedSuggestion,
     Message,
     MessageThread,
     Organization,
     SupplyLot,
     User,
+    WatchlistItem,
 )
 
 
@@ -46,14 +47,20 @@ class SupplyLotAdmin(admin.ModelAdmin):
     list_filter = ("status", "category")
 
 
-@admin.register(Match)
-class MatchAdmin(admin.ModelAdmin):
-    list_display = ("id", "demand_post", "supply_lot", "created_at", "notified_at")
+@admin.register(WatchlistItem)
+class WatchlistItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "supply_lot", "demand_post", "status", "source", "created_at")
+    list_filter = ("status", "source")
+
+
+@admin.register(DismissedSuggestion)
+class DismissedSuggestionAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "supply_lot", "demand_post", "created_at")
 
 
 @admin.register(MessageThread)
 class MessageThreadAdmin(admin.ModelAdmin):
-    list_display = ("id", "match", "buyer", "supplier")
+    list_display = ("id", "watchlist_item", "buyer", "supplier")
 
 
 @admin.register(Message)

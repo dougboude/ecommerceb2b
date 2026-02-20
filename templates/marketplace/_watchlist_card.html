@@ -1,0 +1,72 @@
+{% load i18n %}
+<div id="watchlist-card-{{ item.pk }}" class="match-card match-card--watchlist{% if inactive %} match-card-inactive{% endif %}" data-href="{% if item.supply_lot %}{% url 'marketplace:supply_lot_detail' item.supply_lot.pk %}{% else %}{% url 'marketplace:demand_post_detail' item.demand_post.pk %}{% endif %}">
+    <div class="match-card-details">
+        {% if item.supply_lot %}
+            <strong><a href="{% url 'marketplace:supply_lot_detail' item.supply_lot.pk %}">{{ item.supply_lot.item_text }}</a></strong>
+            {% if item.supply_lot.status == "deleted" %}<span class="status status-deleted">{% trans "Listing deleted" %}</span>
+            {% elif item.supply_lot.status == "withdrawn" %}<span class="status status-withdrawn">{% trans "Listing withdrawn" %}</span>
+            {% endif %}
+            {% if item.supply_lot.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ item.supply_lot.created_by.display_name }}</span>{% endif %}
+            {% if item.supply_lot.category %}<span class="tile-meta">{{ item.supply_lot.get_category_display }}</span>{% endif %}
+            {% if item.supply_lot.quantity_value %}<span class="tile-meta">{{ item.supply_lot.quantity_value }} {{ item.supply_lot.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ item.supply_lot.location_country }}{% if item.supply_lot.location_locality %}, {{ item.supply_lot.location_locality }}{% endif %}</span>
+            {% if item.supply_lot.asking_price %}<span class="tile-meta">${{ item.supply_lot.asking_price }}/{{ item.supply_lot.get_price_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ item.supply_lot.get_shipping_scope_display }}</span>
+        {% else %}
+            <strong><a href="{% url 'marketplace:demand_post_detail' item.demand_post.pk %}">{% trans "Looking for:" %} {{ item.demand_post.item_text }}</a></strong>
+            {% if item.demand_post.status == "deleted" %}<span class="status status-deleted">{% trans "Listing deleted" %}</span>
+            {% elif item.demand_post.status == "paused" %}<span class="status status-paused">{% trans "Listing paused" %}</span>
+            {% elif item.demand_post.status == "expired" %}<span class="status status-expired">{% trans "Listing expired" %}</span>
+            {% endif %}
+            {% if item.demand_post.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ item.demand_post.created_by.display_name }}</span>{% endif %}
+            {% if item.demand_post.category %}<span class="tile-meta">{{ item.demand_post.get_category_display }}</span>{% endif %}
+            {% if item.demand_post.quantity_value %}<span class="tile-meta">{{ item.demand_post.quantity_value }} {{ item.demand_post.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ item.demand_post.location_country }}{% if item.demand_post.location_locality %}, {{ item.demand_post.location_locality }}{% endif %}</span>
+            {% if item.demand_post.frequency %}<span class="tile-meta">{{ item.demand_post.get_frequency_display }}</span>{% endif %}
+        {% endif %}
+    </div>
+    <div class="match-card-actions">
+        <div class="match-card-actions-left">
+            {% if show_star %}
+            <button type="button" class="star-toggle" title="{% trans 'Star' %}"
+                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
+                    hx-target="#watchlist-card-{{ item.pk }}"
+                    hx-swap="outerHTML">&#9734;</button>
+            {% endif %}
+            {% if show_unstar %}
+            <button type="button" class="star-toggle star-toggle--active" title="{% trans 'Unstar' %}"
+                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
+                    hx-target="#watchlist-card-{{ item.pk }}"
+                    hx-swap="outerHTML">&#9733;</button>
+            {% endif %}
+        </div>
+        <div class="match-card-actions-right">
+            {% if show_archive %}
+            <form method="post" action="{% url 'marketplace:watchlist_archive' item.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-small" title="{% trans 'Archive' %}">{% trans "Archive" %}</button>
+            </form>
+            {% endif %}
+            {% if show_remove %}
+            <form method="post" action="{% url 'marketplace:watchlist_delete' item.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-small" title="{% trans 'Remove' %}">{% trans "Remove" %}</button>
+            </form>
+            {% endif %}
+            {% if show_unarchive %}
+            <form method="post" action="{% url 'marketplace:watchlist_unarchive' item.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-small" title="{% trans 'Restore' %}">{% trans "Restore" %}</button>
+            </form>
+            {% endif %}
+            {% if item.thread %}
+                <a href="{% url 'marketplace:thread_detail' item.thread.pk %}" class="btn btn-primary btn-small">{% trans "Message" %}</a>
+            {% elif not inactive %}
+                <form method="post" action="{% url 'marketplace:watchlist_message' item.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-small">{% trans "Message" %}</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
