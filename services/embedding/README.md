@@ -12,6 +12,15 @@ Django  ──(Unix socket)──>  This service
 
 The `paraphrase-multilingual-MiniLM-L12-v2` model takes 1-2 minutes to load into memory. When it lived inside Django, every Django restart forced users to wait through a cold start on their first search. Running it as a separate process means the model stays loaded across Django restarts.
 
+## Model (Locked)
+
+Current model: `paraphrase-multilingual-MiniLM-L12-v2`
+
+**Important:** This model is intentionally locked. Changing it will
+materially shift cosine distance distributions and can invalidate
+the current cutoff logic. Any change requires a human-reviewed
+re-evaluation of search quality and cutoff thresholds.
+
 ## Prerequisites
 
 - Python 3.12+
@@ -139,6 +148,22 @@ Search for listings by semantic similarity. Returns PKs and distances only (Djan
 ```
 
 Results are filtered through an adaptive cutoff algorithm that finds the natural cluster boundary in the distance distribution, discarding low-relevance results automatically.
+
+#### Debugging flags (optional)
+
+You can pass query parameters to inspect raw distances or bypass cutoff:
+
+- `?debug=1` — include raw PKs + distances and the cutoff keep_count in the response.
+- `?bypass_cutoff=1` — return all raw results without applying the adaptive cutoff.
+
+Example:
+```bash
+curl --unix-socket /tmp/ecommerceb2b-embedding.sock \
+  -H "X-Service-Token: dev-token-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }' \
+  "http://localhost/search?debug=1"
+```
 
 The `filters` object uses [ChromaDB where-clause syntax](https://docs.trychroma.com/guides#filtering-by-metadata).
 

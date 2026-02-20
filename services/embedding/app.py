@@ -21,6 +21,9 @@ logging.basicConfig(level=logging.INFO)
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+# NOTE: Model choice is intentionally locked. Changing the model will
+# materially shift cosine distance distributions and invalidates current
+# cutoff behavior unless re-evaluated with a human-in-the-loop.
 MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 COLLECTION_NAME = "listings"
 CHROMA_PERSIST_DIR = os.environ.get("CHROMA_PERSIST_DIR", "../../data/chroma")
@@ -159,7 +162,7 @@ async def index_listing(req: IndexRequest):
 
 
 @app.post("/search")
-async def search(req: SearchRequest):
+async def search(req: SearchRequest, debug: int = 0, bypass_cutoff: int = 0):
     collection = _get_collection()
     count = collection.count()
     if count == 0:
@@ -185,16 +188,48 @@ async def search(req: SearchRequest):
         all_pks.append(meta["pk"])
         all_distances.append(distance)
 
+    if bypass_cutoff:
+        return {
+            "results": [
+                {"pk": pk, "distance": dist}
+                for pk, dist in zip(all_pks, all_distances)
+            ],
+            "debug": {
+                "bypass_cutoff": True,
+                "raw_count": len(all_distances),
+            },
+        }
+
     keep_count = _find_adaptive_cutoff(all_distances)
     if keep_count == 0:
+        if debug:
+            return {
+                "results": [],
+                "debug": {
+                    "bypass_cutoff": False,
+                    "raw_count": len(all_distances),
+                    "raw_pks": all_pks,
+                    "raw_distances": all_distances,
+                    "keep_count": 0,
+                },
+            }
         return {"results": []}
 
-    return {
+    response = {
         "results": [
             {"pk": pk, "distance": dist}
             for pk, dist in zip(all_pks[:keep_count], all_distances[:keep_count])
         ]
     }
+    if debug:
+        response["debug"] = {
+            "bypass_cutoff": False,
+            "raw_count": len(all_distances),
+            "raw_pks": all_pks,
+            "raw_distances": all_distances,
+            "keep_count": keep_count,
+        }
+    return response
 
 
 @app.post("/remove")
