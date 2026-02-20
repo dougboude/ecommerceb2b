@@ -68,6 +68,9 @@
     {% endfor %}
     {% else %}
     <p class="empty-state">{% trans "No results found. Try broadening your search." %}</p>
+    {% if short_query_hint %}
+    <p class="empty-state">{% trans "Tip: try a more descriptive search (3+ words) for better semantic matches." %}</p>
+    {% endif %}
     {% endif %}
 {% endif %}
 {% endblock %}

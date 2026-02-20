@@ -520,6 +520,11 @@ def _run_discover_search(user, query, category, country, search_mode="similar"):
     )
 
 
+def _is_short_query(query):
+    words = [w for w in query.strip().split() if w]
+    return len(words) <= 2
+
+
 def _discover_watchlisted_pks(user):
     """Return set of PKs already on the user's watchlist."""
     if user.role == Role.BUYER:
@@ -537,6 +542,7 @@ def discover_view(request):
     results = []
     searched = False
     watchlisted_pks = set()
+    short_query_hint = False
 
     if request.method == "POST":
         form = DiscoverForm(request.POST, user=user)
@@ -557,6 +563,8 @@ def discover_view(request):
             results = _run_discover_search(user, query, category, country, search_mode)
             searched = True
             watchlisted_pks = _discover_watchlisted_pks(user)
+            if not results and search_mode == "similar" and _is_short_query(query):
+                short_query_hint = True
     else:
         # Repopulate from session only when redirected back from save/unsave
         keep_results = request.session.pop("discover_keep_results", False)
@@ -577,6 +585,8 @@ def discover_view(request):
             )
             searched = True
             watchlisted_pks = _discover_watchlisted_pks(user)
+            if not results and initial["search_mode"] == "similar" and _is_short_query(session_query):
+                short_query_hint = True
         else:
             form = DiscoverForm(user=user)
 
@@ -585,6 +595,7 @@ def discover_view(request):
         "results": results,
         "searched": searched,
         "watchlisted_pks": watchlisted_pks,
+        "short_query_hint": short_query_hint,
     })
 
 
