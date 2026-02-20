@@ -13,6 +13,8 @@ Do not create new per-version status files.
 - Watchlist + discover flows implemented; suggestions computed on the fly.
 - Skinnable CSS system introduced with two skins.
 - V3 spec and session docs added; CLAUDE instructions updated to include V3.
+- Semantic search documentation added; debug flags for raw distances/cutoff bypass added to sidecar `/search`.
+- Discover page now shows a tip when a 1–2 word semantic search returns no results.
 
 ## Current State
 - Branch: `main` (ahead by recent milestone commit)
