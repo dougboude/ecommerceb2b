@@ -1,111 +1,111 @@
 # Implementation Plan
 
-- [ ] 1. Build migration control-plane primitives
-- [ ] 1.1 Add migration state, mapping, audit, and parity-report persistence models
+- [x] 1. Build migration control-plane primitives
+- [x] 1.1 Add migration state, mapping, audit, and parity-report persistence models
   - Create persistent entities for `MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, and `ParityReport`
   - Add constraints for unique legacy-to-target mappings and checkpoint progression metadata
   - _Requirements: 2.2, 2.4, 5.2, 6.3_
-- [ ] 1.2 Add migration control configuration and mode toggles
+- [x] 1.2 Add migration control configuration and mode toggles
   - Add configuration surface for `legacy`, `compatibility`, and `target` modes
   - Add toggles for canonical read/write and dual-read/dual-write behavior
   - _Requirements: 3.1, 3.3, 5.1_
-- [ ]* 1.3 Add unit tests for migration control state transitions
+- [x]* 1.3 Add unit tests for migration control state transitions
   - Verify valid checkpoint progression and invalid transition blocking
   - Verify destructive operations remain blocked before cleanup checkpoint
   - _Requirements: 4.1, 4.2, 5.1_
 
-- [ ] 2. Implement additive-first schema stage
-- [ ] 2.1 Create additive migrations for target role-agnostic and unified-listing schemas
+- [x] 2. Implement additive-first schema stage
+- [x] 2.1 Create additive migrations for target role-agnostic and unified-listing schemas
   - Add target-side schema objects without dropping or mutating legacy columns/tables destructively
   - Ensure nullable/default-safe constraints to avoid breaking legacy writes
   - _Requirements: 1.1, 1.2, 1.3_
-- [ ] 2.2 Add migration support tables for mapping, audits, and gate evidence
+- [x] 2.2 Add migration support tables for mapping, audits, and gate evidence
   - Create tables needed for backfill traceability and checkpoint validation evidence
   - _Requirements: 2.2, 2.4, 6.3_
-- [ ]* 2.3 Add migration tests for additive stage safety
+- [x]* 2.3 Add migration tests for additive stage safety
   - Verify legacy schema and runtime paths remain intact after additive migrations
   - Verify migration failure leaves system in prior safe state
   - _Requirements: 1.2, 1.4, 6.1_
 
-- [ ] 3. Implement deterministic backfill engine
-- [ ] 3.1 Implement user/org backfill transforms
+- [x] 3. Implement deterministic backfill engine
+- [x] 3.1 Implement user/org backfill transforms
   - Backfill organization data into role-agnostic user shape using deterministic rules
   - Persist mapping and audit records for each transformed row
   - _Requirements: 2.1, 2.2, 2.3_
-- [ ] 3.2 Implement listing backfill transforms for split legacy listing models
+- [x] 3.2 Implement listing backfill transforms for split legacy listing models
   - Map legacy listing records into unified target listing representation deterministically
   - Persist source-target linkage for reconciliation and rollback traceability
   - _Requirements: 2.1, 2.2, 2.4_
-- [ ] 3.3 Implement thread/watchlist backfill reconciliation
+- [x] 3.3 Implement thread/watchlist backfill reconciliation
   - Backfill and reconcile thread/watchlist relationships required by target schema contracts
   - Log unresolved records with reason codes and prevent checkpoint advancement
   - _Requirements: 2.3, 2.4, 5.2_
-- [ ]* 3.4 Add unit/integration tests for idempotent backfill and replay
+- [x]* 3.4 Add unit/integration tests for idempotent backfill and replay
   - Verify deterministic outcomes across reruns
   - Verify failed record remediation and replay path
   - _Requirements: 2.1, 2.3, 6.1_
 
-- [ ] 4. Implement compatibility repository (dual-write / dual-read)
-- [ ] 4.1 Create compatibility write adapters for launch-critical mutation paths
+- [x] 4. Implement compatibility repository (dual-write / dual-read)
+- [x] 4.1 Create compatibility write adapters for launch-critical mutation paths
   - Route user/listing/thread/watchlist mutations through a central compatibility repository
   - Implement dual-write behavior and divergence capture
   - _Requirements: 3.1, 3.2, 3.4_
-- [ ] 4.2 Create compatibility read adapters with canonical + fallback strategy
+- [x] 4.2 Create compatibility read adapters with canonical + fallback strategy
   - Implement read canonical ordering and explicit fallback behavior
   - Capture read mismatches for parity diagnostics
   - _Requirements: 3.3, 3.4, 5.2_
-- [ ]* 4.3 Add tests for compatibility behavior parity
+- [x]* 4.3 Add tests for compatibility behavior parity
   - Verify launch-critical flows produce equivalent behavior across canonical/fallback reads
   - Verify dual-write mismatch handling blocks unsafe progression
   - _Requirements: 3.2, 3.3, 6.2, 6.4_
 
-- [ ] 5. Implement parity validator and checkpoint gates
-- [ ] 5.1 Build parity validation checks and gate evaluation logic
+- [x] 5. Implement parity validator and checkpoint gates
+- [x] 5.1 Build parity validation checks and gate evaluation logic
   - Implement counts, relationship integrity, and distribution checks
   - Implement threshold-based pass/fail gates with persisted reports
   - _Requirements: 2.4, 5.2, 6.3_
-- [ ] 5.2 Build checkpoint promotion controller
+- [x] 5.2 Build checkpoint promotion controller
   - Enforce ordered checkpoint advancement with required gate dependencies
   - Block progression when any required gate fails
   - _Requirements: 4.1, 5.1, 5.2_
-- [ ] 5.3 Build rollback controller per checkpoint matrix
+- [x] 5.3 Build rollback controller per checkpoint matrix
   - Implement rollback actions to restore prior canonical read/write paths
   - Block destructive cleanup before rollback window closure
   - _Requirements: 4.1, 4.3, 5.4_
 
-- [ ] 6. Implement cutover sequencing and cleanup guards
-- [ ] 6.1 Implement cutover command flow (CP0 -> CP5)
+- [x] 6. Implement cutover sequencing and cleanup guards
+- [x] 6.1 Implement cutover command flow (CP0 -> CP5)
   - Encode ordered stage transitions: schema, backfill, compatibility, cutover, cleanup
   - Enforce preconditions and postconditions at each checkpoint
   - _Requirements: 5.1, 5.2, 5.3_
-- [ ] 6.2 Implement canonical switch controls for reads/writes
+- [x] 6.2 Implement canonical switch controls for reads/writes
   - Switch canonical reads to target before disabling legacy writes
   - Preserve fallback behavior only during rollback window
   - _Requirements: 5.3, 5.4, 4.3_
-- [ ] 6.3 Implement irreversible cleanup guardrails
+- [x] 6.3 Implement irreversible cleanup guardrails
   - Prevent destructive legacy cleanup unless cutover stability gates pass
   - Block cleanup if rollback eligibility is still required
   - _Requirements: 1.1, 4.2, 4.4_
 
-- [ ] 7. Implement migration validation and regression test suite
-- [ ] 7.1 Add launch-critical behavior parity integration tests
+- [x] 7. Implement migration validation and regression test suite
+- [x] 7.1 Add launch-critical behavior parity integration tests
   - Cover listing CRUD, discovery, watchlist, messaging, profile, and permission flows
   - Validate parity before and after compatibility/cutover transitions
   - _Requirements: 6.2, 6.4, 1.2_
-- [ ] 7.2 Add cutover smoke and rollback drill tests
+- [x] 7.2 Add cutover smoke and rollback drill tests
   - Simulate cutover failure and execute rollback to prior checkpoint
   - Verify data integrity and behavior restoration after rollback
   - _Requirements: 4.3, 4.4, 5.4, 6.4_
-- [ ] 7.3 Add non-goal enforcement tests
+- [x] 7.3 Add non-goal enforcement tests
   - Assert migration introduces no unrelated marketplace feature behavior
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 8. Checkpoint - Verify migration readiness gates
+- [x] 8. Checkpoint - Verify migration readiness gates
   - Run migration test suites and parity validations
   - Validate checkpoint evidence artifacts are complete
   - Confirm cutover is blocked when gate thresholds are not satisfied
 
-- [ ] 9. Final Checkpoint - Confirm spec completion criteria
+- [x] 9. Final Checkpoint - Confirm spec completion criteria
   - Ensure every requirement criterion is traced to implemented tasks and tests
   - Ensure rollback path is validated up to final reversible checkpoint
   - Ensure cleanup is still guarded as destructive and post-cutover only

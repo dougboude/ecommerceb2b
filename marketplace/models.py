@@ -62,6 +62,27 @@ class ShippingScope(models.TextChoices):
     INTERNATIONAL = "international", _("Worldwide")
 
 
+class ListingType(models.TextChoices):
+    SUPPLY = "supply", _("Supply")
+    DEMAND = "demand", _("Demand")
+
+
+class ListingStatus(models.TextChoices):
+    ACTIVE = "active", _("Active")
+    PAUSED = "paused", _("Paused")
+    FULFILLED = "fulfilled", _("Fulfilled")
+    WITHDRAWN = "withdrawn", _("Withdrawn")
+    EXPIRED = "expired", _("Expired")
+    DELETED = "deleted", _("Deleted")
+
+
+class ListingShippingScope(models.TextChoices):
+    LOCAL_ONLY = "local_only", _("Local pickup only")
+    DOMESTIC = "domestic", _("Domestic")
+    NORTH_AMERICA = "north_america", _("North America")
+    WORLDWIDE = "worldwide", _("Worldwide")
+
+
 class DemandStatus(models.TextChoices):
     ACTIVE = "active", _("Active")
     PAUSED = "paused", _("Paused")
@@ -99,6 +120,38 @@ class Skin(models.TextChoices):
     SIMPLE_BLUE = "simple-blue", _("Simple Blue")
 
 
+class MigrationMode(models.TextChoices):
+    LEGACY = "legacy", _("Legacy")
+    COMPATIBILITY = "compatibility", _("Compatibility")
+    TARGET = "target", _("Target")
+
+
+class MigrationStage(models.TextChoices):
+    SCHEMA = "schema", _("Schema")
+    BACKFILL = "backfill", _("Backfill")
+    COMPAT = "compat", _("Compatibility")
+    CUTOVER = "cutover", _("Cutover")
+    CLEANUP = "cleanup", _("Cleanup")
+
+
+class CanonicalSource(models.TextChoices):
+    LEGACY = "legacy", _("Legacy")
+    TARGET = "target", _("Target")
+
+
+class MigrationEntityType(models.TextChoices):
+    USER = "user", _("User")
+    LISTING = "listing", _("Listing")
+    THREAD = "thread", _("Thread")
+    WATCHLIST = "watchlist", _("Watchlist")
+
+
+class BackfillAuditStatus(models.TextChoices):
+    SUCCESS = "success", _("Success")
+    FAILED = "failed", _("Failed")
+    SKIPPED = "skipped", _("Skipped")
+
+
 # ---------------------------------------------------------------------------
 # User
 # ---------------------------------------------------------------------------
@@ -126,6 +179,12 @@ class User(AbstractUser):
     )
     email_on_message = models.BooleanField(
         _("email me when I receive a message"), default=False,
+    )
+    organization_name = models.CharField(
+        _("organization name"),
+        max_length=255,
+        blank=True,
+        null=True,
     )
 
     objects = UserManager()
@@ -173,6 +232,57 @@ class LocationMixin(models.Model):
 
     class Meta:
         abstract = True
+
+
+# ---------------------------------------------------------------------------
+# Unified target Listing (additive schema for migration)
+# ---------------------------------------------------------------------------
+
+class Listing(LocationMixin):
+    type = models.CharField(max_length=10, choices=ListingType.choices)
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="target_listings",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=20, choices=Category.choices, blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=ListingStatus.choices,
+        default=ListingStatus.ACTIVE,
+    )
+    price_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    price_currency = models.CharField(max_length=3, blank=True)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, blank=True)
+    price_unit = models.CharField(max_length=20, choices=UNIT_CHOICES, blank=True)
+    shipping_scope = models.CharField(
+        max_length=20,
+        choices=ListingShippingScope.choices,
+        blank=True,
+    )
+    radius_km = models.PositiveIntegerField(null=True, blank=True)
+    frequency = models.CharField(max_length=10, choices=Frequency.choices, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    legacy_source_type = models.CharField(max_length=20, blank=True)
+    legacy_source_pk = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["legacy_source_type", "legacy_source_pk"],
+                condition=models.Q(legacy_source_type__gt="", legacy_source_pk__isnull=False),
+                name="unique_listing_legacy_source",
+            ),
+        ]
+
+    def __str__(self):
+        return self.title
 
 
 # ---------------------------------------------------------------------------
@@ -438,3 +548,184 @@ class ThreadReadState(models.Model):
 
     def __str__(self):
         return f"ReadState thread={self.thread_id} user={self.user_id}"
+
+
+# ---------------------------------------------------------------------------
+# Migration control-plane persistence models
+# ---------------------------------------------------------------------------
+
+class MigrationState(models.Model):
+    """
+    Persisted migration control state so deploy/restart remains checkpoint-safe.
+    """
+
+    name = models.CharField(max_length=50, unique=True, default="default")
+    mode = models.CharField(
+        max_length=20,
+        choices=MigrationMode.choices,
+        default=MigrationMode.LEGACY,
+    )
+    stage = models.CharField(
+        max_length=20,
+        choices=MigrationStage.choices,
+        default=MigrationStage.SCHEMA,
+    )
+    checkpoint = models.CharField(max_length=10, default="CP0")
+    checkpoint_order = models.PositiveSmallIntegerField(default=0)
+    dual_write_enabled = models.BooleanField(default=False)
+    dual_read_enabled = models.BooleanField(default=False)
+    read_canonical = models.CharField(
+        max_length=10,
+        choices=CanonicalSource.choices,
+        default=CanonicalSource.LEGACY,
+    )
+    write_canonical = models.CharField(
+        max_length=10,
+        choices=CanonicalSource.choices,
+        default=CanonicalSource.LEGACY,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(checkpoint_order__gte=0, checkpoint_order__lte=5),
+                name="migration_state_checkpoint_order_bounds",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"MigrationState({self.name} "
+            f"mode={self.mode} checkpoint={self.checkpoint})"
+        )
+
+
+class LegacyToTargetMapping(models.Model):
+    entity_type = models.CharField(
+        max_length=20,
+        choices=MigrationEntityType.choices,
+    )
+    legacy_pk = models.PositiveIntegerField()
+    target_pk = models.PositiveIntegerField()
+    mapping_version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entity_type", "legacy_pk"],
+                name="unique_legacy_to_target_mapping",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Mapping({self.entity_type}:{self.legacy_pk}->{self.target_pk})"
+
+
+class BackfillAuditRecord(models.Model):
+    entity_type = models.CharField(
+        max_length=20,
+        choices=MigrationEntityType.choices,
+    )
+    source_pk = models.PositiveIntegerField()
+    target_pk = models.PositiveIntegerField(null=True, blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=BackfillAuditStatus.choices,
+    )
+    reason_code = models.CharField(max_length=100, blank=True, null=True)
+    details = models.JSONField(default=dict, blank=True)
+    migrated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["entity_type", "source_pk"]),
+            models.Index(fields=["status", "migrated_at"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"BackfillAuditRecord({self.entity_type}:{self.source_pk} "
+            f"status={self.status})"
+        )
+
+
+class ParityReport(models.Model):
+    stage = models.CharField(
+        max_length=20,
+        choices=MigrationStage.choices,
+    )
+    scope = models.CharField(max_length=100)
+    passed = models.BooleanField(default=False)
+    total_checked = models.PositiveIntegerField(default=0)
+    failures = models.PositiveIntegerField(default=0)
+    failure_summary = models.TextField(blank=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["stage", "scope", "generated_at"]),
+            models.Index(fields=["passed", "generated_at"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"ParityReport(stage={self.stage} scope={self.scope} "
+            f"passed={self.passed})"
+        )
+
+
+class ListingWatchlistItem(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="target_watchlist_items",
+    )
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="target_watchlist_items",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=WatchlistStatus.choices,
+        default=WatchlistStatus.WATCHING,
+    )
+    source = models.CharField(max_length=10, choices=WatchlistSource.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                name="unique_user_target_listing_watchlist",
+            ),
+        ]
+        ordering = ["-updated_at"]
+
+
+class ListingMessageThread(models.Model):
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="target_threads",
+    )
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="target_created_threads",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "created_by_user"],
+                name="unique_target_thread_per_listing_initiator",
+            ),
+        ]
+
+    def __str__(self):
+        return f"TargetThread listing={self.listing_id} initiator={self.created_by_user_id}"
