@@ -1,15 +1,22 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% if editing %}{% trans "Edit Demand Post" %}{% else %}{% trans "Create Demand Post" %}{% endif %}{% endblock %}
+{% block title %}{% if editing %}{% trans "Edit Wanted Listing" %}{% else %}{% trans "Create Wanted Listing" %}{% endif %}{% endblock %}
 
 {% block content %}
-<h1>{% if editing %}{% trans "Edit Demand Post" %}{% else %}{% trans "Create Demand Post" %}{% endif %}</h1>
+<h1>{% if editing %}{% trans "Edit Wanted Listing" %}{% else %}{% trans "Create Wanted Listing" %}{% endif %}</h1>
 <div class="card">
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">{% trans "Submit" %}</button>
+        <div class="actions">
+            <button type="submit">{% trans "Submit" %}</button>
+            {% if editing %}
+                <a href="{% url 'marketplace:demand_post_detail' form.instance.pk %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+            {% else %}
+                <a href="{% url 'marketplace:demand_post_list' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+            {% endif %}
+        </div>
     </form>
 </div>
 {% endblock %}

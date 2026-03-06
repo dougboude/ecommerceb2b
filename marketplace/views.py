@@ -16,7 +16,9 @@ from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
 from .forms import DemandPostForm, DiscoverForm, MessageForm, ProfileForm, SignupForm, SupplyLotForm
+from .context_processors import SKIN_COOKIE_NAME
 from .matching import (
+    bulk_suggestion_counts,
     get_suggestions_for_lot,
     get_suggestions_for_post,
     watchlisted_demand_post_ids,
@@ -31,12 +33,26 @@ from .models import (
     Role,
     SupplyLot,
     SupplyStatus,
+    ThreadReadState,
     WatchlistItem,
     WatchlistSource,
     WatchlistStatus,
 )
+from .notifications import send_new_message_notification
 
 PAGE_SIZE = 25
+SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+
+def _set_skin_cookie(response, skin_name):
+    response.set_cookie(
+        SKIN_COOKIE_NAME,
+        skin_name,
+        max_age=SKIN_COOKIE_MAX_AGE,
+        samesite="Lax",
+        httponly=True,
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +190,8 @@ def signup_view(request):
             user = form.save()
             login(request, user)
             django_messages.success(request, _("Account created successfully."))
-            return redirect("marketplace:dashboard")
+            response = redirect("marketplace:dashboard")
+            return _set_skin_cookie(response, user.skin)
     else:
         form = SignupForm()
     return render(request, "registration/signup.html", {"form": form})
@@ -183,6 +200,10 @@ def signup_view(request):
 class MarketplaceLoginView(LoginView):
     template_name = "registration/login.html"
     redirect_authenticated_user = True
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        return _set_skin_cookie(response, form.get_user().skin)
 
 
 class MarketplaceLogoutView(LogoutView):
@@ -271,9 +292,10 @@ def profile_edit(request):
     if request.method == "POST":
         form = ProfileForm(request.POST, instance=request.user)
         if form.is_valid():
-            form.save()
+            user = form.save()
             django_messages.success(request, _("Profile updated."))
-            return redirect("marketplace:profile")
+            response = redirect("marketplace:profile")
+            return _set_skin_cookie(response, user.skin)
     else:
         form = ProfileForm(instance=request.user)
     return render(request, "marketplace/profile_edit.html", {"form": form})
@@ -291,8 +313,10 @@ def demand_post_list(request):
     post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    counts = bulk_suggestion_counts(page_obj, request.user, listing_side="demand")
     for post in page_obj:
         post.post_number = post_numbers.get(post.pk, 1)
+        post.unsaved_count, post.saved_count = counts.get(post.pk, (0, 0))
     return render(request, "marketplace/demand_post_list.html", {"page_obj": page_obj})
 
 
@@ -308,7 +332,7 @@ def demand_post_create(request):
             post.organization = request.user.organization
             post.save()
             _sync_listing_to_vector_index(post)
-            django_messages.success(request, _("Demand post created."))
+            django_messages.success(request, _("Wanted listing created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
         form = DemandPostForm(user=request.user)
@@ -323,7 +347,7 @@ def demand_post_edit(request, pk):
         if form.is_valid():
             form.save()
             _sync_listing_to_vector_index(post)
-            django_messages.success(request, _("Demand post updated."))
+            django_messages.success(request, _("Wanted listing updated."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
         form = DemandPostForm(instance=post, user=request.user)
@@ -342,11 +366,24 @@ def demand_post_detail(request, pk):
     if is_owner and post.status == DemandStatus.ACTIVE:
         suggestions = get_suggestions_for_post(post, request.user, limit=5)
     watchlisted_pks = watchlisted_supply_lot_ids(request.user) if suggestions else set()
+
+    listing_threads = []
+    if is_owner:
+        listing_threads = list(
+            MessageThread.objects.filter(
+                watchlist_item__demand_post=post,
+            ).select_related("buyer", "supplier").annotate(
+                message_count=Count("messages"),
+                last_message_at=models.Max("messages__created_at"),
+            ).filter(message_count__gt=0).order_by("-last_message_at")
+        )
+
     return render(request, "marketplace/demand_post_detail.html", {
         "post": post,
         "suggestions": suggestions,
         "is_owner": is_owner,
         "watchlisted_pks": watchlisted_pks,
+        "listing_threads": listing_threads,
     })
 
 
@@ -375,7 +412,7 @@ def demand_post_delete(request, pk):
         post.save(update_fields=["status"])
         _archive_watchlist_items_for_post(post)
         _remove_listing_from_vector_index(post)
-        django_messages.success(request, _("Demand post deleted."))
+        django_messages.success(request, _("Wanted listing deleted."))
         return redirect("marketplace:demand_post_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
         "listing_title": post.item_text,
@@ -396,8 +433,10 @@ def supply_lot_list(request):
     lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    counts = bulk_suggestion_counts(page_obj, request.user, listing_side="supply")
     for lot in page_obj:
         lot.lot_number = lot_numbers.get(lot.pk, 1)
+        lot.unsaved_count, lot.saved_count = counts.get(lot.pk, (0, 0))
     return render(request, "marketplace/supply_lot_list.html", {"page_obj": page_obj})
 
 
@@ -412,7 +451,7 @@ def supply_lot_create(request):
             lot.created_by = request.user
             lot.save()
             _sync_listing_to_vector_index(lot)
-            django_messages.success(request, _("Supply lot created."))
+            django_messages.success(request, _("Available listing created."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm()
@@ -427,7 +466,7 @@ def supply_lot_edit(request, pk):
         if form.is_valid():
             form.save()
             _sync_listing_to_vector_index(lot)
-            django_messages.success(request, _("Supply lot updated."))
+            django_messages.success(request, _("Available listing updated."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm(instance=lot)
@@ -446,11 +485,24 @@ def supply_lot_detail(request, pk):
     if is_owner and lot.status == SupplyStatus.ACTIVE:
         suggestions = get_suggestions_for_lot(lot, request.user, limit=5)
     watchlisted_pks = watchlisted_demand_post_ids(request.user) if suggestions else set()
+
+    listing_threads = []
+    if is_owner:
+        listing_threads = list(
+            MessageThread.objects.filter(
+                watchlist_item__supply_lot=lot,
+            ).select_related("buyer", "supplier").annotate(
+                message_count=Count("messages"),
+                last_message_at=models.Max("messages__created_at"),
+            ).filter(message_count__gt=0).order_by("-last_message_at")
+        )
+
     return render(request, "marketplace/supply_lot_detail.html", {
         "lot": lot,
         "suggestions": suggestions,
         "is_owner": is_owner,
         "watchlisted_pks": watchlisted_pks,
+        "listing_threads": listing_threads,
     })
 
 
@@ -479,7 +531,7 @@ def supply_lot_delete(request, pk):
         lot.save(update_fields=["status"])
         _archive_watchlist_items_for_lot(lot)
         _remove_listing_from_vector_index(lot)
-        django_messages.success(request, _("Supply lot deleted."))
+        django_messages.success(request, _("Available listing deleted."))
         return redirect("marketplace:supply_lot_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
         "listing_title": lot.item_text,
@@ -520,6 +572,33 @@ def _run_discover_search(user, query, category, country, search_mode="similar"):
     )
 
 
+def _sort_discover_results(results, sort_by, user):
+    """Sort discover results based on user-selected mode."""
+    if sort_by == DiscoverForm.SORT_NEWEST:
+        return sorted(results, key=lambda listing: listing.created_at, reverse=True)
+
+    if sort_by == DiscoverForm.SORT_ENDING_SOON:
+        if user.role == Role.BUYER:
+            # Buyers discover supply lots, so "ending soon" means availability ends soonest.
+            return sorted(
+                results,
+                key=lambda listing: (
+                    listing.available_until is None,
+                    listing.available_until or listing.created_at,
+                ),
+            )
+        # Suppliers discover demand posts, so "ending soon" means post expiry soonest.
+        return sorted(
+            results,
+            key=lambda listing: (
+                listing.expires_at is None,
+                listing.expires_at or listing.created_at,
+            ),
+        )
+
+    return results
+
+
 def _is_short_query(query):
     words = [w for w in query.strip().split() if w]
     return len(words) <= 2
@@ -552,6 +631,8 @@ def discover_view(request):
             country = form.cleaned_data.get("location_country") or ""
             radius = form.cleaned_data.get("radius") or ""
             search_mode = form.cleaned_data.get("search_mode", "similar")
+            sort_by = form.cleaned_data.get("sort_by", DiscoverForm.SORT_BEST_MATCH)
+            exclude_watched = form.cleaned_data.get("exclude_watched", False)
 
             # Store params in session
             request.session["discover_last_query"] = query
@@ -559,10 +640,15 @@ def discover_view(request):
             request.session["discover_last_country"] = country
             request.session["discover_last_radius"] = radius
             request.session["discover_last_search_mode"] = search_mode
+            request.session["discover_last_sort_by"] = sort_by
+            request.session["discover_last_exclude_watched"] = exclude_watched
 
             results = _run_discover_search(user, query, category, country, search_mode)
+            results = _sort_discover_results(results, sort_by, user)
             searched = True
             watchlisted_pks = _discover_watchlisted_pks(user)
+            if exclude_watched and watchlisted_pks:
+                results = [r for r in results if r.pk not in watchlisted_pks]
             if not results and search_mode == "similar" and _is_short_query(query):
                 short_query_hint = True
     else:
@@ -576,6 +662,8 @@ def discover_view(request):
                 "location_country": request.session.get("discover_last_country", ""),
                 "radius": request.session.get("discover_last_radius", ""),
                 "search_mode": request.session.get("discover_last_search_mode", "similar"),
+                "sort_by": request.session.get("discover_last_sort_by", DiscoverForm.SORT_BEST_MATCH),
+                "exclude_watched": request.session.get("discover_last_exclude_watched", False),
             }
             form = DiscoverForm(initial=initial, user=user)
             results = _run_discover_search(
@@ -583,8 +671,11 @@ def discover_view(request):
                 initial["category"], initial["location_country"],
                 initial["search_mode"],
             )
+            results = _sort_discover_results(results, initial["sort_by"], user)
             searched = True
             watchlisted_pks = _discover_watchlisted_pks(user)
+            if initial["exclude_watched"] and watchlisted_pks:
+                results = [r for r in results if r.pk not in watchlisted_pks]
             if not results and initial["search_mode"] == "similar" and _is_short_query(session_query):
                 short_query_hint = True
         else:
@@ -604,7 +695,8 @@ def discover_clear(request):
     """Clear discover search session state and redirect to a fresh form."""
     for key in ["discover_last_query", "discover_last_category",
                 "discover_last_country", "discover_last_radius",
-                "discover_last_search_mode", "discover_keep_results"]:
+                "discover_last_search_mode", "discover_last_sort_by",
+                "discover_last_exclude_watched", "discover_keep_results"]:
         request.session.pop(key, None)
     return redirect("marketplace:discover")
 
@@ -652,6 +744,33 @@ def _keyword_search(query, listing_type, user, category=None, country=None, limi
 # Watchlist
 # ---------------------------------------------------------------------------
 
+def _attach_unread_counts(user, items):
+    """Attach .unread_count to each WatchlistItem. Two DB queries total."""
+    thread_ids = [item.thread_id for item in items if item.thread_id]
+    for item in items:
+        item.unread_count = 0
+    if not thread_ids:
+        return
+    # Query 1: read states
+    read_states = {
+        rs.thread_id: rs.last_read_at
+        for rs in ThreadReadState.objects.filter(user=user, thread_id__in=thread_ids)
+    }
+    # Query 2: all non-own messages for those threads, filtered in Python
+    unread_map = {tid: 0 for tid in thread_ids}
+    for thread_id, created_at in (
+        Message.objects
+        .filter(thread_id__in=thread_ids)
+        .exclude(sender=user)
+        .values_list("thread_id", "created_at")
+    ):
+        last_read = read_states.get(thread_id)
+        if last_read is None or created_at > last_read:
+            unread_map[thread_id] += 1
+    for item in items:
+        item.unread_count = unread_map.get(item.thread_id, 0)
+
+
 @login_required
 def watchlist_view(request):
     user = request.user
@@ -665,6 +784,9 @@ def watchlist_view(request):
         status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
     ).order_by("-updated_at"))
     archived = list(qs.filter(status=WatchlistStatus.ARCHIVED).order_by("-updated_at"))
+
+    _attach_unread_counts(user, watching)
+    _attach_unread_counts(user, archived)
 
     return render(request, "marketplace/watchlist.html", {
         "watching": watching,
@@ -685,6 +807,7 @@ def watchlist_star(request, pk):
     if request.headers.get("HX-Request"):
         is_starred = item.status == WatchlistStatus.STARRED
         inactive = item.status == WatchlistStatus.ARCHIVED
+        _attach_unread_counts(request.user, [item])
         return render(request, "marketplace/_watchlist_card.html", {
             "item": item,
             "show_star": not is_starred and not inactive,
@@ -848,6 +971,14 @@ def thread_detail(request, pk):
     )
     if request.user not in (thread.buyer, thread.supplier):
         raise PermissionDenied
+
+    # Mark thread as read for current user
+    from django.utils import timezone
+    ThreadReadState.objects.update_or_create(
+        thread=thread, user=request.user,
+        defaults={"last_read_at": timezone.now()},
+    )
+
     listing = thread.watchlist_item.supply_lot or thread.watchlist_item.demand_post
     listing_deleted = listing.status == "deleted"
     if request.method == "POST":
@@ -855,10 +986,18 @@ def thread_detail(request, pk):
             raise PermissionDenied
         form = MessageForm(request.POST)
         if form.is_valid():
-            Message.objects.create(
+            msg = Message.objects.create(
                 thread=thread,
                 sender=request.user,
                 body=form.cleaned_data["body"],
+            )
+            send_new_message_notification(msg)
+            from .sse_client import publish_new_message
+            publish_new_message(msg)
+            # Update read state after sending (sender has read their own message)
+            ThreadReadState.objects.update_or_create(
+                thread=thread, user=request.user,
+                defaults={"last_read_at": timezone.now()},
             )
             return redirect("marketplace:thread_detail", pk=thread.pk)
     else:
@@ -870,8 +1009,95 @@ def thread_detail(request, pk):
         "messages_list": msgs,
         "form": form,
         "counterparty": counterparty,
+        "listing": listing,
+        "is_supply": thread.watchlist_item.supply_lot is not None,
         "listing_deleted": listing_deleted,
     })
+
+
+# ---------------------------------------------------------------------------
+# Inbox
+# ---------------------------------------------------------------------------
+
+@login_required
+def inbox_view(request):
+    from django.db.models import F, Subquery, OuterRef
+    from django.utils import timezone
+
+    user = request.user
+
+    read_at_sq = ThreadReadState.objects.filter(
+        thread=OuterRef("pk"), user=user,
+    ).values("last_read_at")[:1]
+
+    last_msg_body_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at").values("body")[:1]
+
+    last_other_msg_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).exclude(sender=user).order_by("-created_at").values("created_at")[:1]
+
+    threads = (
+        MessageThread.objects.filter(
+            Q(buyer=user) | Q(supplier=user),
+        )
+        .select_related(
+            "watchlist_item",
+            "watchlist_item__supply_lot",
+            "watchlist_item__demand_post",
+            "buyer",
+            "supplier",
+        )
+        .annotate(
+            last_message_at=models.Max("messages__created_at"),
+            last_other_message_at=Subquery(last_other_msg_sq),
+            user_read_at=Subquery(read_at_sq),
+            last_message_body=Subquery(last_msg_body_sq),
+        )
+        .filter(last_message_at__isnull=False)
+        .order_by("-last_message_at")
+    )
+
+    thread_list = []
+    for t in threads:
+        t.counterparty = t.supplier if user == t.buyer else t.buyer
+        t.listing = t.watchlist_item.supply_lot or t.watchlist_item.demand_post
+        preview = (t.last_message_body or "")[:120]
+        if len(t.last_message_body or "") > 120:
+            preview += "..."
+        t.preview = preview
+        t.is_unread = (
+            t.last_other_message_at is not None
+            and (t.user_read_at is None or t.last_other_message_at > t.user_read_at)
+        )
+        thread_list.append(t)
+
+    return render(request, "marketplace/inbox.html", {
+        "threads": thread_list,
+    })
+
+
+@login_required
+@require_POST
+def suggestion_message(request):
+    """Create watchlist item + thread from a suggestion card and redirect to thread."""
+    listing_type = request.POST.get("listing_type")
+    listing_pk = request.POST.get("listing_pk")
+    if listing_type == "supply_lot":
+        lot = get_object_or_404(SupplyLot, pk=listing_pk)
+        item, _ = _get_or_create_watchlist_item(
+            request.user, supply_lot=lot, source=WatchlistSource.SUGGESTION,
+        )
+    elif listing_type == "demand_post":
+        post = get_object_or_404(DemandPost, pk=listing_pk)
+        item, _ = _get_or_create_watchlist_item(
+            request.user, demand_post=post, source=WatchlistSource.SUGGESTION,
+        )
+    else:
+        raise PermissionDenied
+    thread, _ = _get_or_create_thread(item)
+    return redirect("marketplace:thread_detail", pk=thread.pk)
 
 
 # ---------------------------------------------------------------------------

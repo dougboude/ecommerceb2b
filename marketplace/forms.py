@@ -15,6 +15,7 @@ from .models import (
     SupplyLot,
     User,
 )
+from .skin_config import DEFAULT_SKIN_SLUG
 
 
 class SignupForm(UserCreationForm):
@@ -43,6 +44,8 @@ class SignupForm(UserCreationForm):
         user = super().save(commit=False)
         user.role = self.cleaned_data["role"]
         user.country = self.cleaned_data["country"]
+        if not user.skin:
+            user.skin = DEFAULT_SKIN_SLUG
         if commit:
             user.save()
             if user.role == Role.BUYER:
@@ -153,9 +156,17 @@ class SupplyLotForm(forms.ModelForm):
 class DiscoverForm(forms.Form):
     SEARCH_MODE_SIMILAR = "similar"
     SEARCH_MODE_KEYWORD = "keyword"
+    SORT_BEST_MATCH = "best_match"
+    SORT_NEWEST = "newest"
+    SORT_ENDING_SOON = "ending_soon"
     SEARCH_MODE_CHOICES = [
         (SEARCH_MODE_SIMILAR, _("Similar meaning")),
         (SEARCH_MODE_KEYWORD, _("Contains these words")),
+    ]
+    SORT_CHOICES = [
+        (SORT_BEST_MATCH, _("Best match")),
+        (SORT_NEWEST, _("Newest posted")),
+        (SORT_ENDING_SOON, _("Ending soon")),
     ]
 
     query = forms.CharField(
@@ -167,6 +178,11 @@ class DiscoverForm(forms.Form):
         initial=SEARCH_MODE_SIMILAR,
         widget=forms.RadioSelect,
         label=_("Search mode"),
+    )
+    sort_by = forms.ChoiceField(
+        choices=SORT_CHOICES,
+        initial=SORT_BEST_MATCH,
+        label=_("Sort by"),
     )
     category = forms.ChoiceField(
         choices=[("", _("All categories"))] + list(Category.choices),
@@ -185,6 +201,10 @@ class DiscoverForm(forms.Form):
         ],
         required=False, label=_("Radius"),
     )
+    exclude_watched = forms.BooleanField(
+        required=False, initial=False,
+        label=_("Hide listings I'm watching"),
+    )
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -201,4 +221,4 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit", "skin"]
+        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit", "skin", "email_on_message"]

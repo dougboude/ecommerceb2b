@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .constants import UNIT_CHOICES
+from .skin_config import DEFAULT_SKIN_SLUG
 
 
 # ---------------------------------------------------------------------------
@@ -15,6 +16,7 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required")
         email = self.normalize_email(email)
+        extra_fields.setdefault("skin", DEFAULT_SKIN_SLUG)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -121,7 +123,9 @@ class User(AbstractUser):
         _("theme"),
         max_length=20,
         choices=Skin.choices,
-        default=Skin.WARM_EDITORIAL,
+    )
+    email_on_message = models.BooleanField(
+        _("email me when I receive a message"), default=False,
     )
 
     objects = UserManager()
@@ -408,3 +412,29 @@ class Message(models.Model):
 
     def __str__(self):
         return f"Message #{self.pk}"
+
+
+# ---------------------------------------------------------------------------
+# ThreadReadState (per-user read tracking)
+# ---------------------------------------------------------------------------
+
+class ThreadReadState(models.Model):
+    thread = models.ForeignKey(
+        MessageThread, on_delete=models.CASCADE, related_name="read_states",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="thread_read_states",
+    )
+    last_read_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "user"],
+                name="unique_thread_read_state",
+            ),
+        ]
+
+    def __str__(self):
+        return f"ReadState thread={self.thread_id} user={self.user_id}"

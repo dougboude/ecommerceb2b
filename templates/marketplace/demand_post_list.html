@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Demand Posts" %}{% endblock %}
+{% block title %}{% trans "Wanted Listings" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Your Demand Posts" %}</h1>
+<div class="page-header">
+    <h1>{% trans "Your Wanted Listings" %}</h1>
+    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
+</div>
 {% if page_obj %}
+{% include "includes/_listing_filter.html" %}
 <div class="card-grid">
     {% for post in page_obj %}
     <a href="{% url 'marketplace:demand_post_detail' post.pk %}" class="tile">
@@ -14,14 +18,17 @@
         {% if post.quantity_value %}<div class="tile-meta">{{ post.quantity_value }} {{ post.get_quantity_unit_display }}</div>{% endif %}
         {% if post.category %}<div class="tile-meta">{{ post.get_category_display }}</div>{% endif %}
         <div class="tile-meta">{{ post.get_location_country_display|default:post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}</div>
+        {% if post.unsaved_count or post.saved_count %}
+        <div class="tile-match-counts">
+            {% if post.unsaved_count %}<span class="match-badge match-badge-unsaved">{{ post.unsaved_count }} {% trans "new" %}</span>{% endif %}
+            {% if post.saved_count %}<span class="match-badge match-badge-saved">{{ post.saved_count }} {% trans "saved" %}</span>{% endif %}
+        </div>
+        {% endif %}
     </a>
     {% endfor %}
 </div>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p class="empty-state">{% trans "No demand posts yet." %}</p>
+<p class="empty-state">{% trans "No wanted listings yet." %}</p>
 {% endif %}
-<div class="actions">
-    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
-</div>
 {% endblock %}

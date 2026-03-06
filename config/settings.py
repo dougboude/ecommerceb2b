@@ -86,6 +86,8 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "marketplace.context_processors.skin",
                 "marketplace.context_processors.nav_section",
+                "marketplace.context_processors.unread_thread_count",
+                "marketplace.context_processors.sse_stream",
             ],
         },
     },
@@ -198,6 +200,13 @@ EMBEDDING_SOCKET_PATH = os.environ.get(
 EMBEDDING_SERVICE_TOKEN = os.environ.get(
     "EMBEDDING_SERVICE_TOKEN", "dev-token-change-me"
 )
+
+# ---------------------------------------------------------------------------
+# SSE service (sidecar over TCP — browser needs direct access)
+# ---------------------------------------------------------------------------
+SSE_SERVICE_URL = os.environ.get("SSE_SERVICE_URL", "http://127.0.0.1:8001")
+SSE_SERVICE_TOKEN = os.environ.get("SSE_SERVICE_TOKEN", "dev-token-change-me")
+SSE_STREAM_SECRET = os.environ.get("SSE_STREAM_SECRET", "dev-stream-secret")
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True

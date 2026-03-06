@@ -40,6 +40,12 @@
                     <button type="submit" class="btn btn-secondary btn-small">{% trans "Save" %}</button>
                 </form>
             {% endif %}
+            <form method="post" action="{% url 'marketplace:suggestion_message' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                <button type="submit" class="btn btn-primary btn-small">{% trans "Message" %}</button>
+            </form>
             <form method="post" action="{% url 'marketplace:suggestion_dismiss' %}" style="display:inline;">
                 {% csrf_token %}
                 <input type="hidden" name="listing_type" value="supply_lot">
@@ -49,6 +55,21 @@
             </form>
         </div>
     </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+{% if is_owner and listing_threads %}
+<section>
+    <h2>{% trans "Conversations" %} ({{ listing_threads|length }})</h2>
+    {% for thread in listing_threads %}
+    <a href="{% url 'marketplace:thread_detail' thread.pk %}" class="match-card" style="text-decoration:none; color:inherit;">
+        <div class="match-card-details">
+            <strong>{{ thread.supplier.display_name|default:thread.supplier.email }}</strong>
+            <span class="tile-meta">{{ thread.message_count }} {% trans "messages" %}</span>
+        </div>
+        <span class="tile-meta">{{ thread.last_message_at|timesince }} {% trans "ago" %}</span>
+    </a>
     {% endfor %}
 </section>
 {% endif %}

@@ -8,7 +8,7 @@
 
 {% if user.role == "buyer" %}
     <section>
-        <h2>{% trans "Your Demand Posts" %}</h2>
+        <h2>{% trans "Your Wanted Listings" %}</h2>
         {% if demand_posts %}
         <div class="card-grid">
             {% for post in demand_posts %}
@@ -22,14 +22,14 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="empty-state">{% trans "No demand posts yet." %}</p>
+        <p class="empty-state">{% trans "No wanted listings yet." %}</p>
         {% endif %}
-        <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create demand post" %}</a>
+        <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Post a Wanted Listing" %}</a>
     </section>
 
 {% else %}
     <section>
-        <h2>{% trans "Your Supply Lots" %}</h2>
+        <h2>{% trans "Your Available Listings" %}</h2>
         {% if supply_lots %}
         <div class="card-grid">
             {% for lot in supply_lots %}
@@ -43,9 +43,9 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="empty-state">{% trans "No supply lots yet." %}</p>
+        <p class="empty-state">{% trans "No available listings yet." %}</p>
         {% endif %}
-        <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create supply lot" %}</a>
+        <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Post an Available Listing" %}</a>
     </section>
 {% endif %}
 
@@ -82,6 +82,12 @@
                     <button type="submit" class="btn btn-secondary btn-small">{% trans "Save" %}</button>
                 </form>
             {% endif %}
+            <form method="post" action="{% url 'marketplace:suggestion_message' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="{{ suggestion_type }}">
+                <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
+                <button type="submit" class="btn btn-primary btn-small">{% trans "Message" %}</button>
+            </form>
             <form method="post" action="{% url 'marketplace:suggestion_dismiss' %}" style="display:inline;">
                 {% csrf_token %}
                 <input type="hidden" name="listing_type" value="{{ suggestion_type }}">

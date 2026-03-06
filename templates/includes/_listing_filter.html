@@ -1,0 +1,133 @@
+{% load i18n %}
+<div class="listing-filter-bar">
+    <div class="listing-filter-input-wrap">
+        <input type="text" id="listing-filter-input" placeholder="{% trans "Type to filter..." %}" autocomplete="off">
+        <button type="button" id="listing-filter-clear" class="listing-filter-clear" aria-label="{% trans "Clear filter" %}" hidden>&times;</button>
+    </div>
+    <div id="listing-status-checks" class="listing-status-checks"></div>
+    <span id="listing-filter-count" class="listing-filter-count" hidden></span>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var input = document.getElementById('listing-filter-input');
+    var clearBtn = document.getElementById('listing-filter-clear');
+    var countEl = document.getElementById('listing-filter-count');
+    var checksContainer = document.getElementById('listing-status-checks');
+    var grid = document.querySelector('.card-grid');
+    if (!input || !grid) return;
+
+    var tiles = Array.from(grid.querySelectorAll('.tile'));
+    var total = tiles.length;
+    if (total === 0) return;
+
+    // Pre-compute searchable text for each tile
+    var tileTexts = tiles.map(function(tile) {
+        return tile.textContent.toLowerCase();
+    });
+
+    // Extract status from each tile's .status element class list
+    var tileStatuses = tiles.map(function(tile) {
+        var statusEl = tile.querySelector('.status');
+        if (!statusEl) return '';
+        var classes = statusEl.className.split(/\s+/);
+        for (var i = 0; i < classes.length; i++) {
+            if (classes[i].indexOf('status-') === 0 && classes[i] !== 'status') {
+                return classes[i].replace('status-', '');
+            }
+        }
+        return '';
+    });
+
+    // Build status counts
+    var statusCounts = {};
+    tileStatuses.forEach(function(s) {
+        if (s) statusCounts[s] = (statusCounts[s] || 0) + 1;
+    });
+
+    var statusKeys = Object.keys(statusCounts).sort();
+    var activeStatuses = {};
+
+    // Build checkbox filters — show when multiple statuses exist
+    if (statusKeys.length >= 2) {
+        statusKeys.forEach(function(status) {
+            activeStatuses[status] = true;
+
+            var label = document.createElement('label');
+            label.className = 'listing-status-check';
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = true;
+            cb.dataset.status = status;
+
+            var text = document.createTextNode(
+                ' ' + status.charAt(0).toUpperCase() + status.slice(1) + ' (' + statusCounts[status] + ')'
+            );
+
+            label.appendChild(cb);
+            label.appendChild(text);
+            checksContainer.appendChild(label);
+
+            cb.addEventListener('change', function() {
+                activeStatuses[status] = cb.checked;
+                applyFilter();
+            });
+        });
+    }
+
+    function applyFilter() {
+        var query = input.value.toLowerCase().trim();
+        clearBtn.hidden = !query;
+
+        var allStatusesOn = true;
+        for (var k in activeStatuses) {
+            if (!activeStatuses[k]) { allStatusesOn = false; break; }
+        }
+
+        var showCount = query || !allStatusesOn;
+        var visible = 0;
+
+        tiles.forEach(function(tile, i) {
+            var textMatch = true;
+            var statusMatch = true;
+
+            if (query) {
+                var words = query.split(/\s+/);
+                var text = tileTexts[i];
+                textMatch = words.every(function(w) { return text.indexOf(w) !== -1; });
+            }
+
+            if (!allStatusesOn) {
+                statusMatch = activeStatuses[tileStatuses[i]] !== false;
+            }
+
+            var show = textMatch && statusMatch;
+            tile.classList.toggle('tile-filtered', !show);
+            if (show) visible++;
+        });
+
+        if (showCount) {
+            countEl.textContent = visible + ' / ' + total;
+            countEl.hidden = false;
+        } else {
+            countEl.hidden = true;
+        }
+    }
+
+    input.addEventListener('input', applyFilter);
+
+    clearBtn.addEventListener('click', function() {
+        input.value = '';
+        applyFilter();
+        input.focus();
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            input.value = '';
+            applyFilter();
+        }
+    });
+});
+</script>

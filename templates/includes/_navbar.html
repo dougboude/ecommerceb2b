@@ -9,6 +9,7 @@
         {% endif %}
         <a href="{% url 'marketplace:discover' %}"{% if nav_section == "discover" %} class="nav-active"{% endif %}>{% trans "Discover" %}</a>
         <a href="{% url 'marketplace:watchlist' %}"{% if nav_section == "watchlist" %} class="nav-active"{% endif %}>{% trans "Watchlist" %}</a>
+        <a href="{% url 'marketplace:inbox' %}" id="nav-messages-link"{% if nav_section == "messages" %} class="nav-active"{% endif %}>{% trans "Messages" %}{% if unread_thread_count %}<span class="nav-badge" id="nav-unread-badge">{{ unread_thread_count }}</span>{% endif %}</a>
         <a href="{% url 'marketplace:profile' %}"{% if nav_section == "profile" %} class="nav-active"{% endif %}>{% trans "Profile" %}</a>
         <form method="post" action="{% url 'marketplace:logout' %}" style="display:inline;">
             {% csrf_token %}

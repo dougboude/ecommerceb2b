@@ -27,6 +27,10 @@
         if (card) window.location = card.dataset.href;
     });
     </script>
+    {% if sse_stream_url %}
+    <script src="{% static 'js/sse-client.js' %}"></script>
+    <script>initSSE("{{ sse_stream_url|escapejs }}");</script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>

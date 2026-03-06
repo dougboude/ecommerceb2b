@@ -46,3 +46,6 @@ data/chroma/
 
 # Compiled translations
 *.mo
+
+# Start script logs
+logs/

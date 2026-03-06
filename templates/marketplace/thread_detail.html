@@ -10,23 +10,23 @@
 <section>
     <h2>{% trans "Item details" %}</h2>
     <dl>
-        {% if user.role == "buyer" %}
-        <dt>{% trans "Supply" %}</dt><dd>{{ thread.watchlist_item.supply_lot.item_text }}</dd>
-        {% if thread.watchlist_item.supply_lot.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ thread.watchlist_item.supply_lot.quantity_value }} {{ thread.watchlist_item.supply_lot.get_quantity_unit_display }}</dd>{% endif %}
-        <dt>{% trans "Location" %}</dt><dd>{{ thread.watchlist_item.supply_lot.location_country }}{% if thread.watchlist_item.supply_lot.location_locality %}, {{ thread.watchlist_item.supply_lot.location_locality }}{% endif %}</dd>
-        {% if thread.watchlist_item.supply_lot.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>${{ thread.watchlist_item.supply_lot.asking_price }}/{{ thread.watchlist_item.supply_lot.get_price_unit_display }}</dd>{% endif %}
-        <dt>{% trans "Shipping" %}</dt><dd>{{ thread.watchlist_item.supply_lot.get_shipping_scope_display }}</dd>
+        {% if is_supply %}
+        <dt>{% trans "Supply" %}</dt><dd>{{ listing.item_text }}</dd>
+        {% if listing.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Location" %}</dt><dd>{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</dd>
+        {% if listing.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Shipping" %}</dt><dd>{{ listing.get_shipping_scope_display }}</dd>
         {% else %}
-        <dt>{% trans "Demand" %}</dt><dd>{{ thread.watchlist_item.demand_post.item_text }}</dd>
-        {% if thread.watchlist_item.demand_post.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ thread.watchlist_item.demand_post.quantity_value }} {{ thread.watchlist_item.demand_post.get_quantity_unit_display }}</dd>{% endif %}
-        <dt>{% trans "Location" %}</dt><dd>{{ thread.watchlist_item.demand_post.location_country }}{% if thread.watchlist_item.demand_post.location_locality %}, {{ thread.watchlist_item.demand_post.location_locality }}{% endif %}</dd>
+        <dt>{% trans "Demand" %}</dt><dd>{{ listing.item_text }}</dd>
+        {% if listing.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</dd>{% endif %}
+        <dt>{% trans "Location" %}</dt><dd>{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</dd>
         {% endif %}
     </dl>
 </section>
 
-<div class="messages-list">
+<div class="messages-list" id="sse-messages-list" data-thread-id="{{ thread.pk }}">
     {% for msg in messages_list %}
-    <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}">
+    <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}" data-message-ts="{{ msg.created_at|date:'U' }}">
         <strong>{{ msg.sender.display_name }}</strong>
         <span>{{ msg.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         <p>{{ msg.body }}</p>
@@ -51,6 +51,6 @@
 {% endif %}
 
 <div class="actions">
-    <a href="{% url 'marketplace:watchlist' %}" class="btn btn-secondary">{% trans "Back to watchlist" %}</a>
+    <a href="{% url 'marketplace:inbox' %}" class="btn btn-secondary">{% trans "Back to messages" %}</a>
 </div>
 {% endblock %}

@@ -1,11 +1,12 @@
 {% load i18n %}
-<div id="watchlist-card-{{ item.pk }}" class="match-card match-card--watchlist{% if inactive %} match-card-inactive{% endif %}" data-href="{% if item.supply_lot %}{% url 'marketplace:supply_lot_detail' item.supply_lot.pk %}{% else %}{% url 'marketplace:demand_post_detail' item.demand_post.pk %}{% endif %}">
+<div id="watchlist-card-{{ item.pk }}" class="match-card match-card--watchlist{% if inactive %} match-card-inactive{% endif %}" data-href="{% if item.supply_lot %}{% url 'marketplace:supply_lot_detail' item.supply_lot.pk %}{% else %}{% url 'marketplace:demand_post_detail' item.demand_post.pk %}{% endif %}"{% if item.thread %} data-thread-id="{{ item.thread.pk }}"{% endif %}>
     <div class="match-card-details">
         {% if item.supply_lot %}
             <strong><a href="{% url 'marketplace:supply_lot_detail' item.supply_lot.pk %}">{{ item.supply_lot.item_text }}</a></strong>
             {% if item.supply_lot.status == "deleted" %}<span class="status status-deleted">{% trans "Listing deleted" %}</span>
             {% elif item.supply_lot.status == "withdrawn" %}<span class="status status-withdrawn">{% trans "Listing withdrawn" %}</span>
             {% endif %}
+            {% if item.thread %}<span class="match-badge match-badge-saved" id="watchlist-badge-{{ item.thread.pk }}">{% trans "In conversation" %}{% if item.unread_count %}<span class="watchlist-unread-count"> &middot; {{ item.unread_count }} {% trans "unread" %}</span>{% endif %}</span>{% endif %}
             {% if item.supply_lot.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ item.supply_lot.created_by.display_name }}</span>{% endif %}
             {% if item.supply_lot.category %}<span class="tile-meta">{{ item.supply_lot.get_category_display }}</span>{% endif %}
             {% if item.supply_lot.quantity_value %}<span class="tile-meta">{{ item.supply_lot.quantity_value }} {{ item.supply_lot.get_quantity_unit_display }}</span>{% endif %}
@@ -18,6 +19,7 @@
             {% elif item.demand_post.status == "paused" %}<span class="status status-paused">{% trans "Listing paused" %}</span>
             {% elif item.demand_post.status == "expired" %}<span class="status status-expired">{% trans "Listing expired" %}</span>
             {% endif %}
+            {% if item.thread %}<span class="match-badge match-badge-saved" id="watchlist-badge-{{ item.thread.pk }}">{% trans "In conversation" %}{% if item.unread_count %}<span class="watchlist-unread-count"> &middot; {{ item.unread_count }} {% trans "unread" %}</span>{% endif %}</span>{% endif %}
             {% if item.demand_post.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ item.demand_post.created_by.display_name }}</span>{% endif %}
             {% if item.demand_post.category %}<span class="tile-meta">{{ item.demand_post.get_category_display }}</span>{% endif %}
             {% if item.demand_post.quantity_value %}<span class="tile-meta">{{ item.demand_post.quantity_value }} {{ item.demand_post.get_quantity_unit_display }}</span>{% endif %}
@@ -60,7 +62,7 @@
             </form>
             {% endif %}
             {% if item.thread %}
-                <a href="{% url 'marketplace:thread_detail' item.thread.pk %}" class="btn btn-primary btn-small">{% trans "Message" %}</a>
+                <a href="{% url 'marketplace:thread_detail' item.thread.pk %}" class="btn btn-primary btn-small">{% trans "Open conversation" %}</a>
             {% elif not inactive %}
                 <form method="post" action="{% url 'marketplace:watchlist_message' item.pk %}" style="display:inline;">
                     {% csrf_token %}

@@ -96,21 +96,82 @@ EMBEDDING_SOCKET_PATH=/tmp/ecommerceb2b-embedding.sock uvicorn app:app --uds /tm
 **Use `ai-docs/SESSION_STATUS.md` as the single source of truth for current status.**
 This file tracks what's done, what still needs testing, and any known issues.
 
+# SSE Service (Sidecar — Real-time Messaging)
+
+## Architecture
+The SSE relay runs as a standalone FastAPI sidecar over **TCP** (not UDS), because
+browsers connect directly via `EventSource`. Django publishes events over HTTP;
+the sidecar fans them out to connected browsers.
+
+```
+Browser  ──(EventSource, TCP :8001)──>  SSE Service (FastAPI/uvicorn)
+Django   ──(HTTP POST /publish)──────>  SSE Service
+```
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `services/sse/app.py` | FastAPI app — SSE relay + publish endpoint |
+| `services/sse/run.sh` | Startup script |
+| `services/sse/requirements.txt` | Service-specific deps (fastapi, uvicorn) |
+| `marketplace/sse_client.py` | Django-side HTTP client — publish events + generate stream tokens |
+| `static/js/sse-client.js` | Browser EventSource client — updates thread, inbox, navbar |
+
+## How to Run
+```bash
+# Terminal 1: Start the SSE service
+cd services/sse
+bash run.sh
+# Or directly:
+.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8001
+
+# Terminal 2: Start the embedding service
+cd services/embedding
+bash run.sh
+
+# Terminal 3: Django as usual
+.venv/bin/python manage.py runserver
+```
+
+## Configuration (env vars / settings.py)
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `SSE_SERVICE_URL` | `http://127.0.0.1:8001` | Django + browser |
+| `SSE_SERVICE_TOKEN` | `dev-token-change-me` | Django + service (shared secret) |
+| `SSE_STREAM_SECRET` | `dev-stream-secret` | Django + service (HMAC signing) |
+| `SSE_CORS_ORIGINS` | `http://127.0.0.1:8000,http://localhost:8000` | Service only |
+| `SSE_HOST` | `127.0.0.1` | Service only (run.sh) |
+| `SSE_PORT` | `8001` | Service only (run.sh) |
+
+## API Endpoints (service)
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/publish` | Django publishes events (auth: `X-Service-Token`) |
+| GET | `/stream/{user_id}?token=...` | Browser EventSource connection (auth: HMAC token) |
+| GET | `/health` | Readiness check (unauthenticated) |
+
+## Important Notes
+- No model loading — service starts instantly (unlike embedding sidecar).
+- If the service is down, SSE publish calls fail silently (logged). Email notifications still work.
+- Browser auth uses HMAC-signed query tokens (EventSource can't set headers).
+- Auto-reconnect with exponential backoff in the browser client (max 10 retries).
+- Django's `marketplace/sse_client.py` public API: `generate_stream_token()`, `publish_event()`, `publish_new_message()`.
+
 # Skinnable Theme System
 
 ## How It Works
 - Each skin = one standalone CSS file in `static/css/skin-<name>.css`.
 - All skins implement the same CSS class names (the "skin contract").
-- The active skin is stored on `User.skin` (default: `warm-editorial`).
+- The active skin is stored on `User.skin` (application default: `simple-blue`, no DB default).
 - `marketplace/context_processors.py` provides `{{ skin_css }}` to templates.
 - `base.html` uses `<link rel="stylesheet" href="{% static skin_css %}">`.
-- Unauthenticated users see the default skin (`warm-editorial`).
+- Unauthenticated users see the default skin (`simple-blue`).
 
 ## Available Skins
 | Slug | File | Description |
 |------|------|-------------|
-| `warm-editorial` | `skin-warm-editorial.css` | Cream/coral/serif editorial theme (default) |
-| `simple-blue` | `skin-simple-blue.css` | Clean blue/gray utilitarian theme |
+| `warm-editorial` | `skin-warm-editorial.css` | Cream/coral/serif editorial theme |
+| `simple-blue` | `skin-simple-blue.css` | Clean blue/gray utilitarian theme (default) |
 
 ## Adding a New Skin
 1. Add a choice to `Skin` enum in `marketplace/models.py`.
@@ -123,13 +184,15 @@ This file tracks what's done, what still needs testing, and any known issues.
 - **Buttons:** `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-small`, `button[type="submit"]`
 - **Cards:** `section`, `.card`
 - **Tiles:** `.card-grid`, `.tile`, `.tile-title`, `.tile-meta`
+- **Listing filter:** `.listing-filter-bar`, `.listing-filter-input-wrap`, `.listing-filter-clear`, `.listing-filter-count`, `.listing-status-checks`, `.listing-status-check`, `.tile-filtered`
 - **Forms:** `form p`, `label`, input types, `select`, `textarea`, `.helptext`, `.errorlist`, `.search-mode-row`
 - **Auth:** `.auth-form`, `.auth-link`
 - **Messages (Django):** `.messages`, `.message`, `.success`, `.error`, `.warning`, `.info`
 - **Messaging (thread):** `.messages-list`, `.message.sent`, `.message.received`
 - **Status badges:** `.status`, `.status-active`, `.status-paused`, `.status-expired`, `.status-fulfilled`, `.status-withdrawn`, `.status-deleted`
 - **Definition lists:** `dl`, `dt`, `dd`
-- **Match UI:** `.match-group`, `.match-group-header`, `.match-card`, `.match-card--watchlist`, `.match-card-inactive`, `.match-card-details`, `.match-card-actions`, `.match-card-actions-left`, `.match-card-actions-right`, `.match-badge`, `.matches-scroll`, `details.match-group`
+- **Match UI:** `.match-group`, `.match-group-header`, `.match-card`, `.match-card--watchlist`, `.match-card-inactive`, `.match-card-details`, `.match-card-actions`, `.match-card-actions-left`, `.match-card-actions-right`, `.match-badge`, `.match-badge-unsaved`, `.match-badge-saved`, `.tile-match-counts`, `.matches-scroll`, `details.match-group`
+- **Inbox/Messages:** `.nav-badge`, `.thread-unread`, `.thread-preview`
 - **Misc:** `.actions`, `.empty-state`, `.item-list`, `.pagination`
 - **Responsive:** `@media (max-width: 600px)`
 

@@ -13,10 +13,12 @@
         <div class="search-mode-row">
             {{ form.search_mode }}
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
             <p>{{ form.category.label_tag }} {{ form.category }}</p>
             <p>{{ form.location_country.label_tag }} {{ form.location_country }}</p>
+            <p>{{ form.sort_by.label_tag }} {{ form.sort_by }}</p>
         </div>
+        <label style="display: flex; align-items: center; gap: 0.4rem; margin: 0.5rem 0;">{{ form.exclude_watched }} {{ form.exclude_watched.label }}</label>
         <button type="submit" class="btn btn-primary">{% trans "Search" %}</button>
         {% if searched %}<a href="{% url 'marketplace:discover_clear' %}" class="btn btn-secondary">{% trans "Clear" %}</a>{% endif %}
     </form>
@@ -25,8 +27,15 @@
 {% if searched %}
     {% if results %}
     <h2>{% trans "Results" %}</h2>
+    <div id="discover-results-list">
     {% for listing in results %}
-    <div class="match-card" data-href="{% if user.role == 'buyer' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">
+    <div
+        class="match-card"
+        data-href="{% if user.role == 'buyer' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}"
+        data-best-rank="{{ forloop.counter0 }}"
+        data-created-at="{{ listing.created_at|date:'U' }}"
+        data-ending-at="{% if user.role == 'buyer' %}{% if listing.available_until %}{{ listing.available_until|date:'U' }}{% endif %}{% else %}{% if listing.expires_at %}{{ listing.expires_at|date:'U' }}{% endif %}{% endif %}"
+    >
         <div class="match-card-details">
             <strong><a href="{% if user.role == 'buyer' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">{{ listing.item_text }}</a></strong>
             {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
@@ -66,6 +75,7 @@
         </div>
     </div>
     {% endfor %}
+    </div>
     {% else %}
     <p class="empty-state">{% trans "No results found. Try broadening your search." %}</p>
     {% if short_query_hint %}
@@ -73,4 +83,48 @@
     {% endif %}
     {% endif %}
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var sortSelect = document.getElementById('id_sort_by');
+    var resultsList = document.getElementById('discover-results-list');
+    if (!sortSelect || !resultsList) return;
+
+    function asNumber(value, fallback) {
+        if (value === '' || value === null || value === undefined) {
+            return fallback;
+        }
+        var parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function sortedCards(sortBy) {
+        var cards = Array.from(resultsList.querySelectorAll('.match-card'));
+        return cards.sort(function(a, b) {
+            if (sortBy === 'newest') {
+                return asNumber(b.dataset.createdAt, 0) - asNumber(a.dataset.createdAt, 0);
+            }
+            if (sortBy === 'ending_soon') {
+                var aEnding = asNumber(a.dataset.endingAt, Number.POSITIVE_INFINITY);
+                var bEnding = asNumber(b.dataset.endingAt, Number.POSITIVE_INFINITY);
+                if (aEnding !== bEnding) return aEnding - bEnding;
+                var aCreated = asNumber(a.dataset.createdAt, 0);
+                var bCreated = asNumber(b.dataset.createdAt, 0);
+                return aCreated - bCreated;
+            }
+            return asNumber(a.dataset.bestRank, 0) - asNumber(b.dataset.bestRank, 0);
+        });
+    }
+
+    sortSelect.addEventListener('change', function() {
+        var cards = sortedCards(sortSelect.value);
+        if (cards.length < 2) return;
+        cards.forEach(function(card) {
+            resultsList.appendChild(card);
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -177,6 +177,65 @@ def watchlisted_demand_post_ids(user):
     ).values_list("demand_post_id", flat=True))
 
 
+def bulk_suggestion_counts(user_listings, user, listing_side="supply"):
+    """Compute suggestion counts for multiple listings in a single pass.
+
+    Args:
+        user_listings: iterable of the user's own listings (SupplyLot or DemandPost)
+        user: the request user
+        listing_side: "supply" if user_listings are SupplyLots,
+                      "demand" if DemandPosts
+
+    Returns:
+        dict of {listing_pk: (unsaved_count, saved_count)}
+    """
+    # Load counterparts and exclusion sets once
+    if listing_side == "supply":
+        counterparts = list(_active_demand_posts())
+        dismissed = _excluded_demand_post_ids(user)
+        watchlisted = watchlisted_demand_post_ids(user)
+    else:
+        counterparts = list(_active_supply_lots())
+        dismissed = _excluded_supply_lot_ids(user)
+        watchlisted = watchlisted_supply_lot_ids(user)
+
+    # Pre-tokenize counterparts
+    cp_data = []
+    for cp in counterparts:
+        if cp.pk in dismissed:
+            continue
+        tokens = normalize(cp.item_text)
+        if tokens:
+            cp_data.append((cp, tokens))
+
+    result = {}
+    for listing in user_listings:
+        listing_tokens = normalize(listing.item_text)
+        if not listing_tokens:
+            result[listing.pk] = (0, 0)
+            continue
+
+        unsaved = 0
+        saved = 0
+        for cp, cp_tokens in cp_data:
+            if not overlaps(listing_tokens, cp_tokens):
+                continue
+            if listing_side == "supply":
+                if not location_compatible(listing, cp):
+                    continue
+            else:
+                if not location_compatible(cp, listing):
+                    continue
+            if cp.pk in watchlisted:
+                saved += 1
+            else:
+                unsaved += 1
+
+        result[listing.pk] = (unsaved, saved)
+
+    return result
+
+
 def get_suggestions_for_post(demand_post, user, limit=5):
     """Return suggested supply lots for a demand post (on the fly)."""
     demand_tokens = normalize(demand_post.item_text)

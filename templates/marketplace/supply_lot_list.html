@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Supply Lots" %}{% endblock %}
+{% block title %}{% trans "Available Listings" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Your Supply Lots" %}</h1>
+<div class="page-header">
+    <h1>{% trans "Your Available Listings" %}</h1>
+    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
+</div>
 {% if page_obj %}
+{% include "includes/_listing_filter.html" %}
 <div class="card-grid">
     {% for lot in page_obj %}
     <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}" class="tile">
@@ -14,14 +18,17 @@
         {% if lot.quantity_value %}<div class="tile-meta">{{ lot.quantity_value }} {{ lot.get_quantity_unit_display }}</div>{% endif %}
         {% if lot.category %}<div class="tile-meta">{{ lot.get_category_display }}</div>{% endif %}
         <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>
+        {% if lot.unsaved_count or lot.saved_count %}
+        <div class="tile-match-counts">
+            {% if lot.unsaved_count %}<span class="match-badge match-badge-unsaved">{{ lot.unsaved_count }} {% trans "new" %}</span>{% endif %}
+            {% if lot.saved_count %}<span class="match-badge match-badge-saved">{{ lot.saved_count }} {% trans "saved" %}</span>{% endif %}
+        </div>
+        {% endif %}
     </a>
     {% endfor %}
 </div>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p class="empty-state">{% trans "No supply lots yet." %}</p>
+<p class="empty-state">{% trans "No available listings yet." %}</p>
 {% endif %}
-<div class="actions">
-    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
-</div>
 {% endblock %}

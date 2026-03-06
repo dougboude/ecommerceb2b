@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Messages" %}{% endblock %}
+
+{% block content %}
+<h1>{% trans "Messages" %}</h1>
+
+<div id="sse-inbox-page" style="display:none;"></div>
+{% if threads %}
+{% for thread in threads %}
+<a href="{% url 'marketplace:thread_detail' thread.pk %}" data-thread-id="{{ thread.pk }}" class="match-card{% if thread.is_unread %} thread-unread{% endif %}" style="text-decoration:none; color:inherit;">
+    <div class="match-card-details">
+        <strong>{{ thread.counterparty.display_name|default:thread.counterparty.email }}</strong>
+        <span class="tile-meta">{{ thread.listing.item_text|truncatechars:60 }}</span>
+        <span class="thread-preview">{{ thread.preview }}</span>
+    </div>
+    <div data-badge-container style="text-align:right; white-space:nowrap;">
+        {% if thread.is_unread %}<span class="nav-badge">{% trans "New" %}</span>{% endif %}
+        <span class="tile-meta">{{ thread.last_message_at|timesince }} {% trans "ago" %}</span>
+    </div>
+</a>
+{% endfor %}
+{% else %}
+<p class="empty-state">{% trans "No conversations yet. Use Discover or your Watchlist to start messaging." %}</p>
+{% endif %}
+{% endblock %}

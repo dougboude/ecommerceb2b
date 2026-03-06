@@ -15,19 +15,19 @@ urlpatterns = [
     path("profile/", views.profile_view, name="profile"),
     path("profile/edit/", views.profile_edit, name="profile_edit"),
     # DemandPost (buyer)
-    path("demands/", views.demand_post_list, name="demand_post_list"),
-    path("demands/new/", views.demand_post_create, name="demand_post_create"),
-    path("demands/<int:pk>/", views.demand_post_detail, name="demand_post_detail"),
-    path("demands/<int:pk>/edit/", views.demand_post_edit, name="demand_post_edit"),
-    path("demands/<int:pk>/toggle/", views.demand_post_toggle, name="demand_post_toggle"),
-    path("demands/<int:pk>/delete/", views.demand_post_delete, name="demand_post_delete"),
+    path("wanted/", views.demand_post_list, name="demand_post_list"),
+    path("wanted/new/", views.demand_post_create, name="demand_post_create"),
+    path("wanted/<int:pk>/", views.demand_post_detail, name="demand_post_detail"),
+    path("wanted/<int:pk>/edit/", views.demand_post_edit, name="demand_post_edit"),
+    path("wanted/<int:pk>/toggle/", views.demand_post_toggle, name="demand_post_toggle"),
+    path("wanted/<int:pk>/delete/", views.demand_post_delete, name="demand_post_delete"),
     # SupplyLot (supplier)
-    path("supply/", views.supply_lot_list, name="supply_lot_list"),
-    path("supply/new/", views.supply_lot_create, name="supply_lot_create"),
-    path("supply/<int:pk>/", views.supply_lot_detail, name="supply_lot_detail"),
-    path("supply/<int:pk>/edit/", views.supply_lot_edit, name="supply_lot_edit"),
-    path("supply/<int:pk>/toggle/", views.supply_lot_toggle, name="supply_lot_toggle"),
-    path("supply/<int:pk>/delete/", views.supply_lot_delete, name="supply_lot_delete"),
+    path("available/", views.supply_lot_list, name="supply_lot_list"),
+    path("available/new/", views.supply_lot_create, name="supply_lot_create"),
+    path("available/<int:pk>/", views.supply_lot_detail, name="supply_lot_detail"),
+    path("available/<int:pk>/edit/", views.supply_lot_edit, name="supply_lot_edit"),
+    path("available/<int:pk>/toggle/", views.supply_lot_toggle, name="supply_lot_toggle"),
+    path("available/<int:pk>/delete/", views.supply_lot_delete, name="supply_lot_delete"),
     # Discover
     path("discover/", views.discover_view, name="discover"),
     path("discover/clear/", views.discover_clear, name="discover_clear"),
@@ -44,6 +44,8 @@ urlpatterns = [
     # Suggestions
     path("suggestions/save/", views.suggestion_save, name="suggestion_save"),
     path("suggestions/dismiss/", views.suggestion_dismiss, name="suggestion_dismiss"),
+    path("suggestions/message/", views.suggestion_message, name="suggestion_message"),
     # Messaging
+    path("messages/", views.inbox_view, name="inbox"),
     path("threads/<int:pk>/", views.thread_detail, name="thread_detail"),
 ]

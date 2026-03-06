@@ -8,6 +8,7 @@ from .models import (
     MessageThread,
     Organization,
     SupplyLot,
+    ThreadReadState,
     User,
     WatchlistItem,
 )
@@ -66,3 +67,9 @@ class MessageThreadAdmin(admin.ModelAdmin):
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
     list_display = ("id", "thread", "sender", "created_at")
+
+
+@admin.register(ThreadReadState)
+class ThreadReadStateAdmin(admin.ModelAdmin):
+    list_display = ("id", "thread", "user", "last_read_at")
+    raw_id_fields = ("thread", "user")

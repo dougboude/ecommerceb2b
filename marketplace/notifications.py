@@ -40,3 +40,47 @@ def send_watchlist_notification(watchlist_item):
         recipient_list=[recipient.email],
         fail_silently=True,
     )
+
+
+def send_new_message_notification(message):
+    """Send email notification when a new message is sent in a thread."""
+    thread = message.thread
+    sender = message.sender
+
+    # Determine recipient (the other party)
+    if sender == thread.buyer:
+        recipient = thread.supplier
+    else:
+        recipient = thread.buyer
+
+    if not recipient.email_on_message:
+        return
+
+    # Determine listing text
+    listing = thread.watchlist_item.supply_lot or thread.watchlist_item.demand_post
+    item_text = listing.item_text
+
+    preview = message.body[:200]
+    if len(message.body) > 200:
+        preview += "..."
+
+    sender_name = sender.display_name or sender.email
+
+    subject = _("New message about: %(item)s") % {"item": item_text}
+    body = _(
+        "%(sender)s sent you a message about \"%(item)s\":\n\n"
+        "%(preview)s\n\n"
+        "Log in to read the full message and reply."
+    ) % {
+        "sender": sender_name,
+        "item": item_text,
+        "preview": preview,
+    }
+
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[recipient.email],
+        fail_silently=True,
+    )
