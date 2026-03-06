@@ -16,24 +16,44 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("email", "display_name", "role", "country", "email_verified", "is_active")
-    list_filter = ("role", "is_active", "email_verified")
+    list_display = ("email", "display_name", "organization_name", "country", "email_verified", "is_active")
+    list_filter = ("is_active", "email_verified")
     search_fields = ("email",)
     ordering = ("-date_joined",)
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Profile", {"fields": ("role", "country", "display_name", "email_verified", "first_name", "last_name", "timezone", "distance_unit")}),
+        (
+            "Profile",
+            {
+                "fields": (
+                    "organization_name",
+                    "country",
+                    "display_name",
+                    "email_verified",
+                    "first_name",
+                    "last_name",
+                    "timezone",
+                    "distance_unit",
+                ),
+            },
+        ),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
         ("Dates", {"fields": ("last_login", "date_joined")}),
     )
     add_fieldsets = (
-        (None, {"classes": ("wide",), "fields": ("email", "display_name", "password1", "password2", "role", "country")}),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "display_name", "organization_name", "password1", "password2", "country"),
+            },
+        ),
     )
 
 
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ("name", "type", "country", "owner")
+    list_display = ("name", "country", "owner")
 
 
 @admin.register(DemandPost)

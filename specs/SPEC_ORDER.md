@@ -25,7 +25,7 @@ Rules:
 2. **role-agnostic-user-and-org-flattening**
    - Phase: FOUNDATION
    - Depends on: `migration-safety-and-compatibility-rails`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/role-agnostic-user-and-org-flattening/`
 
 3. **unified-listing-model-and-status-contract**

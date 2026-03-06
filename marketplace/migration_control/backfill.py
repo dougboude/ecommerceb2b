@@ -16,12 +16,12 @@ from marketplace.models import (
     ListingType,
     ListingWatchlistItem,
     MessageThread,
-    Organization,
     SupplyLot,
     SupplyStatus,
     User,
     WatchlistItem,
 )
+from marketplace.migration_control.identity import IdentityCompatibilityAdapter
 
 
 STATUS_MAP_DEMAND = {
@@ -58,24 +58,11 @@ class BackfillEngine:
     @transaction.atomic
     def backfill_users(self) -> BackfillStats:
         stats = BackfillStats()
-        users = User.objects.select_related("organization").all()
-        for user in users:
-            stats.processed += 1
-            org_name = None
-            try:
-                org_name = user.organization.name
-            except Organization.DoesNotExist:
-                org_name = None
-
-            user.organization_name = org_name or user.organization_name
-            user.save(update_fields=["organization_name"])
-            self._audit("user", user.pk, user.pk, BackfillAuditStatus.SUCCESS, "org_name_backfilled")
-            LegacyToTargetMapping.objects.update_or_create(
-                entity_type="user",
-                legacy_pk=user.pk,
-                defaults={"target_pk": user.pk, "mapping_version": 1},
-            )
-            stats.success += 1
+        adapter = IdentityCompatibilityAdapter()
+        processed, success, failed = adapter.backfill_org_names()
+        stats.processed = processed
+        stats.success = success
+        stats.failed = failed
         return stats
 
     @transaction.atomic

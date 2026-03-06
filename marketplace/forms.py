@@ -15,43 +15,60 @@ from .models import (
     SupplyLot,
     User,
 )
+from .migration_control.config import get_runtime_mode
 from .skin_config import DEFAULT_SKIN_SLUG
 
 
 class SignupForm(UserCreationForm):
-    role = forms.ChoiceField(choices=Role.choices, label=_("I am a"))
     country = forms.ChoiceField(choices=COUNTRY_CHOICES, label=_("Country"))
-    # Buyer-only fields (shown/hidden via JS or validated server-side)
-    org_name = forms.CharField(
+    organization_name = forms.CharField(
         max_length=255, required=False, label=_("Organization name"),
     )
-    org_type = forms.CharField(
-        max_length=100, required=False, label=_("Organization type"),
-    )
+    role = forms.ChoiceField(choices=Role.choices, label=_("I am a"), required=False)
 
     class Meta:
         model = User
-        fields = ("email", "display_name", "password1", "password2", "role", "country")
+        fields = (
+            "email",
+            "display_name",
+            "password1",
+            "password2",
+            "country",
+            "organization_name",
+            "role",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.runtime_mode = get_runtime_mode()
+        if self.runtime_mode == "target":
+            self.fields.pop("role", None)
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("role") == Role.BUYER:
-            if not cleaned.get("org_name"):
-                self.add_error("org_name", _("Organization name is required for buyers."))
+        org_name = (cleaned.get("organization_name") or "").strip()
+        cleaned["organization_name"] = org_name or None
+
+        if self.runtime_mode != "target":
+            selected_role = cleaned.get("role") or Role.SUPPLIER
+            if selected_role == Role.BUYER and not cleaned.get("organization_name"):
+                self.add_error("organization_name", _("Organization name is required for buyers."))
         return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.role = self.cleaned_data["role"]
+        selected_role = self.cleaned_data.get("role") or Role.SUPPLIER
+        user.role = selected_role
         user.country = self.cleaned_data["country"]
+        user.organization_name = self.cleaned_data.get("organization_name")
         if not user.skin:
             user.skin = DEFAULT_SKIN_SLUG
         if commit:
             user.save()
-            if user.role == Role.BUYER:
+            if self.runtime_mode != "target" and user.role == Role.BUYER and user.organization_name:
                 Organization.objects.create(
-                    name=self.cleaned_data["org_name"],
-                    type=self.cleaned_data.get("org_type", ""),
+                    name=user.organization_name,
+                    type="",
                     country=user.country,
                     owner=user,
                 )
@@ -221,4 +238,17 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["display_name", "first_name", "last_name", "timezone", "distance_unit", "skin", "email_on_message"]
+        fields = [
+            "display_name",
+            "organization_name",
+            "first_name",
+            "last_name",
+            "timezone",
+            "distance_unit",
+            "skin",
+            "email_on_message",
+        ]
+
+    def clean_organization_name(self):
+        value = (self.cleaned_data.get("organization_name") or "").strip()
+        return value or None

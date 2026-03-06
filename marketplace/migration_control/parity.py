@@ -15,6 +15,7 @@ from marketplace.models import (
     User,
     WatchlistItem,
 )
+from marketplace.migration_control.identity import IdentityComplianceScanner
 
 
 @dataclass
@@ -73,6 +74,17 @@ class ParityValidator:
             total_checked=2,
             failures=failures,
             summary="; ".join(notes),
+        )
+
+    def validate_identity(self) -> ValidationResult:
+        scanner = IdentityComplianceScanner()
+        passed, violations = scanner.scan()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
         )
 
     def create_report(self, stage: str, scope: str, result: ValidationResult) -> ParityReport:
