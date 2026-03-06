@@ -91,6 +91,21 @@ Do not create new per-version status files.
   - Added management commands: `migration_set_state`, `migration_backfill`, `migration_validate`, `migration_checkpoint`, `migration_cutover`.
   - Added migration regression tests in `marketplace/tests/test_migration_control.py` (state transitions, additive safety, idempotent backfill, compatibility dual-write, cutover/rollback drill, non-goal enforcement).
   - Updated `specs/migration-safety-and-compatibility-rails/tasks.md` to mark all tasks complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 1.
+- Feature 2 (`role-agnostic-user-and-org-flattening`) implementation executed on branch `feat/02-role-agnostic-user-and-org-flattening`:
+  - Added identity compatibility module `marketplace/migration_control/identity.py` with profile reads, org-name normalization/update, deterministic org-name backfill, and identity compliance scanning.
+  - Updated signup/profile identity flows:
+    - `SignupForm` now supports role-agnostic target mode (no role field), normalized `organization_name`, and legacy-compatible behavior in non-target modes.
+    - Profile now renders identity via adapter-backed `identity_profile` and includes organization name display.
+    - Profile editing persists normalized `organization_name`.
+  - Removed identity-surface dependency on organization type semantics:
+    - Signup no longer captures `org_type`; legacy `Organization` shadow writes use empty type.
+    - Admin identity views no longer expose role/type as primary profile semantics.
+  - Wired identity parity into migration gating:
+    - `migration_validate` adds `identity` scope.
+    - Checkpoint gates now require passing identity report for CP4/CP5.
+    - `migration_cutover` emits identity parity reports at cutover stages.
+  - Added Feature 2 regression tests in `marketplace/tests/test_identity_migration.py` (signup mode behavior, org fallback/backfill, profile display, identity compliance).
+  - Updated `specs/role-agnostic-user-and-org-flattening/tasks.md` to mark all tasks complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 2.
 
 ## Current State
 - Branch: `main` (uncommitted changes from this session)

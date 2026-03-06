@@ -195,6 +195,12 @@ class User(AbstractUser):
     class Meta:
         ordering = ["-date_joined"]
 
+    def clean(self):
+        super().clean()
+        if self.organization_name is not None:
+            normalized = self.organization_name.strip()
+            self.organization_name = normalized or None
+
     def __str__(self):
         return self.display_name or self.email
 

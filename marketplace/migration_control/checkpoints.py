@@ -98,6 +98,8 @@ class CheckpointController:
                 return "Cannot advance to CP4: missing passing counts parity report"
             if not self._latest_report_passed(scope="relationships"):
                 return "Cannot advance to CP4: missing passing relationships parity report"
+            if not self._latest_report_passed(scope="identity"):
+                return "Cannot advance to CP4: missing passing identity compliance report"
 
         if target_checkpoint == "CP5":
             # Cleanup requires cutover-stage passing reports.
@@ -107,6 +109,8 @@ class CheckpointController:
                 return "Cannot advance to CP5: missing passing cutover counts report"
             if not self._latest_report_passed(scope="relationships", stage=MigrationStage.CUTOVER):
                 return "Cannot advance to CP5: missing passing cutover relationships report"
+            if not self._latest_report_passed(scope="identity", stage=MigrationStage.CUTOVER):
+                return "Cannot advance to CP5: missing passing cutover identity report"
 
         return None
 

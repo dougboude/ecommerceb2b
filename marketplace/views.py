@@ -24,6 +24,7 @@ from .matching import (
     watchlisted_demand_post_ids,
     watchlisted_supply_lot_ids,
 )
+from .migration_control.identity import IdentityCompatibilityAdapter
 from .models import (
     DemandPost,
     DemandStatus,
@@ -42,6 +43,7 @@ from .notifications import send_new_message_notification
 
 PAGE_SIZE = 25
 SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+identity_adapter = IdentityCompatibilityAdapter()
 
 
 def _set_skin_cookie(response, skin_name):
@@ -188,6 +190,10 @@ def signup_view(request):
         form = SignupForm(request.POST)
         if form.is_valid():
             user = form.save()
+            identity_adapter.update_identity(
+                user,
+                organization_name=form.cleaned_data.get("organization_name"),
+            )
             login(request, user)
             django_messages.success(request, _("Account created successfully."))
             response = redirect("marketplace:dashboard")
@@ -284,7 +290,8 @@ def dashboard_view(request):
 
 @login_required
 def profile_view(request):
-    return render(request, "marketplace/profile.html")
+    profile = identity_adapter.get_profile(request.user)
+    return render(request, "marketplace/profile.html", {"identity_profile": profile})
 
 
 @login_required
@@ -293,6 +300,10 @@ def profile_edit(request):
         form = ProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             user = form.save()
+            identity_adapter.update_identity(
+                user,
+                organization_name=form.cleaned_data.get("organization_name"),
+            )
             django_messages.success(request, _("Profile updated."))
             response = redirect("marketplace:profile")
             return _set_skin_cookie(response, user.skin)
