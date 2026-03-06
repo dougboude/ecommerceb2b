@@ -108,6 +108,12 @@ class CompatibilityRepository:
         canonical = read_canonical()
         if canonical == "target" and dual_read_enabled():
             target = Listing.objects.filter(pk=pk).first()
+            if not target:
+                legacy_source_type = "demand_post" if listing_type == ListingType.DEMAND else "supply_lot"
+                target = Listing.objects.filter(
+                    legacy_source_type=legacy_source_type,
+                    legacy_source_pk=pk,
+                ).first()
             if target:
                 return target
 
