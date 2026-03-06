@@ -1,6 +1,6 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-06
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
@@ -61,6 +61,7 @@ Do not create new per-version status files.
   - `get_unread_thread_count()` extracted as reusable helper in `context_processors.py`
   - Template updates: `_navbar.html` (id attrs), `thread_detail.html` (SSE data attrs), `inbox.html` (page marker + thread ids), `base.html` (SSE script loading)
   - CLAUDE.md updated with SSE sidecar documentation section
+- Updated `ai-docs/PRODUCT_ROADMAP.md` with clarifications: demand quantity/unit, price per unit semantics, derived optional lat/lng + radius fallback, search direction openness, and listing-centric messaging multiple threads per listing.
 
 ## Current State
 - Branch: `main` (uncommitted changes from this session)

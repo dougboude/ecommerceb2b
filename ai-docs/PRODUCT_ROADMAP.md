@@ -121,8 +121,8 @@ Listing
   location_locality
   location_region
   location_postal_code
-  location_lat
-  location_lng
+  location_lat          (nullable, derived)
+  location_lng          (nullable, derived)
   price_value          (nullable)
   price_currency       (nullable)
   created_at
@@ -154,6 +154,8 @@ shipping_scope    (LOCAL_ONLY | DOMESTIC | NORTH_AMERICA | WORLDWIDE)
 Fields that apply only when `type = DEMAND`. Null for SUPPLY listings.
 
 ```
+quantity
+unit
 radius_km
 frequency    (ONE_TIME | RECURRING | SEASONAL)
 ```
@@ -175,7 +177,7 @@ All listings share a single status field with the following values:
 
 ### Price Fields on Demand Listings
 
-`price_value` and `price_currency` are present on the base Listing model and are nullable. For demand listings they are stored but **not exposed in the demand listing UI** in the current implementation. They are reserved for future use (e.g., buyer budget signals in Phase 2 matching). For supply listings they represent the asking price and are shown in the UI.
+`price_value` and `price_currency` are present on the base Listing model and are nullable. For supply listings, `price_value` is **per** `price_unit` when `price_unit` is provided (e.g., $100 per kg). For demand listings they are stored but **not exposed in the demand listing UI** in the current implementation. They are reserved for future use (e.g., buyer budget signals in Phase 2 matching).
 
 ### Category
 
@@ -203,8 +205,8 @@ OTHER
 | price_value | ✓ (shown) | ✓ (stored, not shown) |
 | price_currency | ✓ (shown) | ✓ (stored, not shown) |
 | expires_at | ✓ | ✓ |
-| quantity | ✓ | — |
-| unit | ✓ | — |
+| quantity | ✓ | ✓ |
+| unit | ✓ | ✓ |
 | shipping_scope | ✓ | — |
 | radius_km | — | ✓ |
 | frequency | — | ✓ |
@@ -333,7 +335,7 @@ Unique constraint: (listing_id, created_by_user_id)
 
 The listing owner is always derivable as `listing.created_by_user`. No explicit second participant FK is required on the thread.
 
-The unique constraint on `(listing_id, created_by_user_id)` ensures that one user can have at most one conversation thread about any given listing.
+Multiple conversations can exist per listing: each watcher (created_by_user) may have at most one thread for that listing, and all such threads are between that watcher and the listing owner.
 
 ### Auto‑Save Behavior
 
@@ -374,7 +376,7 @@ Because there are no user roles, the Discover page cannot infer what type of lis
 
 ### Search Direction Selector
 
-The Discover page presents a **search direction selector** before or alongside the search form:
+The Discover page presents a **search direction selector** before or alongside the search form. Any authenticated user may search **either direction** regardless of what listings they currently have.
 
 ```
 Find Supply    |    Find Demand
@@ -462,6 +464,8 @@ Users may upload a profile image used on:
 ## 5.4 Radius Filtering
 
 Discover results should respect radius filtering when location data exists.
+
+`location_lat`/`location_lng` are optional and derived (e.g., geocoded from the location fields). Users never enter coordinates directly. If coordinates are missing, radius filtering falls back to country-only matching.
 
 Shipping scope overrides radius filtering. A supply listing with `shipping_scope = WORLDWIDE` is compatible with any demand listing regardless of radius. A supply listing with `shipping_scope = LOCAL_ONLY` must satisfy the demand listing's radius constraint.
 
