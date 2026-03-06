@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 
+from django.db.models import Q
 from django.db.models import Count
 
 from marketplace.models import (
     DemandPost,
     LegacyToTargetMapping,
     Listing,
+    ListingStatus,
+    ListingType,
     ListingMessageThread,
     ListingWatchlistItem,
     Message,
@@ -72,6 +75,49 @@ class ParityValidator:
         return ValidationResult(
             passed=failures == 0,
             total_checked=2,
+            failures=failures,
+            summary="; ".join(notes),
+        )
+
+    def validate_listing_contract(self) -> ValidationResult:
+        failures = 0
+        notes = []
+
+        invalid_supply = Listing.objects.filter(
+            type=ListingType.SUPPLY,
+        ).filter(
+            Q(radius_km__isnull=False)
+            | ~Q(frequency="")
+            | Q(status=ListingStatus.FULFILLED)
+        ).count()
+        if invalid_supply:
+            failures += 1
+            notes.append(f"invalid_supply_rows={invalid_supply}")
+
+        invalid_demand = Listing.objects.filter(
+            type=ListingType.DEMAND,
+        ).filter(
+            ~Q(shipping_scope="")
+            | ~Q(price_unit="")
+            | Q(status=ListingStatus.WITHDRAWN)
+        ).count()
+        if invalid_demand:
+            failures += 1
+            notes.append(f"invalid_demand_rows={invalid_demand}")
+
+        missing_mappings = Listing.objects.filter(
+            legacy_source_type__in=["demand_post", "supply_lot"],
+            legacy_source_pk__isnull=False,
+        ).exclude(
+            pk__in=LegacyToTargetMapping.objects.filter(entity_type="listing").values_list("target_pk", flat=True)
+        ).count()
+        if missing_mappings:
+            failures += 1
+            notes.append(f"missing_listing_mappings={missing_mappings}")
+
+        return ValidationResult(
+            passed=failures == 0,
+            total_checked=3,
             failures=failures,
             summary="; ".join(notes),
         )

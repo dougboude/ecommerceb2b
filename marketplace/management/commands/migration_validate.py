@@ -8,7 +8,11 @@ class Command(BaseCommand):
     help = "Validate migration parity gates and write report evidence"
 
     def add_arguments(self, parser):
-        parser.add_argument("--scope", choices=["counts", "relationships", "identity", "all"], default="all")
+        parser.add_argument(
+            "--scope",
+            choices=["counts", "relationships", "identity", "listing", "all"],
+            default="all",
+        )
         parser.add_argument("--fail-on-error", action="store_true")
 
     def handle(self, *args, **options):
@@ -34,6 +38,12 @@ class Command(BaseCommand):
             result = validator.validate_identity()
             validator.create_report(stage=state.stage, scope="identity", result=result)
             self.stdout.write(f"identity: passed={result.passed} failures={result.failures} summary={result.summary}")
+            failures += result.failures
+
+        if options["scope"] in {"listing", "all"}:
+            result = validator.validate_listing_contract()
+            validator.create_report(stage=state.stage, scope="listing", result=result)
+            self.stdout.write(f"listing: passed={result.passed} failures={result.failures} summary={result.summary}")
             failures += result.failures
 
         if options["fail_on_error"] and failures > 0:

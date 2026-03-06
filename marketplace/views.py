@@ -25,6 +25,7 @@ from .matching import (
     watchlisted_supply_lot_ids,
 )
 from .migration_control.identity import IdentityCompatibilityAdapter
+from .migration_control.listings import ListingCompatibilityService
 from .models import (
     DemandPost,
     DemandStatus,
@@ -44,6 +45,7 @@ from .notifications import send_new_message_notification
 PAGE_SIZE = 25
 SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 identity_adapter = IdentityCompatibilityAdapter()
+listing_service = ListingCompatibilityService()
 
 
 def _set_skin_cookie(response, skin_name):
@@ -342,6 +344,7 @@ def demand_post_create(request):
             post.created_by = request.user
             post.organization = request.user.organization
             post.save()
+            listing_service.sync_shadow(post)
             _sync_listing_to_vector_index(post)
             django_messages.success(request, _("Wanted listing created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
@@ -357,6 +360,7 @@ def demand_post_edit(request, pk):
         form = DemandPostForm(request.POST, instance=post, user=request.user)
         if form.is_valid():
             form.save()
+            listing_service.sync_shadow(post)
             _sync_listing_to_vector_index(post)
             django_messages.success(request, _("Wanted listing updated."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
@@ -407,6 +411,7 @@ def demand_post_toggle(request, pk):
     elif post.status in ("paused", "fulfilled"):
         post.status = "active"
     post.save(update_fields=["status"])
+    listing_service.sync_shadow(post)
     _sync_listing_to_vector_index(post)
     if post.status == "active":
         _restore_watchlist_items_for_post(post)
@@ -421,6 +426,7 @@ def demand_post_delete(request, pk):
     if request.method == "POST":
         post.status = DemandStatus.DELETED
         post.save(update_fields=["status"])
+        listing_service.sync_shadow(post)
         _archive_watchlist_items_for_post(post)
         _remove_listing_from_vector_index(post)
         django_messages.success(request, _("Wanted listing deleted."))
@@ -461,6 +467,7 @@ def supply_lot_create(request):
             lot = form.save(commit=False)
             lot.created_by = request.user
             lot.save()
+            listing_service.sync_shadow(lot)
             _sync_listing_to_vector_index(lot)
             django_messages.success(request, _("Available listing created."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
@@ -476,6 +483,7 @@ def supply_lot_edit(request, pk):
         form = SupplyLotForm(request.POST, instance=lot)
         if form.is_valid():
             form.save()
+            listing_service.sync_shadow(lot)
             _sync_listing_to_vector_index(lot)
             django_messages.success(request, _("Available listing updated."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
@@ -526,6 +534,7 @@ def supply_lot_toggle(request, pk):
     elif lot.status == "withdrawn":
         lot.status = "active"
     lot.save(update_fields=["status"])
+    listing_service.sync_shadow(lot)
     _sync_listing_to_vector_index(lot)
     if lot.status == "active":
         _restore_watchlist_items_for_lot(lot)
@@ -540,6 +549,7 @@ def supply_lot_delete(request, pk):
     if request.method == "POST":
         lot.status = SupplyStatus.DELETED
         lot.save(update_fields=["status"])
+        listing_service.sync_shadow(lot)
         _archive_watchlist_items_for_lot(lot)
         _remove_listing_from_vector_index(lot)
         django_messages.success(request, _("Available listing deleted."))
@@ -561,6 +571,15 @@ def _run_discover_search(user, query, category, country, search_mode="similar"):
         listing_type = "supply_lot"
     else:
         listing_type = "demand_post"
+
+    target_results = listing_service.discover_queryset(
+        listing_type="supply" if listing_type == "supply_lot" else "demand",
+        query=query,
+        category=category or None,
+        country=country or None,
+    )
+    if target_results is not None:
+        return target_results
 
     if search_mode == "keyword":
         return _keyword_search(

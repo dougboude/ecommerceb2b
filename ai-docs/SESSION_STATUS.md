@@ -106,6 +106,27 @@ Do not create new per-version status files.
     - `migration_cutover` emits identity parity reports at cutover stages.
   - Added Feature 2 regression tests in `marketplace/tests/test_identity_migration.py` (signup mode behavior, org fallback/backfill, profile display, identity compliance).
   - Updated `specs/role-agnostic-user-and-org-flattening/tasks.md` to mark all tasks complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 2.
+- Feature 3 (`unified-listing-model-and-status-contract`) implementation executed on branch `feat/03-unified-listing-model-and-status-contract`:
+  - Implemented unified listing contract enforcement in `Listing.clean()`:
+    - Supply listings reject demand-only fields (`radius_km`, `frequency`) and `FULFILLED` status.
+    - Demand listings reject supply-only fields (`shipping_scope`, `price_unit`) and `WITHDRAWN` status.
+  - Added compatibility properties on `Listing` (`item_text`, `available_until`, `asking_price`, `quantity_value`, `quantity_unit`, `created_by`) to preserve legacy template/view expectations during transition.
+  - Added listing compatibility service `marketplace/migration_control/listings.py`:
+    - Centralized listing shadow-sync entrypoint for CRUD flows.
+    - Target-canonical discover query path via unified `Listing` when `MIGRATION_READ_CANONICAL=target` + dual-read enabled.
+  - Routed listing CRUD flows through compatibility adapter sync in `marketplace/views.py` for create/edit/toggle/delete on both DemandPost and SupplyLot paths.
+  - Extended migration gating/validation for listing contract:
+    - `ParityValidator.validate_listing_contract()`
+    - `migration_validate --scope listing`
+    - Checkpoint gating now requires passing `listing` parity report for CP4 and CP5.
+    - `migration_cutover` now emits listing reports at cutover stages.
+  - Enhanced compatibility lookup for target canonical reads in `CompatibilityRepository.read_listing()` by resolving legacy-source mappings.
+  - Added Feature 3 regression coverage in `marketplace/tests/test_listing_unification.py`:
+    - listing type/status contract validation
+    - deterministic listing backfill + parity
+    - target-canonical discover read behavior
+    - cutover gate enforcement for listing scope
+  - Updated `specs/unified-listing-model-and-status-contract/tasks.md` to all complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 3.
 
 ## Current State
 - Branch: `main` (uncommitted changes from this session)

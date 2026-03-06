@@ -37,9 +37,11 @@ class Command(BaseCommand):
                 r_counts = validator.validate_counts()
                 r_rels = validator.validate_relationships()
                 r_identity = validator.validate_identity()
+                r_listing = validator.validate_listing_contract()
                 validator.create_report(stage=state.stage, scope="counts", result=r_counts)
                 validator.create_report(stage=state.stage, scope="relationships", result=r_rels)
                 validator.create_report(stage=state.stage, scope="identity", result=r_identity)
+                validator.create_report(stage=state.stage, scope="listing", result=r_listing)
 
             if checkpoint == "CP5":
                 # Emit explicit cutover-stage evidence before cleanup.
@@ -49,9 +51,11 @@ class Command(BaseCommand):
                 r_counts = validator.validate_counts()
                 r_rels = validator.validate_relationships()
                 r_identity = validator.validate_identity()
+                r_listing = validator.validate_listing_contract()
                 validator.create_report(stage="cutover", scope="counts", result=r_counts)
                 validator.create_report(stage="cutover", scope="relationships", result=r_rels)
                 validator.create_report(stage="cutover", scope="identity", result=r_identity)
+                validator.create_report(stage="cutover", scope="listing", result=r_listing)
 
             result = controller.advance_to(checkpoint)
             if not result.ok:

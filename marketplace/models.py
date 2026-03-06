@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -286,6 +287,51 @@ class Listing(LocationMixin):
                 name="unique_listing_legacy_source",
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.type == ListingType.SUPPLY:
+            if self.radius_km is not None:
+                errors["radius_km"] = _("radius_km must be null for supply listings.")
+            if self.frequency:
+                errors["frequency"] = _("frequency must be blank for supply listings.")
+            if self.status == ListingStatus.FULFILLED:
+                errors["status"] = _("FULFILLED is only valid for demand listings.")
+        elif self.type == ListingType.DEMAND:
+            if self.shipping_scope:
+                errors["shipping_scope"] = _("shipping_scope must be blank for demand listings.")
+            if self.price_unit:
+                errors["price_unit"] = _("price_unit must be blank for demand listings.")
+            if self.status == ListingStatus.WITHDRAWN:
+                errors["status"] = _("WITHDRAWN is only valid for supply listings.")
+
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def item_text(self):
+        return self.title
+
+    @property
+    def available_until(self):
+        return self.expires_at if self.type == ListingType.SUPPLY else None
+
+    @property
+    def asking_price(self):
+        return self.price_value if self.type == ListingType.SUPPLY else None
+
+    @property
+    def quantity_value(self):
+        return self.quantity
+
+    @property
+    def quantity_unit(self):
+        return self.unit
+
+    @property
+    def created_by(self):
+        return self.created_by_user
 
     def __str__(self):
         return self.title

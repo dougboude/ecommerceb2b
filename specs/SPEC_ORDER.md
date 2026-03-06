@@ -31,7 +31,7 @@ Rules:
 3. **unified-listing-model-and-status-contract**
    - Phase: FOUNDATION
    - Depends on: `migration-safety-and-compatibility-rails`, `role-agnostic-user-and-org-flattening`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/unified-listing-model-and-status-contract/`
 
 4. **ownership-based-permission-policy**
