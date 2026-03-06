@@ -62,6 +62,27 @@ Do not create new per-version status files.
   - Template updates: `_navbar.html` (id attrs), `thread_detail.html` (SSE data attrs), `inbox.html` (page marker + thread ids), `base.html` (SSE script loading)
   - CLAUDE.md updated with SSE sidecar documentation section
 - Updated `ai-docs/PRODUCT_ROADMAP.md` with clarifications: demand quantity/unit, price per unit semantics, derived optional lat/lng + radius fallback, search direction openness, and listing-centric messaging multiple threads per listing.
+- Created specsmd docs for foundational migration planning:
+  - `specs/migration-safety-and-compatibility-rails/{requirements.md,design.md,tasks.md}`
+  - `specs/role-agnostic-user-and-org-flattening/requirements.md`
+  - `specs/unified-listing-model-and-status-contract/requirements.md`
+  - `specs/ownership-based-permission-policy/requirements.md`
+  - `specs/listing-centric-messaging-and-watchlist-decoupling/requirements.md`
+  - `specs/discover-direction-and-visibility-contract/requirements.md`
+- Added design docs for foundational follow-on specs:
+  - `specs/role-agnostic-user-and-org-flattening/design.md`
+  - `specs/unified-listing-model-and-status-contract/design.md`
+  - `specs/ownership-based-permission-policy/design.md`
+  - `specs/listing-centric-messaging-and-watchlist-decoupling/design.md`
+  - `specs/discover-direction-and-visibility-contract/design.md`
+- Added ordered execution index: `specs/SPEC_ORDER.md` (dependency-safe sequencing + status tracking for specs)
+- Added tasks docs for all foundational specs with completed requirements+design:
+  - `specs/role-agnostic-user-and-org-flattening/tasks.md`
+  - `specs/unified-listing-model-and-status-contract/tasks.md`
+  - `specs/ownership-based-permission-policy/tasks.md`
+  - `specs/listing-centric-messaging-and-watchlist-decoupling/tasks.md`
+  - `specs/discover-direction-and-visibility-contract/tasks.md`
+- Updated `specs/SPEC_ORDER.md` statuses to `REQ, DES, TASK` for all foundational follow-on specs
 
 ## Current State
 - Branch: `main` (uncommitted changes from this session)

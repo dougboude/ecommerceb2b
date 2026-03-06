@@ -7,17 +7,12 @@ Before doing any work in this repository, read and internalize:
 0. `ai-docs/SESSION_STATUS.md` — canonical handoff log (update at end of session)
 
 1. `ai-docs/ai-constitution.md` — governance rules, scope control, stop conditions
-2. `ai-docs/v1-agent-build-spec.md` — authoritative product spec and data schemas
-3. `ai-docs/v1-implementation-decisions.md` — locked engineering decisions
-4. `ai-docs/v3-discovery-watchlist-spec.md` — V3 discovery/watchlist/messaging evolution
 
 ## Authority Order
 
-1. `ai-docs/v1-agent-build-spec.md` (highest, except as overridden below)
-2. `ai-docs/v3-discovery-watchlist-spec.md` (overrides V1 only for discovery/watchlist/messaging evolution)
-3. `ai-docs/ai-constitution.md`
-4. `ai-docs/v1-implementation-decisions.md`
-5. Explicit human instructions in the current session (lowest)
+1. `ai-docs/ai-constitution.md`
+2. `ai-docs/v1-implementation-decisions.md`
+3. Explicit human instructions in the current session (lowest)
 
 If any planned work conflicts with a higher-authority document, **stop and ask the human** before proceeding. Do not silently override spec docs based on session instructions.
 
