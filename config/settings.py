@@ -208,6 +208,19 @@ SSE_SERVICE_URL = os.environ.get("SSE_SERVICE_URL", "http://127.0.0.1:8001")
 SSE_SERVICE_TOKEN = os.environ.get("SSE_SERVICE_TOKEN", "dev-token-change-me")
 SSE_STREAM_SECRET = os.environ.get("SSE_STREAM_SECRET", "dev-stream-secret")
 
+# ---------------------------------------------------------------------------
+# Migration control-plane runtime toggles
+# ---------------------------------------------------------------------------
+MIGRATION_CONTROL_MODE = os.environ.get("MIGRATION_CONTROL_MODE", "legacy")
+MIGRATION_DUAL_WRITE_ENABLED = os.environ.get(
+    "MIGRATION_DUAL_WRITE_ENABLED", "false",
+).lower() in ("true", "1", "yes")
+MIGRATION_DUAL_READ_ENABLED = os.environ.get(
+    "MIGRATION_DUAL_READ_ENABLED", "false",
+).lower() in ("true", "1", "yes")
+MIGRATION_READ_CANONICAL = os.environ.get("MIGRATION_READ_CANONICAL", "legacy")
+MIGRATION_WRITE_CANONICAL = os.environ.get("MIGRATION_WRITE_CANONICAL", "legacy")
+
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 SECURE_BROWSER_XSS_FILTER = True

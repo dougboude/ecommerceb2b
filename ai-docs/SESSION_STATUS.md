@@ -83,6 +83,14 @@ Do not create new per-version status files.
   - `specs/listing-centric-messaging-and-watchlist-decoupling/tasks.md`
   - `specs/discover-direction-and-visibility-contract/tasks.md`
 - Updated `specs/SPEC_ORDER.md` statuses to `REQ, DES, TASK` for all foundational follow-on specs
+- Feature 1 (`migration-safety-and-compatibility-rails`) implementation executed on branch `feat/01-migration-safety-and-compatibility-rails`:
+  - Added migration control persistence models (`MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, `ParityReport`) and migration `0009`.
+  - Added additive target schemas and migration `0010`: `User.organization_name`, unified `Listing`, `ListingWatchlistItem`, `ListingMessageThread`.
+  - Added migration control-plane modules (`marketplace/migration_control/`): config toggles, state manager, checkpoint controller, backfill engine, compatibility repository, parity validator.
+  - Added dual-write sync signals (`marketplace/signals.py`) wired via `MarketplaceConfig.ready()`.
+  - Added management commands: `migration_set_state`, `migration_backfill`, `migration_validate`, `migration_checkpoint`, `migration_cutover`.
+  - Added migration regression tests in `marketplace/tests/test_migration_control.py` (state transitions, additive safety, idempotent backfill, compatibility dual-write, cutover/rollback drill, non-goal enforcement).
+  - Updated `specs/migration-safety-and-compatibility-rails/tasks.md` to mark all tasks complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 1.
 
 ## Current State
 - Branch: `main` (uncommitted changes from this session)

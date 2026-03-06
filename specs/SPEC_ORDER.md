@@ -19,7 +19,7 @@ Rules:
 1. **migration-safety-and-compatibility-rails**
    - Phase: FOUNDATION
    - Depends on: none
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/migration-safety-and-compatibility-rails/`
 
 2. **role-agnostic-user-and-org-flattening**
