@@ -384,12 +384,12 @@ Do not create new per-version status files.
 - Current suite: `47` passing, `6` skipped, `0` failures
 - Per-version status files removed; this is the only status tracker
 
-- Feature 11 (`profile-image-upload`) spec started — requirements doc written, awaiting review:
+- Feature 11 (`profile-image-upload`) spec in progress — requirements approved, design doc written:
   - `specs/profile-image-upload/requirements.md` created (9 requirements)
   - Design proposal produced in session covering storage strategy, data model, security, processing pipeline, crop UX, surfaces, and reusability
-  - `specs/SPEC_ORDER.md` updated with Feature 11 entry, status `REQ`
+  - `specs/SPEC_ORDER.md` updated with Feature 11 entry, status `REQ, DES`
 
 ## What's Next (if continuing)
 - User reviews `specs/profile-image-upload/requirements.md`
-- On approval: write design.md, then tasks.md, then execute on a new branch
+- On approval of design: write tasks.md, then execute on a new branch
 - Remaining launch requirements after Feature 11: §5.4 Radius Filtering, §5.6 Operator Tools
