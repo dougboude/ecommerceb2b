@@ -76,6 +76,12 @@ Rules:
    - Status: `EXEC`
    - Path: n/a (executed directly, no spec docs — see §5.5 in PRODUCT_ROADMAP.md)
 
+11. **profile-image-upload**
+   - Phase: LAUNCH READINESS
+   - Depends on: all foundation specs (CP5 required); Features 8–9 (`EXEC`)
+   - Status: `REQ`
+   - Path: `specs/profile-image-upload/`
+
 ## Maintenance Workflow
 
 When creating a new spec:
