@@ -134,7 +134,7 @@ If either gate fails, STOP. Install Pillow before proceeding.
   - Add current avatar display: `<img src="{{ user.profile_image_url }}" id="current-avatar" class="avatar avatar-lg" alt="{{ user.display_name }}">`
   - Add file input: `<input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" class="visually-hidden">` with a `<label>` styled as a button
   - Add crop modal: `<dialog id="avatar-crop-modal">` containing `#avatar-crop-image`, `#avatar-crop-preview`, Save and Cancel buttons
-  - Load `{% static 'vendor/cropper.min.css' %}` in `{% block head %}` and `{% static 'vendor/cropper.min.js' %}` + `{% static 'js/avatar-upload.js' %}` before `</body>`
+  - Load `{% static 'vendor/cropper.min.css' %}` in `{% block extra_css %}` and `{% static 'vendor/cropper.min.js' %}` + `{% static 'js/avatar-upload.js' %}` in `{% block extra_js %}` (the blocks exposed by `base.html` — there is no `{% block head %}` in this project)
   - _Requirements: 6.1–6.7, 7.1_
 
 ---

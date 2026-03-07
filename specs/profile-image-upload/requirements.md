@@ -119,7 +119,7 @@ except ImportError:
    - If the image mode is `RGBA`, `LA`, or `PA`, output SHALL be **PNG**.
    - Otherwise, the image SHALL be converted to `RGB` and output SHALL be **JPEG at quality 85**.
 4. THE pipeline SHALL strip all EXIF and metadata. This is achieved implicitly by re-encoding through Pillow — no explicit EXIF removal step is required beyond the re-encode.
-5. THE output image SHALL use the sRGB color space. Images in other color spaces SHALL be converted during re-encoding.
+5. THE pipeline SHALL re-encode all images through Pillow. Pillow's default JPEG and PNG output is sRGB-compatible for the vast majority of source images. Explicit ICC profile conversion is not performed — accurate color management for unusual source color spaces is out of scope for V1.
 6. THE pipeline SHALL NOT accept crop coordinates from the client. The crop blob received from the client is already a square image produced by the Canvas API. The server SHALL resize that blob directly to 512×512 without any server-side cropping step.
 7. When a user uploads a new profile image, the pipeline SHALL perform operations in the following order: (a) validate and process the new image, (b) save the new image file to storage, (c) update the user record with the new path and `profile_image_updated_at`, (d) delete the previously stored file from the storage backend. The old file SHALL only be deleted after the new image has been successfully saved and the user record updated. If the old file does not exist on the storage backend, the deletion failure SHALL be logged and silently swallowed — it SHALL NOT raise an error.
 
@@ -148,7 +148,7 @@ except ImportError:
 #### Acceptance Criteria
 
 1. **Profile page** (`/profile/`): THE user's own profile page SHALL display their avatar (or the default placeholder) prominently, with an affordance to upload or change the image.
-2. **Listing detail pages** (`/supply/<pk>/` and `/demand/<pk>/`): THE listing owner's avatar SHALL be displayed alongside their name in the listing detail view. Clicking the avatar SHALL open a lightbox modal displaying the full 512×512 image. The modal SHALL trap focus and block all interaction with the page behind it until dismissed. The modal SHALL be dismissable by clicking a close button or clicking outside the image. No page navigation occurs.
+2. **Listing detail pages** (`/available/<pk>/` for supply listings, `/wanted/<pk>/` for demand listings): THE listing owner's avatar SHALL be displayed alongside their name in the listing detail view. Clicking the avatar SHALL open a lightbox modal displaying the full 512×512 image. The modal SHALL trap focus and block all interaction with the page behind it until dismissed. The modal SHALL be dismissable by clicking a close button or clicking outside the image. No page navigation occurs.
 3. **Message thread** (`/threads/<pk>/`): Each message SHALL display the sender's avatar (or placeholder) alongside the message body.
 4. In all surfaces, avatars SHALL be rendered as circles via CSS `border-radius: 50%` and SHALL use `User.profile_image_url` so the default fallback is applied automatically.
 5. Avatar images in message threads and listing detail SHALL be rendered at a display size appropriate to the context (e.g., 40×40px for message avatars, 64×64px for listing owner). The same 512×512 source file is used in all cases; CSS constrains the display size.
@@ -176,7 +176,7 @@ The following are explicitly **out of scope** for this spec:
 1. Per-listing images (photos of the item being listed) — future spec.
 2. Initials-based or dynamically generated avatars — future enhancement to §6.4 in the roadmap.
 3. Multiple image sizes or thumbnail generation — single 512×512 derivative only.
-4. Image deletion without replacement (a user cannot remove their avatar without uploading a new one — they revert to the default via the placeholder).
+4. An explicit "remove avatar" action — there is no UI to clear a profile image without replacing it. A user who has never uploaded a photo sees the default placeholder; a user who has uploaded one must upload a new photo to change it. No removal-only flow is implemented in this spec.
 5. CDN configuration — `MEDIA_URL` is the only URL surface; CDN prefix is applied at the settings level when needed.
 6. Admin UI for reviewing or moderating uploaded images — deferred to operator tools roadmap.
 7. `django-storages` or any S3 integration — filesystem only for V1.

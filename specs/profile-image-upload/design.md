@@ -219,7 +219,7 @@ def process_profile_image(file, user) -> tuple[BytesIO, str]:
    - If `img.mode` is `P` (palette): inspect `img.info.get('transparency')` — if transparency info is present, convert to RGBA and output PNG; otherwise convert to RGB and output JPEG
    - All other modes: convert to RGB and output JPEG
 7. **Resize to 512×512** — `img.resize((512, 512), Image.LANCZOS)`. The incoming blob is already square (produced by Canvas API); this step normalizes to the canonical dimension
-8. **Color space** — convert to sRGB if needed (Pillow handles this on re-encode)
+8. **Color space** — no explicit ICC conversion is performed. Pillow's JPEG and PNG re-encoding produces sRGB-compatible output for the vast majority of source images. Accurate color management for unusual ICC profiles is out of scope.
 9. **Re-encode** — write to `BytesIO`. JPEG: `img.save(buf, format='JPEG', quality=85)`; PNG: `img.save(buf, format='PNG')`
 10. Return `(buf, ext)` where `ext` is `'jpg'` or `'png'`
 
