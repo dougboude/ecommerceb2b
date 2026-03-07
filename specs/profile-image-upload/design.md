@@ -133,6 +133,9 @@ class User(AbstractUser):
         blank=True,
     )
     profile_image_updated_at = models.DateTimeField(null=True, blank=True)
+    # Cache busting: each upload stores the new image under a fresh UUID filename,
+    # so the browser always fetches a new URL. profile_image_updated_at is metadata
+    # (useful for admin/audit) but is NOT the primary cache-busting mechanism.
 
     @property
     def profile_image_url(self):
@@ -176,7 +179,7 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 ```
 
-This is Django's standard pattern. It is not suitable for production — a real web server (nginx) or object storage handles media in production.
+This is Django's standard pattern and is only active when `DEBUG=True`. It MUST NOT be used in production. In production, media files must be served by a web server (e.g., nginx) or an object storage backend directly. Relying on Django to serve media in production is a performance and security risk.
 
 ---
 
@@ -209,9 +212,12 @@ def process_profile_image(file, user) -> tuple[BytesIO, str]:
 1. **Size check** — reject if `file.size > MAX_UPLOAD_SIZE_BYTES`
 2. **MIME type check** — reject if content type not in `{'image/jpeg', 'image/png', 'image/webp'}`
 3. **Pillow open + verify** — call `Image.open(file)` then `img.verify()`. On failure: log `WARNING` with `user.pk`, `user.email`, reported content type, file size; raise `ValidationError`
-4. **Reopen** — `img.verify()` exhausts the file object; reopen with `Image.open(file)` before further processing
+4. **Reopen** — `img.verify()` exhausts the file pointer; call `file.seek(0)` before reopening with `Image.open(file)` for further processing. Skipping `file.seek(0)` will cause Pillow to read an empty or partial stream.
 5. **Dimension check** — reject if `img.width < 256 or img.height < 256`
-6. **Transparency detection** — if `img.mode` in `{'RGBA', 'LA', 'PA'}`: output format is PNG; else: convert to RGB, output format is JPEG
+6. **Transparency detection** — determine output format as follows:
+   - If `img.mode` is `RGBA` or `LA`: the image has an explicit alpha channel → output PNG
+   - If `img.mode` is `P` (palette): inspect `img.info.get('transparency')` — if transparency info is present, convert to RGBA and output PNG; otherwise convert to RGB and output JPEG
+   - All other modes: convert to RGB and output JPEG
 7. **Resize to 512×512** — `img.resize((512, 512), Image.LANCZOS)`. The incoming blob is already square (produced by Canvas API); this step normalizes to the canonical dimension
 8. **Color space** — convert to sRGB if needed (Pillow handles this on re-encode)
 9. **Re-encode** — write to `BytesIO`. JPEG: `img.save(buf, format='JPEG', quality=85)`; PNG: `img.save(buf, format='PNG')`
@@ -358,7 +364,7 @@ The existing profile template gains:
 
 ### Listing detail pages
 
-Both `supply_lot_detail.html` and `demand_post_detail.html` gain an owner avatar section above the `<dl>`:
+Both `supply_lot_detail.html` (served at `/available/<pk>/`, view name `supply_lot_detail`) and `demand_post_detail.html` (served at `/wanted/<pk>/`, view name `demand_post_detail`) gain an owner avatar section above the `<dl>`:
 
 ```html
 <div class="listing-owner">
