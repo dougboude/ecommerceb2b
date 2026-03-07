@@ -475,10 +475,11 @@ Shipping scope overrides radius filtering. A supply listing with `shipping_scope
 
 Listings automatically expire after the expiration date.
 
-Implementation options:
+Implementation: **lazy expiration check during queries** — exclude listings where `expires_at < now()` from discover and listing lists at query time. Add `is_expired` computed property on `Listing` for template badge rendering. No background job or DB status writes in this pass.
 
-- scheduled background job
-- lazy expiration check during queries
+Known deferred edge case: if a user unpauses a listing whose `expires_at` has already passed, the listing immediately re-enters the expired filter and becomes invisible — confusing UX. Handled in §6.4 below.
+
+**Vector index note:** Lazily-expired listings remain in the ChromaDB semantic index indefinitely. This is safe because discover post-filters vector search results by expiry after retrieving PKs — expired listings are excluded from results even if ChromaDB returns them. Index bloat accumulates over time but does not affect correctness. Proactive index eviction for expired listings should be part of the housekeeping job in §6.5.
 
 ---
 
@@ -522,6 +523,26 @@ Users receive alerts when supply appears.
 ## 6.3 Listing Duplication
 
 Users may duplicate listings for recurring or seasonal supply/demand.
+
+---
+
+## 6.4 Unpause + Expiry Date Refresh
+
+When a user unpauses a listing whose `expires_at` is in the past (or imminent), the unpause flow should prompt them to set a new expiry date before re-activating. Without this, a freshly unpaused listing immediately falls into the expired filter and appears invisible despite the user's intent.
+
+---
+
+## 6.5 Notification and Housekeeping Infrastructure
+
+A background job mechanism (management command run via cron, or a message queue) for event-driven notifications and periodic housekeeping tasks, including:
+
+- Email owner when listing is 1 day from expiry
+- Email owner when listing expires
+- Email on new match suggestions
+- Write `status = EXPIRED` to DB for formally-expired listings (resolves lazy-expiry data integrity concern from §5.5)
+- Evict expired, deleted, and permanently-paused listings from the ChromaDB vector index via `remove_listing()` or a full `rebuild_index()` to prevent unbounded index bloat
+
+This is intentionally deferred — do not build background infrastructure before the product is validated.
 
 ---
 
