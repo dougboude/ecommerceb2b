@@ -24,17 +24,16 @@ or verifying a deployment.
 Before starting:
 
 ```bash
-# Start Django (Terminal 1)
-.venv/bin/python manage.py runserver
-
-# Optional — required for real-time messaging tests (Terminal 2)
-cd services/sse && bash run.sh
-
-# Optional — required for semantic search tests (Terminal 3)
-cd services/embedding && bash run.sh
+bash start.sh
 ```
 
-Open `http://127.0.0.1:8000` in your browser.
+This starts all three services (embedding sidecar, SSE relay, Django) and streams
+their logs to the terminal. Press **Ctrl-C** once to stop everything cleanly.
+
+Service logs are written to `logs/embedding.log`, `logs/sse.log`, and `logs/django.log`
+if you need to diagnose a startup problem.
+
+Open `http://127.0.0.1:8000` in your browser once `start.sh` reports all three services healthy.
 
 Use two different browsers (or one browser + one private window) when testing
 messaging between two users.
