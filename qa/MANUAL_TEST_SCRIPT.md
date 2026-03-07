@@ -11,6 +11,7 @@ or verifying a deployment.
 - Mark each item `[x]` pass, `[-]` skip (with note), or `[!]` fail (record what happened).
 - A fresh database is recommended. See Setup below.
 - Record your name, date, and build (git commit hash or branch) at the top of your run.
+- Items marked `[AUTO]` are high-value future automation candidates.
 
 **Tester:** ___________________________
 **Date:** ___________________________
@@ -79,7 +80,7 @@ messaging between two users.
 
 ## Section 1 — Account Registration and Email Verification
 
-### 1.1 Sign up — new account
+### 1.1 Sign up — new account `[AUTO]`
 
 - [ ] Navigate to `/signup/`
 - [ ] Fill in: Email, Display Name, Country (pick any), Password, Confirm Password
@@ -87,7 +88,7 @@ messaging between two users.
 - [ ] **Expected:** Redirected to `/verify-email/` with a message saying a verification email was sent
 - [ ] **Expected:** Console backend (default) prints the email — find the verification link in your terminal output
 
-### 1.2 Verify email
+### 1.2 Verify email `[AUTO]`
 
 - [ ] Copy the verification link from the terminal and paste it in the browser
 - [ ] **Expected:** Redirected to dashboard `/` with a success message
@@ -112,7 +113,14 @@ messaging between two users.
 - [ ] Verify via the new link
 - [ ] **Expected:** Login succeeds
 
-### 1.6 Log out and log back in
+### 1.6 Verification link reuse safety
+
+- [ ] Complete a successful verification flow using a fresh verification link
+- [ ] Immediately open the exact same verification link again (same browser tab or new tab)
+- [ ] **Expected:** System returns a safe, friendly "already used" or invalid-link style result
+- [ ] **Expected:** No error page/traceback is shown and account state remains correct
+
+### 1.7 Log out and log back in `[AUTO]`
 
 - [ ] Log out via the nav bar
 - [ ] Log back in
@@ -138,7 +146,7 @@ messaging between two users.
 - [ ] **Expected:** Page reloads with the new display name and the new skin applied site-wide
 - [ ] Switch back to "Simple Blue" and save
 
-### 2.3 Profile image — upload flow
+### 2.3 Profile image — upload flow `[AUTO]`
 
 - [ ] Navigate to `/profile/`
 - [ ] Click "Change photo"
@@ -169,11 +177,28 @@ messaging between two users.
 - [ ] If you have access to a very small image (under 256×256 pixels), try uploading it
 - [ ] **Expected:** An error message appears (image too small)
 
+### 2.7 Profile image — replacement propagation
+
+- [ ] Upload profile image A and confirm it appears on `/profile/`
+- [ ] Upload profile image B immediately after
+- [ ] **Expected:** Image B replaces image A on `/profile/`
+- [ ] Navigate through normal flows where avatars render (at least one listing detail owner block and one message thread)
+- [ ] **Expected:** Only image B is shown in those views
+- [ ] **Expected:** No stale display of image A appears during normal navigation/reload
+
+### 2.8 Profile image — transparent PNG rendering
+
+- [ ] Upload a transparent PNG avatar (with visible transparent edges/corners)
+- [ ] **Expected:** Avatar renders correctly (not broken, not black-boxed, not distorted)
+- [ ] Switch theme to "Warm Editorial" and verify avatar appearance
+- [ ] Switch theme to "Simple Blue" and verify avatar appearance
+- [ ] **Expected:** Avatar looks acceptable and consistent in both themes
+
 ---
 
 ## Section 3 — Supply Listings
 
-### 3.1 Create a supply listing
+### 3.1 Create a supply listing `[AUTO]`
 
 - [ ] Navigate to `/available/new/`
 - [ ] Fill in: Item (e.g. "Heritage Tomatoes"), Category, Quantity, Unit, Location (Country required)
@@ -230,7 +255,7 @@ messaging between two users.
 
 ## Section 4 — Demand Listings
 
-### 4.1 Create a demand listing
+### 4.1 Create a demand listing `[AUTO]`
 
 - [ ] Navigate to `/wanted/new/`
 - [ ] Fill in: Item (e.g. "Organic Oats"), Category, Minimum Quantity, Unit, Frequency, Location
@@ -266,7 +291,7 @@ messaging between two users.
 
 ## Section 5 — Discover
 
-### 5.1 Discover — basic supply search
+### 5.1 Discover — basic supply search `[AUTO]`
 
 > You need another user account with an active supply listing to make results appear.
 > If testing solo, create User A (supply listing) and User B (demand user) in separate browser windows.
@@ -311,11 +336,20 @@ messaging between two users.
 - [ ] On the discover page with results showing, click "Clear"
 - [ ] **Expected:** Results are cleared and the search form is reset
 
+### 5.7 Discover — direction isolation (Find Supply vs Find Demand)
+
+- [ ] Start in "Find Supply", run a search, and note the query + result set
+- [ ] Switch to "Find Demand" and run a different query
+- [ ] **Expected:** Demand results reflect the demand query/direction only (not prior supply results)
+- [ ] Navigate away and return to `/discover/`
+- [ ] Switch directions back and forth once more
+- [ ] **Expected:** Persisted state/results do not bleed incorrectly between directions
+
 ---
 
 ## Section 6 — Watchlist
 
-### 6.1 Watchlist page
+### 6.1 Watchlist page `[AUTO]`
 
 - [ ] Navigate to `/watchlist/`
 - [ ] **Expected:** Any listings saved via Discover appear here with "Watching" or "Starred" status
@@ -337,7 +371,7 @@ messaging between two users.
 
 > Requires two user accounts. Use two browsers or a browser + private window.
 
-### 7.1 Initiate a conversation
+### 7.1 Initiate a conversation `[AUTO]`
 
 - [ ] As User B, go to Discover and find User A's supply listing
 - [ ] Click "Message" on the listing card
@@ -377,6 +411,13 @@ messaging between two users.
 
 - [ ] As User A, navigate to the supply listing that was messaged about
 - [ ] **Expected:** A "Conversations" section shows the thread from User B
+
+### 7.7 Self-messaging prevention
+
+- [ ] Log in as a user who owns at least one listing
+- [ ] Open one of that user's own listing detail pages
+- [ ] **Expected:** UI does not offer a "Message" action to start a conversation with self
+- [ ] **Expected:** No self-thread is created from normal owner-facing listing flows
 
 ---
 
@@ -425,7 +466,7 @@ messaging between two users.
 - [ ] No role labels ("Buyer", "Supplier") should appear anywhere in the UI
 - [ ] All nav links route to the correct pages
 
-### 9.4 Permission guards
+### 9.4 Permission guards `[AUTO]`
 
 - [ ] While logged in as User A, try manually navigating to edit/delete a listing owned by User B
   (e.g. `/available/<user_b_pk>/edit/`)
@@ -483,7 +524,24 @@ The following are intentionally not implemented and do not need to be tested:
 - Email notifications for listing expiry
 - CDN / S3 for media files — filesystem only in V1
 - Admin UI enhancements — Django admin at `/admin/` exists but is barebones
-- Radius-based geographic search — planned, not yet built
+- Radius-based geographic filtering:
+  - What works now: country/location text fields and standard keyword/discover matching.
+  - What is not expected yet: true distance-based filtering (e.g. "within 25 miles/km"), map-radius logic, or geospatial sorting by distance.
+  - QA note: missing radius behavior alone should not be logged as a regression for this build.
+
+---
+
+## Future Automation Targets
+
+Use these `[AUTO]` items first when converting manual checks into automated suites:
+
+- Account flow: 1.1, 1.2, 1.4, 1.5, 1.6, 1.7
+- Listing creation: 3.1 and 4.1
+- Discover/search: 5.1 and 5.7
+- Watchlist: 6.1
+- Messaging: 7.1 and 7.7
+- Profile image upload: 2.3, 2.7, 2.8
+- Permission boundaries: 9.4
 
 ---
 

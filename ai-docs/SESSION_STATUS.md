@@ -7,6 +7,14 @@ If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Updated `qa/MANUAL_TEST_SCRIPT.md` with targeted QA coverage improvements:
+  - added avatar replacement propagation test (A -> B replacement across profile/listing/thread surfaces)
+  - added transparent PNG avatar rendering test across both skins
+  - added self-messaging prevention test for own listings
+  - added verification-link reuse safety test (already-used/invalid friendly handling)
+  - added Discover direction-isolation test (Find Supply vs Find Demand state/result bleed check)
+  - clarified radius filtering limitation wording with explicit "works now" vs "not expected yet" guidance and regression note
+  - added lightweight `[AUTO]` markers + "Future Automation Targets" section for highest-value automation candidates
 - V3 discovery/watchlist milestone implemented and pushed to `origin/main`.
 - Embedding service extracted to `services/embedding/` (FastAPI + UDS).
 - Vector search client updated to use sidecar service.
