@@ -7,6 +7,9 @@ If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Added sales-facing overview document for partner/demo enablement:
+  - `specs/SALES_AUDIENCE_OVERVIEW.md`
+  - non-technical summary of purpose, target markets, core capabilities, demo talking points, and deliberate scope boundaries
 - Updated `qa/MANUAL_TEST_SCRIPT.md` with targeted QA coverage improvements:
   - added avatar replacement propagation test (A -> B replacement across profile/listing/thread surfaces)
   - added transparent PNG avatar rendering test across both skins
