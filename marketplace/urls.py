@@ -17,6 +17,7 @@ urlpatterns = [
     # Profile
     path("profile/", views.profile_view, name="profile"),
     path("profile/edit/", views.profile_edit, name="profile_edit"),
+    path("profile/upload-avatar/", views.upload_profile_image, name="upload_profile_image"),
     # DemandPost (buyer)
     path("wanted/", views.demand_post_list, name="demand_post_list"),
     path("wanted/new/", views.demand_post_create, name="demand_post_create"),

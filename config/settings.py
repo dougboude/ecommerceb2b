@@ -144,10 +144,20 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+# ---------------------------------------------------------------------------
+# Media files (user uploads)
+# ---------------------------------------------------------------------------
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 # ---------------------------------------------------------------------------
 # Email

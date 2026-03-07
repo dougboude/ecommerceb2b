@@ -7,6 +7,14 @@ If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Updated `qa/MANUAL_TEST_SCRIPT.md` with targeted QA coverage improvements:
+  - added avatar replacement propagation test (A -> B replacement across profile/listing/thread surfaces)
+  - added transparent PNG avatar rendering test across both skins
+  - added self-messaging prevention test for own listings
+  - added verification-link reuse safety test (already-used/invalid friendly handling)
+  - added Discover direction-isolation test (Find Supply vs Find Demand state/result bleed check)
+  - clarified radius filtering limitation wording with explicit "works now" vs "not expected yet" guidance and regression note
+  - added lightweight `[AUTO]` markers + "Future Automation Targets" section for highest-value automation candidates
 - V3 discovery/watchlist milestone implemented and pushed to `origin/main`.
 - Embedding service extracted to `services/embedding/` (FastAPI + UDS).
 - Vector search client updated to use sidecar service.
@@ -378,18 +386,34 @@ Do not create new per-version status files.
   - Full suite: 47 passing, 0 failures, 6 skipped
   - SPEC_ORDER.md updated with entry 10 (`listing-expiry-lazy-filtering`)
 
+- Feature 11 (`profile-image-upload`) implementation executed on branch `feat/11-profile-image-upload`:
+  - Added `Pillow>=10.0,<13` to `requirements.txt` (already installed at 12.1.1)
+  - Added `MEDIA_ROOT`, `MEDIA_URL`, `MAX_UPLOAD_SIZE_BYTES` to `config/settings.py`
+  - Added `STORAGES["default"]` = FileSystemStorage (required for ImageField)
+  - Wired DEBUG-only media serving in `config/urls.py`
+  - Created `static/img/default_avatar.png` (Pillow-generated neutral silhouette)
+  - Vendored Cropper.js 1.6.2 to `static/vendor/` (JS + CSS)
+  - Added `User.profile_image` (ImageField), `User.profile_image_updated_at` (DateTimeField), `User.profile_image_url` property to `marketplace/models.py`
+  - Applied migration `marketplace/migrations/0016_add_profile_image_fields.py`
+  - Created `marketplace/image_pipeline.py` — 10-step validate/process pipeline (verify, reopen, min dims, transparency detect, resize 512×512, re-encode JPEG/PNG)
+  - Added `upload_profile_image` view in `marketplace/views.py` — POST-only, login-required, returns JSON `{avatar_url}`
+  - Added URL `profile/upload-avatar/` in `marketplace/urls.py`
+  - Created `static/js/avatar-upload.js` — Cropper.js integration, canvas blob POST, in-place avatar update
+  - Updated `templates/marketplace/profile.html` — avatar display, file input, crop modal (`<dialog>`), Cropper.js extras
+  - Created `templates/includes/_avatar_lightbox.html` — native `<dialog>` lightbox, included once in `base.html`
+  - Updated `templates/marketplace/supply_lot_detail.html`, `demand_post_detail.html` — listing owner avatar with lightbox trigger
+  - Updated `templates/marketplace/thread_detail.html` — sender avatar per message
+  - Added avatar CSS classes (`.avatar`, `.avatar-xs/sm/lg`, `.avatar-clickable`, `.listing-owner`, `.visually-hidden`, lightbox styles) to both skin files
+  - Added 17 tests in `marketplace/tests/test_profile_image.py` — all pass
+  - Full suite: `64` passing, `6` skipped, `0` failures
+  - `specs/SPEC_ORDER.md` Feature 11 status updated to `REQ, DES, TASK, EXEC`
+
 ## Current State
-- Branch: `main`
-- Features 1–10 complete and on `main`
-- Current suite: `47` passing, `6` skipped, `0` failures
+- Branch: `feat/11-profile-image-upload`
+- Features 1–11 complete; Feature 11 on branch pending merge to `main`
+- Current suite: `64` passing, `6` skipped, `0` failures
 - Per-version status files removed; this is the only status tracker
 
-- Feature 11 (`profile-image-upload`) spec in progress — requirements approved, design doc written:
-  - `specs/profile-image-upload/requirements.md` created (9 requirements)
-  - Design proposal produced in session covering storage strategy, data model, security, processing pipeline, crop UX, surfaces, and reusability
-  - `specs/SPEC_ORDER.md` updated with Feature 11 entry, status `REQ, DES, TASK`
-
 ## What's Next (if continuing)
-- User reviews `specs/profile-image-upload/requirements.md`
-- On approval of tasks: execute on a new branch `feat/11-profile-image-upload`
-- Remaining launch requirements after Feature 11: §5.4 Radius Filtering, §5.6 Operator Tools
+- Merge `feat/11-profile-image-upload` → `main`
+- Remaining launch requirements: §5.4 Radius Filtering, §5.6 Operator Tools (admin UI enhancements roadmap)

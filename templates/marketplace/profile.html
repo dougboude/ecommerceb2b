@@ -1,20 +1,52 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Profile" %}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/cropper.min.css' %}">
+<style>
+.profile-avatar-wrap { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+#avatar-crop-modal { border: none; border-radius: 8px; padding: 1.5rem; max-width: 480px; width: 100%; }
+#avatar-crop-modal::backdrop { background: rgba(0,0,0,0.55); }
+.crop-area { max-height: 320px; overflow: hidden; }
+.crop-area img { display: block; max-width: 100%; }
+.crop-preview-wrap { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; }
+#avatar-crop-preview { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; }
+.crop-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+#avatar-upload-error { color: var(--color-error, #c00); margin-top: 0.5rem; font-size: 0.875rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>{% trans "Profile" %}</h1>
+
+<div class="profile-avatar-wrap">
+    <img id="avatar-display"
+         src="{{ user.profile_image_url }}"
+         alt="{% trans 'Your profile photo' %}"
+         class="avatar avatar-lg avatar-live"
+         width="96" height="96">
+    <div>
+        <label for="avatar-input" class="btn btn-secondary" style="cursor:pointer;">
+            {% trans "Change photo" %}
+        </label>
+        <input type="file" id="avatar-input"
+               accept="image/jpeg,image/png,image/webp"
+               data-upload-url="{% url 'marketplace:upload_profile_image' %}"
+               class="visually-hidden">
+        <p id="avatar-upload-error" hidden></p>
+    </div>
+</div>
+
+{% csrf_token %}
+
 <dl>
     <dt>{% trans "Display name" %}</dt><dd>{{ identity_profile.display_name|default:"-" }}</dd>
     <dt>{% trans "Organization" %}</dt><dd>{{ identity_profile.organization_name|default:"-" }}</dd>
     <dt>{% trans "Location" %}</dt>
     <dd>{{ user.country|default:"-" }}</dd>
     <dt>{% trans "Member since" %}</dt><dd>{{ member_since|date:"F j, Y" }}</dd>
-    <dt>{% trans "Profile image" %}</dt>
-    <dd>
-        <span class="status status-paused" aria-label="{% trans 'Profile image placeholder' %}">{{ profile_initial }}</span>
-    </dd>
 </dl>
 
 <section>
@@ -47,4 +79,25 @@
     <a href="{% url 'marketplace:profile_edit' %}" class="btn btn-primary">{% trans "Edit profile" %}</a>
     <a href="{% url 'marketplace:dashboard' %}" class="btn btn-secondary">{% trans "Back to dashboard" %}</a>
 </div>
+
+<!-- Crop modal -->
+<dialog id="avatar-crop-modal" aria-labelledby="crop-modal-title">
+    <h2 id="crop-modal-title" style="margin-top:0;">{% trans "Crop your photo" %}</h2>
+    <div class="crop-area">
+        <img id="avatar-crop-image" src="" alt="">
+    </div>
+    <div class="crop-preview-wrap">
+        <div id="avatar-crop-preview" title="{% trans 'Preview' %}"></div>
+        <span>{% trans "Preview" %}</span>
+    </div>
+    <div class="crop-actions">
+        <button id="avatar-crop-cancel" type="button" class="btn btn-secondary">{% trans "Cancel" %}</button>
+        <button id="avatar-crop-confirm" type="button" class="btn btn-primary">{% trans "Use this photo" %}</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/cropper.min.js' %}"></script>
+<script src="{% static 'js/avatar-upload.js' %}"></script>
 {% endblock %}

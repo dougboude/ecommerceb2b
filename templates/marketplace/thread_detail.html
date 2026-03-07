@@ -27,6 +27,10 @@
 <div class="messages-list" id="sse-messages-list" data-thread-id="{{ thread.pk }}">
     {% for msg in messages_list %}
     <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}" data-message-ts="{{ msg.created_at|date:'U' }}">
+        <img src="{{ msg.sender.profile_image_url }}"
+             alt="{{ msg.sender.display_name }}"
+             class="avatar avatar-xs"
+             width="40" height="40">
         <strong>{{ msg.sender.display_name }}</strong>
         <span>{{ msg.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         <p>{{ msg.body }}</p>

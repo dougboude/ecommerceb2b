@@ -79,7 +79,7 @@ Rules:
 11. **profile-image-upload**
    - Phase: LAUNCH READINESS
    - Depends on: all foundation specs (CP5 required); Features 8–9 (`EXEC`)
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/profile-image-upload/`
 
 ## Maintenance Workflow

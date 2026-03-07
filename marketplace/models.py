@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.templatetags.static import static
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext_lazy as _
 
@@ -166,6 +167,12 @@ class User(AbstractUser):
     skin = models.CharField(_("theme"), max_length=20, choices=Skin.choices)
     email_on_message = models.BooleanField(_("email me when I receive a message"), default=False)
     organization_name = models.CharField(_("organization name"), max_length=255, blank=True, null=True)
+    profile_image = models.ImageField(
+        upload_to="profile_images/",
+        null=True,
+        blank=True,
+    )
+    profile_image_updated_at = models.DateTimeField(null=True, blank=True)
 
     objects = UserManager()
 
@@ -174,6 +181,12 @@ class User(AbstractUser):
 
     class Meta:
         ordering = ["-date_joined"]
+
+    @property
+    def profile_image_url(self):
+        if self.profile_image:
+            return self.profile_image.url
+        return static("img/default_avatar.png")
 
     def clean(self):
         super().clean()

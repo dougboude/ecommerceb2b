@@ -1,10 +1,20 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{{ lot.item_text }} #{{ lot.lot_number }}{% endblock %}
 
 {% block content %}
 <h1>{{ lot.item_text }} #{{ lot.lot_number }}</h1>
+
+<div class="listing-owner">
+    <img src="{{ lot.created_by_user.profile_image_url }}"
+         alt="{{ lot.created_by_user.display_name|default:lot.created_by_user.email }}"
+         class="avatar avatar-sm avatar-clickable"
+         data-full-src="{{ lot.created_by_user.profile_image_url }}"
+         width="64" height="64">
+    <span>{{ lot.created_by_user.display_name|default:lot.created_by_user.email }}</span>
+</div>
+
 <dl>
     <dt>{% trans "Status" %}</dt><dd>{% if lot.is_expired %}<span class="status status-expired">{% trans "Expired" %}</span>{% else %}<span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>{% endif %}</dd>
     <dt>{% trans "Category" %}</dt><dd>{{ lot.get_category_display|default:"-" }}</dd>
