@@ -251,7 +251,7 @@ Expected: all tests pass, 0 failures, 0 errors. If any test fails, fix the regre
 - [ ] 9.11 Write `test_resend_sends_new_token`
   - Create user with `email_verified=False`; create an existing unused token
   - POST to `/resend-verification/` with that user's email
-  - Assert old token is deleted (or has no `used_at`-less siblings after)
+  - Assert old token still exists in DB but has `revoked_at` set (not deleted)
   - Assert new token created
   - Assert one email sent
   - _Requirements: 5.2_

@@ -362,7 +362,7 @@ All tests tagged `@tag('email_verification')`. Use `@override_settings(STORAGES=
 | `test_login_blocked_for_unverified_user` | POST login with valid credentials, `email_verified=False` → form error, no session |
 | `test_login_allowed_for_verified_user` | POST login with valid credentials, `email_verified=True` → redirect to dashboard |
 | `test_resend_sends_new_token_for_unverified` | POST resend with valid unverified email → new token created, new email sent |
-| `test_resend_invalidates_old_tokens` | POST resend → prior unused tokens for that user deleted before new one created |
+| `test_resend_revokes_old_tokens` | POST resend → prior unused tokens for that user have `revoked_at` set; rows are not deleted |
 | `test_resend_neutral_response_for_unknown_email` | POST resend with unknown email → redirect to verify_email page, no error, no email |
 | `test_resend_neutral_response_for_verified_user` | POST resend for already-verified email → same neutral redirect, no email |
 | `test_token_is_valid_property` | Unit test: new token → `is_valid=True`; expired token → `is_valid=False`; used token → `is_valid=False` |

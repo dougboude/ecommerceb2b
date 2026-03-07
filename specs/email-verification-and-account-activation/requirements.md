@@ -61,7 +61,7 @@ except FieldDoesNotExist:
 3. A token SHALL be valid only when `used_at is None` AND `revoked_at is None` AND `expires_at > now()`.
 4. THE model SHALL expose an `is_valid` property returning `True` only for valid tokens.
 5. Prior tokens SHALL be revoked (setting `revoked_at=now()`) rather than deleted when a resend or new signup triggers a new token for the same user. Token rows are never hard-deleted, preserving audit history.
-5. THE `EmailVerificationToken` table SHALL be registered in Django admin.
+6. THE `EmailVerificationToken` table SHALL be registered in Django admin.
 
 ### Requirement 2: Signup Triggers Verification
 
