@@ -86,7 +86,7 @@ class DemandPostForm(forms.ModelForm):
         self.fields["description"].label = _("Notes")
         self.fields["description"].required = False
 
-        # Quantity label for buyers
+        # Demand listing quantity semantics
         self.fields["quantity"].label = _("Minimum quantity")
         self.fields["quantity"].help_text = _(
             "The minimum amount you want to purchase."

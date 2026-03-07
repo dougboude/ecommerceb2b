@@ -316,13 +316,37 @@ Do not create new per-version status files.
       - `migration_backfill` now explicitly retired
       - rollback from CP5 explicitly blocked
     - `manage.py test` passing (`17` tests, `6` skipped retired legacy migration modules)
+- Feature 8 (`ui-language-and-navigation-derolification`) implementation executed on branch `feat/08-ui-language-and-navigation-derolification`:
+  - Derolified launch-critical UI language and navigation surfaces:
+    - updated navbar to role-agnostic structure with `Your Listings` grouping (`Supply` + `Demand`) while preserving `Watchlist` and `Messages` unread badge
+    - updated signup labels to `Create Account`
+    - replaced demand/supply form labels from `Wanted/Available` to `Demand/Supply`
+    - updated dashboard, listing list, and suggestion headings/empty states to role-agnostic listing-type language
+    - updated listing CRUD success messages in views from `Wanted/Available listing ...` to `Demand/Supply listing ...`
+  - Implemented self-profile role-agnostic listing model rendering:
+    - `profile_view` now passes `member_since`, profile initial placeholder, and active `Supply Listings` + `Demand Listings`
+    - `profile.html` now renders both listing sections with empty states and profile placeholder
+  - Added UI compliance scanner and parity integration:
+    - new module `marketplace/migration_control/ui_compliance.py` (`TemplateLanguageComplianceScanner`)
+    - added `ParityValidator.validate_ui_language()`
+    - added `migration_validate --scope ui` support and reporting
+  - Added canonical test coverage:
+    - new `marketplace/tests/test_ui_derolification.py` (7 tests, tagged `ui_derolification`)
+  - Validation evidence:
+    - preflight CP5 gates passed (checkpoint/state + model removals + cutover parity records)
+    - `manage.py test marketplace.tests.test_ui_derolification` passed (7 tests)
+    - `manage.py test marketplace` passed (`24` tests, `6` skipped)
+    - `manage.py migration_validate --scope ui --fail-on-error` passed
+    - `manage.py migration_validate --scope all --fail-on-error` passed
+  - Spec trackers updated:
+    - `specs/ui-language-and-navigation-derolification/tasks.md` all tasks complete
+    - `specs/SPEC_ORDER.md` Feature 8 status updated to `REQ, DES, TASK, EXEC`
 
 ## Current State
-- Branch: `feat/07-legacy-schema-cleanup-and-final-cutover`
-- Features 1–6 are complete and merged to `main`; Feature 7 cleanup implementation is complete on feature branch
-- Current post-cleanup test suite status: `17` passing, `6` skipped (legacy migration-era suites retired)
+- Branch: `feat/08-ui-language-and-navigation-derolification`
+- Features 1–7 are complete and merged to `main`; Feature 8 implementation is complete on feature branch
+- Current suite status after Feature 8: `24` passing, `6` skipped (legacy migration-era suites retired)
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Review retired/skipped legacy migration test modules and replace with post-cleanup equivalents where coverage is still needed.
-- Commit Feature 7 branch, merge to `main`, and push.
+- Commit Feature 8 branch, merge to `main`, and push.

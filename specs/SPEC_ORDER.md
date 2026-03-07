@@ -61,7 +61,7 @@ Rules:
 8. **ui-language-and-navigation-derolification**
    - Phase: LAUNCH READINESS
    - Depends on: `legacy-schema-cleanup-and-final-cutover` (CP5 required); all six foundation specs
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/ui-language-and-navigation-derolification/`
 
 ## Maintenance Workflow

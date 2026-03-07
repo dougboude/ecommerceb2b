@@ -7,7 +7,7 @@
 <h1>{% trans "Dashboard" %}</h1>
 
 <section>
-    <h2>{% trans "Your Wanted Listings" %}</h2>
+    <h2>{% trans "Your Demand Listings" %}</h2>
     {% if demand_posts %}
     <div class="card-grid">
         {% for post in demand_posts %}
@@ -21,13 +21,13 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="empty-state">{% trans "No wanted listings yet." %}</p>
+    <p class="empty-state">{% trans "No demand listings yet." %}</p>
     {% endif %}
-    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Post a Wanted Listing" %}</a>
+    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create Demand Listing" %}</a>
 </section>
 
 <section>
-    <h2>{% trans "Your Available Listings" %}</h2>
+    <h2>{% trans "Your Supply Listings" %}</h2>
     {% if supply_lots %}
     <div class="card-grid">
         {% for lot in supply_lots %}
@@ -41,9 +41,9 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="empty-state">{% trans "No available listings yet." %}</p>
+    <p class="empty-state">{% trans "No supply listings yet." %}</p>
     {% endif %}
-    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Post an Available Listing" %}</a>
+    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create Supply Listing" %}</a>
 </section>
 
 <section>

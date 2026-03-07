@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% if editing %}{% trans "Edit Available Listing" %}{% else %}{% trans "Create Available Listing" %}{% endif %}{% endblock %}
+{% block title %}{% if editing %}{% trans "Edit Supply Listing" %}{% else %}{% trans "New Supply Listing" %}{% endif %}{% endblock %}
 
 {% block content %}
-<h1>{% if editing %}{% trans "Edit Available Listing" %}{% else %}{% trans "Create Available Listing" %}{% endif %}</h1>
+<h1>{% if editing %}{% trans "Edit Supply Listing" %}{% else %}{% trans "New Supply Listing" %}{% endif %}</h1>
 <div class="card">
     <form method="post">
         {% csrf_token %}

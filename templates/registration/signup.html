@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Create account" %}{% endblock %}
+{% block title %}{% trans "Create Account" %}{% endblock %}
 
 {% block content %}
 <div class="auth-form">
-    <h1>{% trans "Create account" %}</h1>
+    <h1>{% trans "Create Account" %}</h1>
     <form method="post" id="signup-form">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">{% trans "Create account" %}</button>
+        <button type="submit">{% trans "Create Account" %}</button>
     </form>
     <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Already have an account? Log in" %}</a></p>
 </div>
