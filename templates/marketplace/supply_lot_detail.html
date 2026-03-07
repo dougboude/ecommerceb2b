@@ -18,7 +18,7 @@
 
 {% if is_owner and suggestions %}
 <section>
-    <h2>{% trans "Suggested Buyers" %}</h2>
+    <h2>{% trans "Suggested Demand Listings" %}</h2>
     {% for listing in suggestions %}
     <div class="match-card" data-href="{% url 'marketplace:demand_post_detail' listing.pk %}">
         <div class="match-card-details">

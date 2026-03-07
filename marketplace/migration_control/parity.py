@@ -19,6 +19,7 @@ from marketplace.migration_control.identity import IdentityComplianceScanner
 from marketplace.migration_control.permissions import RoleAuthComplianceScanner
 from marketplace.migration_control.discover import DiscoverComplianceScanner
 from marketplace.migration_control.cleanup import CleanupComplianceScanner
+from marketplace.migration_control.ui_compliance import TemplateLanguageComplianceScanner
 
 
 @dataclass
@@ -206,6 +207,21 @@ class ParityValidator:
             total_checked=max(failures, 1),
             failures=failures,
             summary="; ".join(violations),
+        )
+
+    def validate_ui_language(self) -> ValidationResult:
+        scanner = TemplateLanguageComplianceScanner()
+        passed, violations = scanner.scan()
+        failures = len(violations)
+        summary = "; ".join(violations)
+        if scanner.warnings:
+            warning_summary = "; ".join(scanner.warnings)
+            summary = f"{summary}; warnings={warning_summary}" if summary else f"warnings={warning_summary}"
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary=summary,
         )
 
     def create_report(self, stage: str, scope: str, result: ValidationResult) -> ParityReport:

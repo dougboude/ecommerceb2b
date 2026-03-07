@@ -298,7 +298,35 @@ def dashboard_view(request):
 @login_required
 def profile_view(request):
     profile = identity_adapter.get_profile(request.user)
-    return render(request, "marketplace/profile.html", {"identity_profile": profile})
+    supply_listings = (
+        Listing.objects.filter(
+            created_by_user=request.user,
+            type=ListingType.SUPPLY,
+            status=ListingStatus.ACTIVE,
+        )
+        .order_by("-created_at")[:5]
+    )
+    demand_listings = (
+        Listing.objects.filter(
+            created_by_user=request.user,
+            type=ListingType.DEMAND,
+            status=ListingStatus.ACTIVE,
+        )
+        .order_by("-created_at")[:5]
+    )
+    display_seed = (profile.display_name or request.user.email or "?").strip()
+    profile_initial = display_seed[0].upper() if display_seed else "?"
+    return render(
+        request,
+        "marketplace/profile.html",
+        {
+            "identity_profile": profile,
+            "member_since": request.user.date_joined,
+            "profile_initial": profile_initial,
+            "supply_listings": supply_listings,
+            "demand_listings": demand_listings,
+        },
+    )
 
 
 @login_required
@@ -349,7 +377,7 @@ def demand_post_create(request):
             post.created_by_user = request.user
             post.save()
             _sync_listing_to_vector_index(post)
-            django_messages.success(request, _("Wanted listing created."))
+            django_messages.success(request, _("Demand listing created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
         form = DemandPostForm(user=request.user)
@@ -365,7 +393,7 @@ def demand_post_edit(request, pk):
         if form.is_valid():
             post = form.save()
             _sync_listing_to_vector_index(post)
-            django_messages.success(request, _("Wanted listing updated."))
+            django_messages.success(request, _("Demand listing updated."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
         form = DemandPostForm(instance=post, user=request.user)
@@ -433,7 +461,7 @@ def demand_post_delete(request, pk):
         post.save(update_fields=["status"])
         _archive_watchlist_items_for_listing(post)
         _remove_listing_from_vector_index(post)
-        django_messages.success(request, _("Wanted listing deleted."))
+        django_messages.success(request, _("Demand listing deleted."))
         return redirect("marketplace:demand_post_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
         "listing_title": post.item_text,
@@ -467,7 +495,7 @@ def supply_lot_create(request):
             lot.created_by_user = request.user
             lot.save()
             _sync_listing_to_vector_index(lot)
-            django_messages.success(request, _("Available listing created."))
+            django_messages.success(request, _("Supply listing created."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm()
@@ -483,7 +511,7 @@ def supply_lot_edit(request, pk):
         if form.is_valid():
             lot = form.save()
             _sync_listing_to_vector_index(lot)
-            django_messages.success(request, _("Available listing updated."))
+            django_messages.success(request, _("Supply listing updated."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm(instance=lot)
@@ -551,7 +579,7 @@ def supply_lot_delete(request, pk):
         lot.save(update_fields=["status"])
         _archive_watchlist_items_for_listing(lot)
         _remove_listing_from_vector_index(lot)
-        django_messages.success(request, _("Available listing deleted."))
+        django_messages.success(request, _("Supply listing deleted."))
         return redirect("marketplace:supply_lot_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
         "listing_title": lot.item_text,

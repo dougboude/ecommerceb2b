@@ -21,6 +21,7 @@ class Command(BaseCommand):
                 "cleanup_listing",
                 "cleanup_messaging",
                 "cleanup_role_org",
+                "ui",
                 "all",
             ],
             default="all",
@@ -100,6 +101,12 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"cleanup_role_org: passed={result.passed} failures={result.failures} summary={result.summary}"
             )
+            failures += result.failures
+
+        if options["scope"] in {"ui", "all"}:
+            result = validator.validate_ui_language()
+            validator.create_report(stage=state.stage, scope="ui", result=result)
+            self.stdout.write(f"ui: passed={result.passed} failures={result.failures} summary={result.summary}")
             failures += result.failures
 
         if options["fail_on_error"] and failures > 0:

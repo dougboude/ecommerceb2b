@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Wanted Listings" %}{% endblock %}
+{% block title %}{% trans "Demand Listings" %}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>{% trans "Your Wanted Listings" %}</h1>
+    <h1>{% trans "Demand Listings" %}</h1>
     <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
 </div>
 {% if page_obj %}
@@ -29,6 +29,6 @@
 </div>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p class="empty-state">{% trans "No wanted listings yet." %}</p>
+<p class="empty-state">{% trans "No demand listings yet." %}</p>
 {% endif %}
 {% endblock %}
