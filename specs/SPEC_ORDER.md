@@ -64,6 +64,12 @@ Rules:
    - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/ui-language-and-navigation-derolification/`
 
+9. **email-verification-and-account-activation**
+   - Phase: LAUNCH READINESS
+   - Depends on: all foundation specs (CP5 required); `ui-language-and-navigation-derolification`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/email-verification-and-account-activation/`
+
 ## Maintenance Workflow
 
 When creating a new spec:
