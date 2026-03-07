@@ -2,11 +2,17 @@
 
 ## First Step (Every Session)
 
-Before doing any work in this repository, read and internalize:
+**Orientation (read once when new to the project):**
+1. `README.md` — what this product is and who it's for
+2. `ai-docs/PRODUCT_ROADMAP.md` — what's been built and where it's going
 
-0. `ai-docs/SESSION_STATUS.md` — canonical handoff log (update at end of session)
-1. `ai-docs/ai-constitution.md` — governance rules, scope control, stop conditions
-2. `ai-docs/AGENT_NOTES.md` — gotchas, non-obvious patterns, hard-won lessons
+**Every session:**
+3. `ai-docs/SESSION_STATUS.md` — current state, what's done, what's next (update at end of session)
+4. `ai-docs/ai-constitution.md` — governance rules, scope control, stop conditions
+5. `ai-docs/AGENT_NOTES.md` — gotchas, non-obvious patterns, hard-won lessons
+
+**QA work only:**
+6. `qa/README.md` — test scripts, seed accounts, reset tooling
 
 ## Authority Order
 
