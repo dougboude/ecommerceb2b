@@ -6,7 +6,7 @@
 {% block content %}
 <h1>{{ lot.item_text }} #{{ lot.lot_number }}</h1>
 <dl>
-    <dt>{% trans "Status" %}</dt><dd><span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span></dd>
+    <dt>{% trans "Status" %}</dt><dd>{% if lot.is_expired %}<span class="status status-expired">{% trans "Expired" %}</span>{% else %}<span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>{% endif %}</dd>
     <dt>{% trans "Category" %}</dt><dd>{{ lot.get_category_display|default:"-" }}</dd>
     <dt>{% trans "Quantity" %}</dt><dd>{{ lot.quantity_value|default:"-" }} {{ lot.get_quantity_unit_display }}</dd>
     <dt>{% trans "Available until" %}</dt><dd>{{ lot.available_until|date:"N j, Y" }}</dd>
@@ -78,6 +78,7 @@
     {% if lot.status == "deleted" %}
     <a href="{% url 'marketplace:supply_lot_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>
     {% else %}
+    {% if not lot.is_expired %}
     {% if lot.status == "active" %}
     <form method="post" action="{% url 'marketplace:supply_lot_toggle' lot.pk %}">
         {% csrf_token %}
@@ -91,6 +92,7 @@
     {% endif %}
     {% if lot.status != "expired" %}
     <a href="{% url 'marketplace:supply_lot_edit' lot.pk %}" class="btn btn-secondary">{% trans "Edit" %}</a>
+    {% endif %}
     {% endif %}
     <a href="{% url 'marketplace:supply_lot_delete' lot.pk %}" class="btn btn-danger">{% trans "Delete" %}</a>
     <a href="{% url 'marketplace:supply_lot_list' %}" class="btn btn-secondary">{% trans "Back to list" %}</a>

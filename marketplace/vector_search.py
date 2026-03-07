@@ -6,6 +6,8 @@ import logging
 
 import httpx
 from django.conf import settings
+from django.db.models import Q
+from django.utils.timezone import now as timezone_now
 
 from .models import Listing, ListingStatus, ListingType
 
@@ -110,12 +112,13 @@ def search_listings(query, listing_type, user, category=None, country=None, limi
 
         pks = [r["pk"] for r in results]
         distances_by_pk = {r["pk"]: r["distance"] for r in results}
+        now = timezone_now()
         objects = {
             obj.pk: obj for obj in Listing.objects.filter(
                 pk__in=pks,
                 type=listing_type,
                 status=ListingStatus.ACTIVE,
-            )
+            ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
         }
         ordered = []
         for pk in pks:

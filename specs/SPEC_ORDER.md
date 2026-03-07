@@ -70,6 +70,12 @@ Rules:
    - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/email-verification-and-account-activation/`
 
+10. **listing-expiry-lazy-filtering**
+   - Phase: LAUNCH READINESS
+   - Depends on: all foundation specs (CP5 required)
+   - Status: `EXEC`
+   - Path: n/a (executed directly, no spec docs — see §5.5 in PRODUCT_ROADMAP.md)
+
 ## Maintenance Workflow
 
 When creating a new spec:

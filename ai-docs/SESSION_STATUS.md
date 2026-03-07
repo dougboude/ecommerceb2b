@@ -369,11 +369,20 @@ Do not create new per-version status files.
     - `specs/email-verification-and-account-activation/tasks.md` all tasks complete
     - `specs/SPEC_ORDER.md` Feature 9 status updated to `REQ, DES, TASK, EXEC`
 
+- Feature 10 (listing expiry, §5.5) executed directly on `main` without a spec (feature too small):
+  - Added `Listing.is_expired` property: `expires_at is not None and expires_at <= now()`
+  - `vector_search.py` post-fetch DB filter now excludes expired listings (adds `Q(expires_at__isnull=True) | Q(expires_at__gt=now)`)
+  - `supply_lot_list.html` and `demand_post_list.html`: status badge renders "Expired" when `is_expired`
+  - `supply_lot_detail.html` and `demand_post_detail.html`: status badge and action buttons (Withdraw/Pause/Edit) suppressed for expired listings
+  - No DB writes, no background job — pure lazy query-time filtering
+  - Full suite: 47 passing, 0 failures, 6 skipped
+  - SPEC_ORDER.md updated with entry 10 (`listing-expiry-lazy-filtering`)
+
 ## Current State
-- Branch: `feat/09-email-verification-and-account-activation`
-- Features 1–8 are complete and merged to `main`; Feature 9 implementation is complete on feature branch
-- Current suite status after Feature 9: `47` passing, `6` skipped (legacy migration-era suites retired)
+- Branch: `main`
+- Features 1–10 complete and on `main`
+- Current suite: `47` passing, `6` skipped, `0` failures
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Commit Feature 9 branch, merge to `main`, and push.
+- Remaining launch requirements: §5.3 Profile Image Upload, §5.4 Radius Filtering, §5.6 Operator Tools

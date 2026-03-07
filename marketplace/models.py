@@ -276,6 +276,10 @@ class Listing(LocationMixin):
         self.price_value = value
 
     @property
+    def is_expired(self):
+        return self.expires_at is not None and self.expires_at <= timezone_now()
+
+    @property
     def shipping_allowed(self):
         return True
 
