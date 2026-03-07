@@ -34,12 +34,13 @@ If either gate fails, STOP. Do not proceed with Phase 1 tasks.
 ### Group 1 — EmailVerificationToken Model and Migration
 
 - [ ] 1.1 Add `EmailVerificationToken` to `marketplace/models.py`
-  - Fields: `user` (FK User, CASCADE), `token` (UUIDField, unique, db_index), `created_at` (auto_now_add), `expires_at` (DateTimeField), `used_at` (nullable DateTimeField)
+  - Fields: `user` (FK User, CASCADE), `token` (UUIDField, unique, db_index), `created_at` (auto_now_add), `expires_at` (DateTimeField), `used_at` (nullable DateTimeField), `revoked_at` (nullable DateTimeField)
   - `TOKEN_EXPIRY_HOURS = 24` class constant
   - `save()` sets `expires_at = now() + timedelta(hours=TOKEN_EXPIRY_HOURS)` on first save if not already set
-  - `is_valid` property: `used_at is None and expires_at > now()`
+  - `is_valid` property: `used_at is None and revoked_at is None and expires_at > now()`
   - `__str__` returns meaningful representation
-  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - Tokens are NEVER hard-deleted; prior tokens are revoked via `revoked_at=now()` to preserve audit history
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
 - [ ] 1.2 Generate and apply additive migration for `EmailVerificationToken`
   - Run `manage.py makemigrations` — confirm the new migration is additive only (no drops, no alters on existing tables)
@@ -58,7 +59,7 @@ If either gate fails, STOP. Do not proceed with Phase 1 tasks.
 ### Group 2 — Signup Flow Integration
 
 - [ ] 2.1 Add `_send_verification_email(request, user)` helper in `marketplace/views.py`
-  - Invalidate prior unused tokens: `EmailVerificationToken.objects.filter(user=user, used_at=None).delete()`
+  - Revoke prior unused tokens (do NOT delete — preserves audit): `EmailVerificationToken.objects.filter(user=user, used_at=None, revoked_at=None).update(revoked_at=now())`
   - Create new token: `EmailVerificationToken.objects.create(user=user)`
   - Build absolute verification URL using `request.build_absolute_uri(reverse(...))`
   - Render `templates/registration/verification_email_subject.txt` and `templates/registration/verification_email_body.txt` via `render_to_string`
@@ -80,9 +81,12 @@ If either gate fails, STOP. Do not proceed with Phase 1 tasks.
 - [ ] 3.2 Add `verify_email_confirm` view in `marketplace/views.py`
   - `GET /verify-email/<uuid:token>/`
   - Look up token by UUID; raise `Http404` if not found
-  - If `used_at is not None`: render `templates/registration/email_verify_used.html`
-  - If not `is_valid` (expired): render `templates/registration/email_verify_expired.html`
-  - If valid: set `user.email_verified=True`, `token.used_at=now()`, save both, call `login(request, user, backend=...)`, add success message, redirect to `marketplace:dashboard`, set skin cookie
+  - Check terminal states outside the transaction: if `used_at is not None` → render `email_verify_used.html`; if not `is_valid` (expired) → render `email_verify_expired.html`
+  - Activation block MUST use `transaction.atomic()` + `select_for_update()` to prevent double-activation on concurrent clicks:
+    - Re-fetch token inside atomic block with `select_for_update().get(pk=obj.pk, used_at=None, revoked_at=None)` — if `DoesNotExist`, another request won the race → render `email_verify_used.html`
+    - Re-check `is_valid` inside transaction; if expired → render `email_verify_expired.html`
+    - Set `user.email_verified=True` and `token.used_at=now()`; save both inside the transaction
+  - After the atomic block: call `login(request, user, backend=...)`, add success message, redirect to `marketplace:dashboard`, set skin cookie
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
 - [ ] 3.3 Add new URL patterns to `marketplace/urls.py`
@@ -98,6 +102,12 @@ If either gate fails, STOP. Do not proceed with Phase 1 tasks.
   - If unverified: `form.add_error(None, mark_safe(...))` with resend link anchored to `reverse("marketplace:resend_verification")`, then `return self.form_invalid(form)`
   - Only call `super().form_valid(form)` (and set skin cookie) if `email_verified=True`
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
+
+- [ ] 4.2 Fix `UserManager.create_superuser` in `marketplace/models.py` to prevent bootstrap lockout
+  - Add `extra_fields.setdefault("email_verified", True)` before calling `self.create_user(...)`
+  - This ensures `manage.py createsuperuser` produces a verified account that can log in immediately
+  - Existing superusers in the DB are NOT retroactively affected — document that pre-existing unverified superusers must be manually fixed via `manage.py shell -c "from marketplace.models import User; User.objects.filter(is_superuser=True).update(email_verified=True)"`
+  - _Requirements: 4.3a_
 
 ### Group 5 — Resend Verification Flow
 

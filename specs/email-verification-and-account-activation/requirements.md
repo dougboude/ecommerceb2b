@@ -56,10 +56,11 @@ except FieldDoesNotExist:
 
 #### Acceptance Criteria
 
-1. THE System SHALL add `EmailVerificationToken` to `marketplace/models.py` with fields: `user` (FK to `User`, CASCADE), `token` (UUID, unique, db_index), `created_at` (auto_now_add), `expires_at` (DateTimeField), `used_at` (nullable DateTimeField).
+1. THE System SHALL add `EmailVerificationToken` to `marketplace/models.py` with fields: `user` (FK to `User`, CASCADE), `token` (UUID, unique, db_index), `created_at` (auto_now_add), `expires_at` (DateTimeField), `used_at` (nullable DateTimeField), `revoked_at` (nullable DateTimeField).
 2. THE `expires_at` field SHALL be set to `created_at + 24 hours` automatically at creation — not left to the caller.
-3. A token SHALL be valid only when `used_at is None` AND `expires_at > now()`.
+3. A token SHALL be valid only when `used_at is None` AND `revoked_at is None` AND `expires_at > now()`.
 4. THE model SHALL expose an `is_valid` property returning `True` only for valid tokens.
+5. Prior tokens SHALL be revoked (setting `revoked_at=now()`) rather than deleted when a resend or new signup triggers a new token for the same user. Token rows are never hard-deleted, preserving audit history.
 5. THE `EmailVerificationToken` table SHALL be registered in Django admin.
 
 ### Requirement 2: Signup Triggers Verification
@@ -96,7 +97,8 @@ except FieldDoesNotExist:
 
 1. WHEN a user attempts to log in with valid credentials and `user.email_verified=False`, THE System SHALL reject the login attempt and NOT create an authenticated session.
 2. THE rejection SHALL display a non-field form error on the login page: a message that the email is not verified, with a link to `/resend-verification/`.
-3. THE login gate SHALL apply to all users including staff and superusers (unless `email_verified` is manually set to `True` via admin).
+3. THE login gate SHALL apply to all users including staff and superusers (unless `email_verified` is manually set to `True` via admin or `create_superuser`).
+3a. THE `UserManager.create_superuser` method SHALL set `email_verified=True` by default via `extra_fields.setdefault("email_verified", True)` to prevent superuser bootstrap lockout on first deploy.
 4. THE gate SHALL be enforced in `MarketplaceLoginView.form_valid()` — not via a custom authentication backend — to keep the existing auth backend unchanged.
 
 ### Requirement 5: Resend Verification Email
@@ -106,7 +108,7 @@ except FieldDoesNotExist:
 #### Acceptance Criteria
 
 1. `GET /resend-verification/` SHALL render a page with an email address input form.
-2. `POST /resend-verification/` SHALL accept an email address. IF a `User` with that email and `email_verified=False` exists, THE System SHALL invalidate all existing unused tokens for that user and create + send a new one.
+2. `POST /resend-verification/` SHALL accept an email address. IF a `User` with that email and `email_verified=False` exists, THE System SHALL revoke all existing unused tokens for that user (set `revoked_at=now()`) and create + send a new one. Tokens SHALL NOT be deleted.
 3. IF no matching unverified user exists (email not found, or account already verified), THE System SHALL show the same neutral success-like confirmation — it SHALL NOT leak whether an account exists for that email.
 4. After POST (success or indeterminate), THE System SHALL redirect to `GET /verify-email/` (the "check your email" confirmation page).
 5. THE resend view SHALL be accessible without authentication.
