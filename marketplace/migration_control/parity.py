@@ -19,6 +19,7 @@ from marketplace.models import (
     WatchlistItem,
 )
 from marketplace.migration_control.identity import IdentityComplianceScanner
+from marketplace.migration_control.permissions import RoleAuthComplianceScanner
 
 
 @dataclass
@@ -124,6 +125,21 @@ class ParityValidator:
 
     def validate_identity(self) -> ValidationResult:
         scanner = IdentityComplianceScanner()
+        passed, violations = scanner.scan()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
+        )
+
+    def validate_permission_policy(self) -> ValidationResult:
+        """
+        Validate that no role-based authorization remains in launch-critical views.
+        Uses RoleAuthComplianceScanner to detect residual role-check patterns.
+        """
+        scanner = RoleAuthComplianceScanner()
         passed, violations = scanner.scan()
         failures = len(violations)
         return ValidationResult(
