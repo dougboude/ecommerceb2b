@@ -4,18 +4,44 @@
 
 Before any task begins, the executing agent MUST confirm all four gates pass and document the output:
 
-```
+```python
 # Gate 1 — CP5 confirmed
-manage.py shell -c "from marketplace.migration_control.state import get_or_create_state; s = get_or_create_state(); assert s.checkpoint_order == 5, f'CP5 required, got {s.checkpoint}'; print('CP5 OK')"
+manage.py shell -c "
+from marketplace.migration_control.state import get_or_create_state
+s = get_or_create_state()
+assert s.checkpoint_order == 5, f'CP5 required, got CP{s.checkpoint_order}'
+print('Gate 1 OK — CP5 confirmed')
+"
 
 # Gate 2 — User.role absent
-manage.py shell -c "from marketplace.models import User; from django.core.exceptions import FieldDoesNotExist; User._meta.get_field('role')" 2>&1 | grep -q "FieldDoesNotExist" && echo "User.role absent OK"
+manage.py shell -c "
+from marketplace.models import User
+from django.core.exceptions import FieldDoesNotExist
+try:
+    User._meta.get_field('role')
+    raise AssertionError('User.role still exists — block execution')
+except FieldDoesNotExist:
+    print('Gate 2 OK — User.role absent')
+"
 
 # Gate 3 — Legacy models absent
-manage.py shell -c "from marketplace.models import Organization, DemandPost, SupplyLot" 2>&1 | grep -q "ImportError" && echo "Legacy models absent OK"
+manage.py shell -c "
+try:
+    from marketplace.models import Organization, DemandPost, SupplyLot
+    raise AssertionError('Legacy models still importable — block execution')
+except ImportError:
+    print('Gate 3 OK — legacy models absent')
+"
 
-# Gate 4 — All parity gates passing
-manage.py migration_validate --scope all --fail-on-error
+# Gate 4 — Cutover-stage parity reports exist and passed
+manage.py shell -c "
+from marketplace.migration_control.parity import ParityReport
+cutover_reports = ParityReport.objects.filter(stage='cutover')
+assert cutover_reports.exists(), 'No cutover-stage parity reports found — run legacy-schema-cleanup-and-final-cutover first'
+failed = cutover_reports.filter(passed=False)
+assert not failed.exists(), f'Cutover-stage failures: {list(failed.values_list(\"scope\", flat=True))}'
+print(f'Gate 4 OK — {cutover_reports.count()} cutover parity reports, all passed')
+"
 ```
 
 If any gate fails, STOP. Do not proceed with Phase 1 tasks.
@@ -32,30 +58,31 @@ If any gate fails, STOP. Do not proceed with Phase 1 tasks.
   - Remove `Role` import from `forms.py` if present
   - _Requirements: 5.2, 5.4_
 
-- [ ] 1.2 Update `templates/marketplace/signup.html`
-  - Change `<h1>` / page heading to `Create Account`
-  - Change submit button label to `Create Account`
-  - Remove any copy reading `Register as Buyer`, `Register as Supplier`, or role-selection instructions
-  - Verify no role radio/select input is rendered
+- [ ] 1.2 Audit `templates/registration/signup.html`; fix if violations found
+  - Confirm `<h1>` / page heading reads `Create Account` — update if not
+  - Confirm submit button label reads `Create Account` — update if not
+  - Confirm no copy reads `Register as Buyer`, `Register as Supplier`, or role-selection instructions — remove if found
+  - Confirm no role radio/select input is rendered
   - _Requirements: 5.1, 5.3, 5.5_
 
-- [ ] 1.3 Verify `templates/marketplace/login.html` contains no role-based language
-  - No changes expected but scanner will confirm
+- [ ] 1.3 Audit `templates/registration/login.html` for role-based language
+  - No changes expected; confirm with scanner output
   - _Requirements: 2.1, 2.2_
 
 ### Group 2 — Navigation Derolification
 
-- [ ] 2.1 Audit `templates/marketplace/_navbar.html` for all `user.role` references
+- [ ] 2.1 Audit `templates/includes/_navbar.html` for all `user.role` references
   - Identify every `{% if user.role == ... %}` block
   - Document which nav items are currently hidden from each role group due to silent no-op
   - _Requirements: 3.3, 7.2_
 
-- [ ] 2.2 Replace role-conditional nav with role-agnostic nav in `_navbar.html`
+- [ ] 2.2 Replace role-conditional nav with role-agnostic nav in `templates/includes/_navbar.html`
   - Remove all `{% if user.role ... %}` blocks
-  - Render Supply and Demand listing links unconditionally for all authenticated users
-  - Structure as "Your Listings" group with Supply and Demand sub-items (or adjacent links — implementation choice)
+  - Render Supply, Demand, and Watchlist links unconditionally for all authenticated users
+  - Structure Supply/Demand as "Your Listings" group with sub-items (or adjacent links — implementation choice)
   - Retain Messages badge (unread count — implemented in prior spec)
-  - Final nav items: Dashboard, Discover, Messages [N], Your Listings (Supply, Demand), Profile
+  - Retain Watchlist link (existing feature — must not be removed)
+  - Final nav items: Dashboard, Discover, Messages [N], Watchlist, Your Listings (Supply, Demand), Profile
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
 - [ ] 2.3 Audit `templates/marketplace/base.html` for any role-conditional blocks
@@ -64,77 +91,75 @@ If any gate fails, STOP. Do not proceed with Phase 1 tasks.
 
 ### Group 3 — Dashboard Derolification
 
-- [ ] 3.1 Audit `templates/marketplace/dashboard.html` for role-based headings and section conditionals
-  - Identify all `{% if user.role ... %}` blocks
-  - Identify any "Buyer Dashboard" / "Supplier Dashboard" heading text
+- [ ] 3.1 Audit `templates/marketplace/dashboard.html` for role-based headings and section conditionals; fix if violations found
+  - Identify any `{% if user.role ... %}` blocks — remove if present
+  - Identify "Buyer Dashboard" / "Supplier Dashboard" heading text — replace with `Dashboard` if present
   - _Requirements: 2.4, 7.2_
 
-- [ ] 3.2 Update `templates/marketplace/dashboard.html`
-  - Replace `<title>` with `Dashboard — NicheMarket` (or site title variable)
-  - Replace role-labeled `<h1>` with `Dashboard`
-  - Remove role-conditional section guards; show both supply and demand listing activity unconditionally
+- [ ] 3.2 Verify `templates/marketplace/dashboard.html` target state; update only what deviates
+  - `<title>` must be `Dashboard — NicheMarket` (or site title variable) — update if not
+  - Primary `<h1>` or heading must be `Dashboard` — update if not
+  - Both supply and demand listing activity must render unconditionally — remove any role guard if present
   - _Requirements: 2.1, 2.4_
 
-- [ ] 3.3 Update `dashboard` view in `marketplace/views.py`
+- [ ] 3.3 Audit `dashboard` view in `marketplace/views.py`; fix surviving role branches if found
   - Remove any `if user.role == Role.BUYER:` / `if user.role == Role.SUPPLIER:` display branching
   - Remove any `context['is_buyer']` / `context['is_supplier']` injection
-  - Pass `supply_listings` and `demand_listings` context variables directly (queried from `Listing` model by type)
+  - Ensure `supply_listings` and `demand_listings` context variables are passed directly (queried from `Listing` model by type)
   - _Requirements: 2.2, 2.4_
 
 ### Group 4 — Profile Page Derolification
 
-- [ ] 4.1 Update `profile` view in `marketplace/views.py`
-  - Remove any `user.role` read or role-based query path
-  - Add `supply_listings = Listing.objects.filter(created_by_user=profile_user, type=ListingType.SUPPLY, status=ListingStatus.ACTIVE)`
-  - Add `demand_listings = Listing.objects.filter(created_by_user=profile_user, type=ListingType.DEMAND, status=ListingStatus.ACTIVE)`
-  - Pass `member_since = profile_user.date_joined` to template context
+- [ ] 4.1 Audit `profile` view in `marketplace/views.py`; fix if role usage found
+  - Scope: self-profile only (`/profile/` — authenticated user's own profile; no `profile_user` argument)
+  - Remove any `user.role` read or role-based query path if present
+  - Ensure `supply_listings = Listing.objects.filter(created_by_user=request.user, type=ListingType.SUPPLY, status=ListingStatus.ACTIVE)` is passed to context
+  - Ensure `demand_listings = Listing.objects.filter(created_by_user=request.user, type=ListingType.DEMAND, status=ListingStatus.ACTIVE)` is passed to context
+  - Ensure `member_since = request.user.date_joined` is passed to context
   - _Requirements: 4.1, 4.2, 4.3, 4.5_
 
-- [ ] 4.2 Update `templates/marketplace/profile.html`
-  - Display: display name, organization name (if set), location (country/locality), member since
-  - Render profile image placeholder (styled initial or generic avatar) — no upload functionality yet
-  - Render Supply Listings section; show empty-state if none
-  - Render Demand Listings section; show empty-state if none
-  - Remove any `{% if user.role ... %}` conditional that shows/hides a listing section
-  - Remove any role label for the profile owner
+- [ ] 4.2 Audit `templates/marketplace/profile.html`; fix if violations found
+  - Confirm display name, organization name (if set), location (country/locality), member since are rendered
+  - Confirm profile image placeholder (styled initial or generic avatar) is rendered — no upload functionality
+  - Confirm Supply Listings section renders with empty-state if no listings
+  - Confirm Demand Listings section renders with empty-state if no listings
+  - Remove any `{% if user.role ... %}` conditional that shows/hides a listing section if found
+  - Remove any role label if found
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 9.2_
 
 ### Group 5 — Listing Form and Detail Label Cleanup
 
-- [ ] 5.1 Update `templates/marketplace/supply_lot_form.html`
-  - Heading: `New Supply Listing` (create) / `Edit Supply Listing` (edit)
-  - `<title>` tag matches heading
-  - Remove any "Supplier" role label from the page
+- [ ] 5.1 Audit `templates/marketplace/supply_lot_form.html`; fix if violations found
+  - Confirm heading is `New Supply Listing` (create) / `Edit Supply Listing` (edit) — update if not
+  - Confirm `<title>` tag matches heading — update if not
+  - Remove any "Supplier" role label from the page if found
   - _Requirements: 2.1, 2.5_
 
-- [ ] 5.2 Update `templates/marketplace/demand_post_form.html`
-  - Heading: `New Demand Listing` (create) / `Edit Demand Listing` (edit)
-  - `<title>` tag matches heading
-  - Remove any "Buyer" / "Wanted" role label from the page
+- [ ] 5.2 Audit `templates/marketplace/demand_post_form.html`; fix if violations found
+  - Confirm heading is `New Demand Listing` (create) / `Edit Demand Listing` (edit) — update if not
+  - Confirm `<title>` tag matches heading — update if not
+  - Remove any "Buyer" / "Wanted" role label from the page if found
   - _Requirements: 2.1, 2.5_
 
-- [ ] 5.3 Audit `templates/marketplace/supply_lot_list.html` and `templates/marketplace/demand_post_list.html`
-  - Remove any role-identity heading ("Your Supply Lots as Supplier", etc.)
-  - Headings: `Supply Listings` and `Demand Listings` respectively
+- [ ] 5.3 Audit `templates/marketplace/supply_lot_list.html` and `templates/marketplace/demand_post_list.html`; fix if violations found
+  - Confirm headings are `Supply Listings` and `Demand Listings` respectively — update if not
+  - Remove any role-identity heading ("Your Supply Lots as Supplier", etc.) if found
   - _Requirements: 2.1, 2.5_
 
-- [ ] 5.4 Audit `templates/marketplace/supply_lot_detail.html` and `templates/marketplace/demand_post_detail.html`
-  - Remove any role-identity labels from detail headings or meta
+- [ ] 5.4 Audit `templates/marketplace/supply_lot_detail.html` and `templates/marketplace/demand_post_detail.html`; fix if violations found
+  - Remove any role-identity labels from detail headings or meta if found
   - _Requirements: 2.1_
 
 ### Group 6 — Remaining Python View Audit
 
-- [ ] 6.1 Audit all view functions in `marketplace/views.py` for surviving `user.role` display references
+- [ ] 6.1 Audit all view functions in `marketplace/views.py` for surviving `user.role` display references; fix if found
   - Exact search: `user.role`, `request.user.role`, `Role.BUYER`, `Role.SUPPLIER`
   - Scope: production view functions only (not test helpers or management commands)
-  - Document any found references with file:line
+  - If any found: replace role-conditional display logic with ownership-based or listing-type-based equivalents
+  - Document any references found with file:line; confirm zero remaining after fixes
   - _Requirements: 2.2, 7.1_
 
-- [ ] 6.2 Remove all surviving `user.role` display references found in 6.1
-  - Replace role-conditional display logic with ownership-based or listing-type-based equivalents
-  - _Requirements: 2.2_
-
-- [ ] 6.3 Confirm `Role` enum is no longer imported in `marketplace/views.py` or `marketplace/forms.py`
+- [ ] 6.2 Confirm `Role` enum is no longer imported in `marketplace/views.py` or `marketplace/forms.py`
   - If `Role` import remains but is unused after prior steps, remove it
   - _Requirements: 2.2, 6.3_
 

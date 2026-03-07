@@ -17,9 +17,16 @@ This spec executes **exclusively at CP5** (post-legacy-cleanup). By the time thi
 | Legacy parity gates | All passing at cutover stage | `migration_validate --scope all` must have produced passing cutover-stage reports |
 
 **Hard gate artifact before Phase 1 begins:**
-```
-manage.py migration_validate --scope all --fail-on-error
-# Must produce: all scopes passed at cutover stage
+```python
+# Confirm cutover-stage parity reports exist and passed — do NOT re-run validate, query existing reports
+manage.py shell -c "
+from marketplace.migration_control.parity import ParityReport
+cutover_reports = ParityReport.objects.filter(stage='cutover')
+assert cutover_reports.exists(), 'No cutover-stage parity reports found — run legacy-schema-cleanup-and-final-cutover first'
+failed = cutover_reports.filter(passed=False)
+assert not failed.exists(), f'Cutover-stage failures found: {list(failed.values_list(\"scope\", flat=True))}'
+print(f'Cutover parity OK — {cutover_reports.count()} reports, all passed')
+"
 ```
 
 **Hard gate artifact before Phase 2 begins:**
@@ -75,7 +82,7 @@ manage.py migration_validate --scope ui --fail-on-error
 
 #### Acceptance Criteria
 
-1. WHEN a user is authenticated, THE System SHALL render the following top-level navigation items: **Dashboard**, **Discover**, **Messages**, **Your Listings**, **Profile**. No role-conditional items shall appear.
+1. WHEN a user is authenticated, THE System SHALL render the following top-level navigation items: **Dashboard**, **Discover**, **Messages**, **Watchlist**, **Your Listings**, **Profile**. No role-conditional items shall appear.
 2. THE **Your Listings** navigation item SHALL expand to or link to two sub-items: **Supply** (routes to supply listing list) and **Demand** (routes to demand listing list). Both sub-items SHALL be visible to all authenticated users regardless of whether they currently have listings of that type.
 3. THE System SHALL remove any `{% if user.role == "buyer" %}` or `{% if user.role == "supplier" %}` conditional wrapping navigation items in `_navbar.html` or `base.html`.
 4. THE System SHALL retain the "Messages N" unread badge on the Messages nav item (implemented in a prior spec).
@@ -83,15 +90,17 @@ manage.py migration_validate --scope ui --fail-on-error
 
 ### Requirement 4: Update Profile Page to Role-Agnostic Model
 
-**User Story:** As a user viewing a profile, I want to see the profile owner's listing activity on both sides of the market, so I can understand the full picture of who I am dealing with.
+**User Story:** As an authenticated user viewing my own profile page (`/profile/`), I want to see my listing activity on both sides of the market, so the page reflects my actual participation without a role label.
+
+**Scope note:** Only the self-profile view (`/profile/`) is in scope. Public profile viewing (e.g., `/profile/<user_id>/`) is not implemented and is out of scope for this spec.
 
 #### Acceptance Criteria
 
-1. WHEN a profile is viewed, THE System SHALL display: display name, optional organization name, location (country / locality when available), member since date.
-2. WHEN a profile is viewed, THE System SHALL show a **Supply Listings** section listing the profile owner's active supply listings (type=SUPPLY, status=ACTIVE).
-3. WHEN a profile is viewed, THE System SHALL show a **Demand Listings** section listing the profile owner's active demand listings (type=DEMAND, status=ACTIVE).
+1. WHEN the authenticated user views `/profile/`, THE System SHALL display: display name, optional organization name, location (country / locality when available), member since date.
+2. WHEN `/profile/` is viewed, THE System SHALL show a **Supply Listings** section listing the user's active supply listings (type=SUPPLY, status=ACTIVE).
+3. WHEN `/profile/` is viewed, THE System SHALL show a **Demand Listings** section listing the user's active demand listings (type=DEMAND, status=ACTIVE).
 4. IF a section has no listings, THE System SHALL render an empty-state message (e.g., "No supply listings yet.") rather than hiding the section.
-5. THE profile page SHALL NOT display `User.role` or any role-based label for the profile owner.
+5. THE profile page SHALL NOT display `User.role` or any role-based label.
 6. THE profile page SHALL display a profile image placeholder (a styled initial or generic avatar) when no image is uploaded. Full image upload is deferred to `profile-and-image-improvements`.
 
 ### Requirement 5: Update Signup and Onboarding Flows

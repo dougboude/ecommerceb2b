@@ -41,8 +41,15 @@ except ImportError:
     print('Legacy models absent — confirmed')
 "
 
-# Gate 4: Full parity validation
-manage.py migration_validate --scope all --fail-on-error
+# Gate 4: Confirm cutover-stage parity reports exist and passed (do NOT re-run validate — query existing reports)
+manage.py shell -c "
+from marketplace.migration_control.parity import ParityReport
+cutover_reports = ParityReport.objects.filter(stage='cutover')
+assert cutover_reports.exists(), 'No cutover-stage parity reports found — run legacy-schema-cleanup-and-final-cutover first'
+failed = cutover_reports.filter(passed=False)
+assert not failed.exists(), f'Cutover-stage failures: {list(failed.values_list(\"scope\", flat=True))}'
+print(f'Cutover parity OK — {cutover_reports.count()} reports, all passed')
+"
 ```
 
 All four gates must produce clean output before Phase 1 proceeds.
@@ -52,10 +59,14 @@ All four gates must produce clean output before Phase 1 proceeds.
 ```
 Phase 1: Convergence (reversible)
   ┌─────────────────────────────────────────────────────────────────┐
+  │  templates/includes/                                            │
+  │  └── _navbar.html         role-conditional → role-agnostic     │
+  │                                                                 │
+  │  templates/registration/                                        │
+  │  └── signup.html          "Create Account", no role selector   │
+  │                                                                 │
   │  templates/marketplace/                                         │
-  │  ├── _navbar.html         role-conditional → role-agnostic     │
   │  ├── base.html            title/meta cleanup                   │
-  │  ├── signup.html          "Create Account", no role selector   │
   │  ├── dashboard.html       "Dashboard", no role heading         │
   │  ├── profile.html         both listing types, no role label    │
   │  └── [listing forms]      "Supply" / "Demand" labels only      │
@@ -85,7 +96,7 @@ Phase 2: Verification Lock (irreversible intent)
 
 ## Phase 1: Template and Form Convergence
 
-### `_navbar.html`
+### `templates/includes/_navbar.html`
 
 **Current state (pre-spec):** Contains `{% if user.role == "buyer" %}` / `{% if user.role == "supplier" %}` blocks that show different navigation items. With `User.role` removed, these evaluate silently to falsy — the nav items they wrapped are invisible to all users. This is the critical silent dead code this spec fixes.
 
@@ -96,6 +107,7 @@ Phase 2: Verification Lock (irreversible intent)
   <a href="{% url 'marketplace:dashboard' %}">Dashboard</a>
   <a href="{% url 'marketplace:discover' %}">Discover</a>
   <a href="{% url 'marketplace:inbox' %}">Messages {% if unread_thread_count %}{{ unread_thread_count }}{% endif %}</a>
+  <a href="{% url 'marketplace:watchlist' %}">Watchlist</a>
   <!-- Your Listings dropdown or grouped links -->
   <a href="{% url 'marketplace:supply_lot_list' %}">Supply</a>
   <a href="{% url 'marketplace:demand_post_list' %}">Demand</a>
@@ -105,7 +117,7 @@ Phase 2: Verification Lock (irreversible intent)
 
 The "Your Listings" grouping (Supply / Demand sub-items) may be implemented as a nav group, a dropdown, or two adjacent links — the implementation approach is left to the executing agent. The requirement is that both are always visible to authenticated users.
 
-### `signup.html` and `SignupForm`
+### `templates/registration/signup.html` and `SignupForm`
 
 **Current state:** `SignupForm` may retain a `role` field assignment in its `save()` method from pre-Feature-2 code. With `User.role` removed, this would raise `AttributeError` on save if not cleaned up in Feature 7. This spec ensures the form and template are clean regardless.
 
@@ -126,9 +138,11 @@ The "Your Listings" grouping (Supply / Demand sub-items) may be implemented as a
 - No role-conditional section display. The dashboard shows the user's listings activity in a role-agnostic layout.
 - Supply listing activity and demand listing activity are both represented without role-gating.
 
-### `profile.html`
+### `templates/marketplace/profile.html` (self-profile only)
 
-**Current state:** Profile page likely shows only one listing type based on the profile owner's role.
+**Scope:** Only the self-profile route (`/profile/`) is in scope. This page shows the authenticated user's own profile. Public profile viewing is not implemented.
+
+**Current state:** Profile page likely shows only one listing type based on the user's role.
 
 **Target state layout:**
 ```
@@ -146,8 +160,8 @@ Demand Listings
 ```
 
 **View changes:**
-- Profile view queries `Listing.objects.filter(created_by_user=profile_user, type=ListingType.SUPPLY, status=ListingStatus.ACTIVE)` for supply section
-- Profile view queries `Listing.objects.filter(created_by_user=profile_user, type=ListingType.DEMAND, status=ListingStatus.ACTIVE)` for demand section
+- Profile view queries `Listing.objects.filter(created_by_user=request.user, type=ListingType.SUPPLY, status=ListingStatus.ACTIVE)` for supply section
+- Profile view queries `Listing.objects.filter(created_by_user=request.user, type=ListingType.DEMAND, status=ListingStatus.ACTIVE)` for demand section
 - No `user.role` read in the profile view
 
 ### Listing Form and Create-Page Labels
@@ -178,35 +192,43 @@ These are replaced by injecting listing counts directly (e.g., `supply_listing_c
 **Location:** `marketplace/migration_control/ui_compliance.py`
 
 **Scan targets:**
-1. All `.html` files under `templates/marketplace/` (recursive)
+1. All `.html` files under `templates/marketplace/`, `templates/includes/`, and `templates/registration/` (recursive)
 2. `marketplace/views.py`
 3. `marketplace/forms.py`
 
-**Violation patterns:**
+**Violation patterns (FAIL — affect `passed` return value):**
 
-| Pattern | Type | Severity |
-|---|---|---|
-| `user.role` in template expression | Silent dead code | FAIL |
-| `request.user.role` in template expression | Silent dead code | FAIL |
-| `{% if ... role ... %}` block | Silent dead code | FAIL |
-| `"Register as Buyer"` / `"Register as Supplier"` | Role language | FAIL |
-| `"Buyer Dashboard"` / `"Supplier Dashboard"` | Role language | FAIL |
-| `"Buyer listing"` / `"Supplier listing"` (role-identity usage) | Role language | FAIL |
-| `Role.BUYER` / `Role.SUPPLIER` in Python files | Dead import | FAIL |
-| `user.role` in Python files | Dead attribute | FAIL |
+| Pattern | Type |
+|---|---|
+| `user.role` in template expression | Silent dead code |
+| `request.user.role` in template expression | Silent dead code |
+| `{% if ... role ... %}` block | Silent dead code |
+| `"Register as Buyer"` / `"Register as Supplier"` | Role language |
+| `"Buyer Dashboard"` / `"Supplier Dashboard"` | Role language |
+| `"Buyer listing"` / `"Supplier listing"` (role-identity usage) | Role language |
+| `Role.BUYER` / `Role.SUPPLIER` in Python files | Dead import |
+| `user.role` in Python files | Dead attribute |
+
+**Warning patterns (reported separately — do NOT affect `passed` return value):**
+
+| Pattern | Type |
+|---|---|
+| `role` in an HTML comment or Python docstring | Role language in comment |
+
+Warnings appear in scanner output under a separate `warnings:` key but do not cause `passed=False`. This allows informational notes without blocking gates.
 
 **Exclusions:**
 - Test files (`*/tests/*`, `test_*.py`)
 - Migration files (`*/migrations/*`)
-- Comments and docstrings are still scanned (role language in comments is a WARNING, not FAIL)
 
 **Return contract:**
 ```python
 def scan(self) -> tuple[bool, list[str]]:
     """
     Returns (passed, violations).
-    Each violation: "path/to/file.html:42 — pattern 'user.role' found"
-    passed=True only when violations is empty.
+    Each violation entry: "path/to/file.html:42 — pattern 'user.role' found"
+    passed=True only when violations (FAIL-severity) is empty.
+    Warnings are surfaced separately and do not influence passed.
     """
 ```
 
