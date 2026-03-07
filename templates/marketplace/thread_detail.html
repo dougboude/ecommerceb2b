@@ -5,7 +5,7 @@
 
 {% block content %}
 <h1>{% trans "Conversation" %}</h1>
-<p class="helptext">{% trans "With:" %} <strong>{{ counterparty.display_name }}</strong></p>
+<p class="helptext">{% trans "With:" %} <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong></p>
 
 <section>
     <h2>{% trans "Item details" %}</h2>

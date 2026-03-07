@@ -11,6 +11,7 @@ from marketplace.models import (
     ListingType,
     ListingMessageThread,
     ListingWatchlistItem,
+    ListingWatchlistItem,
     Message,
     MessageThread,
     ParityReport,
@@ -119,6 +120,51 @@ class ParityValidator:
         return ValidationResult(
             passed=failures == 0,
             total_checked=3,
+            failures=failures,
+            summary="; ".join(notes),
+        )
+
+    def validate_messaging_contract(self) -> ValidationResult:
+        failures = 0
+        notes = []
+
+        missing_listing = MessageThread.objects.filter(listing__isnull=True).count()
+        if missing_listing:
+            failures += 1
+            notes.append(f"threads_missing_listing={missing_listing}")
+
+        missing_initiator = MessageThread.objects.filter(created_by_user__isnull=True).count()
+        if missing_initiator:
+            failures += 1
+            notes.append(f"threads_missing_initiator={missing_initiator}")
+
+        source_pairs = set(
+            MessageThread.objects.filter(
+                listing__isnull=False,
+                created_by_user__isnull=False,
+            ).values_list("listing_id", "created_by_user_id")
+        )
+        target_pairs = set(
+            ListingMessageThread.objects.values_list("listing_id", "created_by_user_id")
+        )
+        mismatched_target_threads = len(source_pairs.symmetric_difference(target_pairs))
+        if mismatched_target_threads:
+            failures += 1
+            notes.append(f"messaging_thread_mismatch={mismatched_target_threads}")
+
+        orphan_target_watchlists = ListingWatchlistItem.objects.filter(listing__isnull=True).count()
+        if orphan_target_watchlists:
+            failures += 1
+            notes.append(f"orphan_target_watchlists={orphan_target_watchlists}")
+
+        orphan_target_threads = ListingMessageThread.objects.filter(listing__isnull=True).count()
+        if orphan_target_threads:
+            failures += 1
+            notes.append(f"orphan_target_threads={orphan_target_threads}")
+
+        return ValidationResult(
+            passed=failures == 0,
+            total_checked=5,
             failures=failures,
             summary="; ".join(notes),
         )

@@ -492,6 +492,30 @@ class WatchlistItem(models.Model):
     def listing(self):
         return self.supply_lot or self.demand_post
 
+    @property
+    def thread(self):
+        thread = self.threads.order_by("-created_at").first()
+        if thread:
+            return thread
+        if self.supply_lot_id:
+            listing = Listing.objects.filter(
+                legacy_source_type="supply_lot",
+                legacy_source_pk=self.supply_lot_id,
+            ).first()
+        elif self.demand_post_id:
+            listing = Listing.objects.filter(
+                legacy_source_type="demand_post",
+                legacy_source_pk=self.demand_post_id,
+            ).first()
+        else:
+            listing = None
+        if not listing:
+            return None
+        return MessageThread.objects.filter(
+            listing=listing,
+            created_by_user=self.user,
+        ).order_by("-created_at").first()
+
 
 # ---------------------------------------------------------------------------
 # DismissedSuggestion
@@ -540,20 +564,109 @@ class DismissedSuggestion(models.Model):
 # ---------------------------------------------------------------------------
 
 class MessageThread(models.Model):
-    watchlist_item = models.OneToOneField(
-        WatchlistItem, on_delete=models.CASCADE, related_name="thread",
+    watchlist_item = models.ForeignKey(
+        WatchlistItem,
+        on_delete=models.SET_NULL,
+        related_name="threads",
+        null=True,
+        blank=True,
     )
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="buyer_threads",
+        null=True,
+        blank=True,
     )
     supplier = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="supplier_threads",
+        null=True,
+        blank=True,
+    )
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.SET_NULL,
+        related_name="message_threads",
+        null=True,
+        blank=True,
+    )
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_message_threads",
+        null=True,
+        blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "created_by_user"],
+                condition=models.Q(listing__isnull=False, created_by_user__isnull=False),
+                name="unique_message_thread_per_listing_initiator",
+            ),
+        ]
+
+    def get_listing(self):
+        if self.listing_id:
+            return self.listing
+        if self.watchlist_item_id:
+            return self.watchlist_item.supply_lot or self.watchlist_item.demand_post
+        return None
+
+    def get_initiator(self):
+        if self.created_by_user_id:
+            return self.created_by_user
+        if self.watchlist_item_id:
+            return self.watchlist_item.user
+        if self.buyer_id and self.supplier_id:
+            # Legacy fallback; no deterministic initiator in old schema.
+            return self.buyer
+        return None
+
+    def get_owner(self):
+        listing = self.get_listing()
+        if listing is None:
+            return None
+        return getattr(listing, "created_by_user", None) or getattr(listing, "created_by", None)
+
+    def participant_ids(self):
+        ids = set()
+        owner = self.get_owner()
+        initiator = self.get_initiator()
+        if owner:
+            ids.add(owner.pk)
+        if initiator:
+            ids.add(initiator.pk)
+        if self.buyer_id:
+            ids.add(self.buyer_id)
+        if self.supplier_id:
+            ids.add(self.supplier_id)
+        return ids
+
+    def is_participant(self, user_id):
+        return user_id in self.participant_ids()
+
+    def counterparty_for(self, user):
+        owner = self.get_owner()
+        initiator = self.get_initiator()
+        if owner and initiator:
+            return owner if user.pk == initiator.pk else initiator
+        if self.buyer_id and self.supplier_id:
+            return self.supplier if user.pk == self.buyer_id else self.buyer
+        return None
+
+    def is_supply_thread(self):
+        listing = self.get_listing()
+        if listing is None:
+            return bool(self.watchlist_item_id and self.watchlist_item.supply_lot_id)
+        listing_type = getattr(listing, "type", None)
+        if listing_type:
+            return listing_type == ListingType.SUPPLY
+        return hasattr(listing, "shipping_scope")
 
     def __str__(self):
         return f"Thread #{self.pk}"

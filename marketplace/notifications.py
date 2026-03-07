@@ -47,17 +47,18 @@ def send_new_message_notification(message):
     thread = message.thread
     sender = message.sender
 
-    # Determine recipient (the other party)
-    if sender == thread.buyer:
-        recipient = thread.supplier
-    else:
-        recipient = thread.buyer
+    # Determine recipient (the other participant)
+    recipient = thread.counterparty_for(sender)
+    if recipient is None:
+        return
 
     if not recipient.email_on_message:
         return
 
     # Determine listing text
-    listing = thread.watchlist_item.supply_lot or thread.watchlist_item.demand_post
+    listing = thread.get_listing()
+    if listing is None:
+        return
     item_text = listing.item_text
 
     preview = message.body[:200]

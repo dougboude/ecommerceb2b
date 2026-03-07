@@ -64,7 +64,7 @@
     {% for thread in listing_threads %}
     <a href="{% url 'marketplace:thread_detail' thread.pk %}" class="match-card" style="text-decoration:none; color:inherit;">
         <div class="match-card-details">
-            <strong>{{ thread.buyer.display_name|default:thread.buyer.email }}</strong>
+            <strong>{{ thread.counterparty.display_name|default:thread.counterparty.email }}</strong>
             <span class="tile-meta">{{ thread.message_count }} {% trans "messages" %}</span>
         </div>
         <span class="tile-meta">{{ thread.last_message_at|timesince }} {% trans "ago" %}</span>

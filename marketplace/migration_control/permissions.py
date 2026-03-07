@@ -56,6 +56,8 @@ class PolicyEngine:
         Returns True if user_id is the buyer or supplier in the thread.
         Works with legacy MessageThread (buyer/supplier FK fields).
         """
+        if hasattr(thread_obj, "is_participant"):
+            return thread_obj.is_participant(user_id)
         return user_id in (thread_obj.buyer_id, thread_obj.supplier_id)
 
     def is_watchlist_owner(self, user_id: int, watchlist_item_obj) -> bool:

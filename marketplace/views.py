@@ -24,6 +24,7 @@ from .matching import (
     watchlisted_demand_post_ids,
     watchlisted_supply_lot_ids,
 )
+from .migration_control.conversations import ThreadWatchlistCoordinator
 from .migration_control.identity import IdentityCompatibilityAdapter
 from .migration_control.listings import ListingCompatibilityService
 from .migration_control.permissions import permission_service
@@ -47,6 +48,7 @@ PAGE_SIZE = 25
 SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 identity_adapter = IdentityCompatibilityAdapter()
 listing_service = ListingCompatibilityService()
+conversation_coordinator = ThreadWatchlistCoordinator()
 
 
 def _set_skin_cookie(response, skin_name):
@@ -79,20 +81,22 @@ def _get_or_create_watchlist_item(user, supply_lot=None, demand_post=None, sourc
 
 
 def _get_or_create_thread(watchlist_item):
-    """Get or create a MessageThread for a watchlist item. Returns (thread, created)."""
-    if hasattr(watchlist_item, "thread"):
-        return watchlist_item.thread, False
-    if watchlist_item.supply_lot:
-        buyer = watchlist_item.user
-        supplier = watchlist_item.supply_lot.created_by
-    else:
-        supplier = watchlist_item.user
-        buyer = watchlist_item.demand_post.created_by
-    thread, created = MessageThread.objects.get_or_create(
-        watchlist_item=watchlist_item,
-        defaults={"buyer": buyer, "supplier": supplier},
+    """Get or create listing-centric thread for a watchlist item."""
+    if watchlist_item.supply_lot_id:
+        result = conversation_coordinator.start_from_legacy_listing(
+            user=watchlist_item.user,
+            listing_type="supply_lot",
+            listing_pk=watchlist_item.supply_lot_id,
+            source=watchlist_item.source,
+        )
+        return result.thread, result.created
+    result = conversation_coordinator.start_from_legacy_listing(
+        user=watchlist_item.user,
+        listing_type="demand_post",
+        listing_pk=watchlist_item.demand_post_id,
+        source=watchlist_item.source,
     )
-    return thread, created
+    return result.thread, result.created
 
 
 def _archive_watchlist_items_for_lot(lot):
@@ -389,12 +393,15 @@ def demand_post_detail(request, pk):
     if is_owner:
         listing_threads = list(
             MessageThread.objects.filter(
-                watchlist_item__demand_post=post,
-            ).select_related("buyer", "supplier").annotate(
+                Q(watchlist_item__demand_post=post)
+                | Q(listing__legacy_source_type="demand_post", listing__legacy_source_pk=post.pk),
+            ).select_related("buyer", "supplier", "created_by_user", "listing", "listing__created_by_user").annotate(
                 message_count=Count("messages"),
                 last_message_at=models.Max("messages__created_at"),
             ).filter(message_count__gt=0).order_by("-last_message_at")
         )
+        for t in listing_threads:
+            t.counterparty = t.counterparty_for(request.user)
 
     return render(request, "marketplace/demand_post_detail.html", {
         "post": post,
@@ -511,12 +518,15 @@ def supply_lot_detail(request, pk):
     if is_owner:
         listing_threads = list(
             MessageThread.objects.filter(
-                watchlist_item__supply_lot=lot,
-            ).select_related("buyer", "supplier").annotate(
+                Q(watchlist_item__supply_lot=lot)
+                | Q(listing__legacy_source_type="supply_lot", listing__legacy_source_pk=lot.pk),
+            ).select_related("buyer", "supplier", "created_by_user", "listing", "listing__created_by_user").annotate(
                 message_count=Count("messages"),
                 last_message_at=models.Max("messages__created_at"),
             ).filter(message_count__gt=0).order_by("-last_message_at")
         )
+        for t in listing_threads:
+            t.counterparty = t.counterparty_for(request.user)
 
     return render(request, "marketplace/supply_lot_detail.html", {
         "lot": lot,
@@ -780,7 +790,12 @@ def _keyword_search(query, listing_type, user, category=None, country=None, limi
 
 def _attach_unread_counts(user, items):
     """Attach .unread_count to each WatchlistItem. Two DB queries total."""
-    thread_ids = [item.thread_id for item in items if item.thread_id]
+    item_threads = {}
+    for item in items:
+        thread = item.thread
+        if thread:
+            item_threads[item.pk] = thread.pk
+    thread_ids = list(item_threads.values())
     for item in items:
         item.unread_count = 0
     if not thread_ids:
@@ -802,7 +817,9 @@ def _attach_unread_counts(user, items):
         if last_read is None or created_at > last_read:
             unread_map[thread_id] += 1
     for item in items:
-        item.unread_count = unread_map.get(item.thread_id, 0)
+        thread_id = item_threads.get(item.pk)
+        if thread_id:
+            item.unread_count = unread_map.get(thread_id, 0)
 
 
 @login_required
@@ -811,7 +828,6 @@ def watchlist_view(request):
     qs = WatchlistItem.objects.filter(user=user).select_related(
         "supply_lot", "supply_lot__created_by",
         "demand_post", "demand_post__created_by",
-        "thread",
     )
 
     watching = list(qs.filter(
@@ -941,15 +957,18 @@ def discover_message(request):
     if listing_type == "supply_lot":
         lot = get_object_or_404(SupplyLot, pk=listing_pk)
         permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
-        item, _ = _get_or_create_watchlist_item(request.user, supply_lot=lot, source=WatchlistSource.DIRECT)
     elif listing_type == "demand_post":
         post = get_object_or_404(DemandPost, pk=listing_pk)
         permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
-        item, _ = _get_or_create_watchlist_item(request.user, demand_post=post, source=WatchlistSource.DIRECT)
     else:
         raise PermissionDenied
-    thread, _ = _get_or_create_thread(item)
-    return redirect("marketplace:thread_detail", pk=thread.pk)
+    result = conversation_coordinator.start_from_legacy_listing(
+        user=request.user,
+        listing_type=listing_type,
+        listing_pk=int(listing_pk),
+        source=WatchlistSource.DIRECT,
+    )
+    return redirect("marketplace:thread_detail", pk=result.thread.pk)
 
 
 # ---------------------------------------------------------------------------
@@ -1005,6 +1024,9 @@ def thread_detail(request, pk):
             "watchlist_item__demand_post__created_by",
             "buyer",
             "supplier",
+            "listing",
+            "listing__created_by_user",
+            "created_by_user",
         ),
         pk=pk,
     )
@@ -1017,8 +1039,8 @@ def thread_detail(request, pk):
         defaults={"last_read_at": timezone.now()},
     )
 
-    listing = thread.watchlist_item.supply_lot or thread.watchlist_item.demand_post
-    listing_deleted = listing.status == "deleted"
+    listing = thread.get_listing()
+    listing_deleted = listing is None or listing.status == "deleted"
     if request.method == "POST":
         if listing_deleted:
             raise PermissionDenied
@@ -1041,14 +1063,14 @@ def thread_detail(request, pk):
     else:
         form = MessageForm()
     msgs = thread.messages.select_related("sender").all()
-    counterparty = thread.supplier if request.user == thread.buyer else thread.buyer
+    counterparty = thread.counterparty_for(request.user)
     return render(request, "marketplace/thread_detail.html", {
         "thread": thread,
         "messages_list": msgs,
         "form": form,
         "counterparty": counterparty,
         "listing": listing,
-        "is_supply": thread.watchlist_item.supply_lot is not None,
+        "is_supply": thread.is_supply_thread(),
         "listing_deleted": listing_deleted,
     })
 
@@ -1078,7 +1100,10 @@ def inbox_view(request):
 
     threads = (
         MessageThread.objects.filter(
-            Q(buyer=user) | Q(supplier=user),
+            Q(buyer=user)
+            | Q(supplier=user)
+            | Q(created_by_user=user)
+            | Q(listing__created_by_user=user),
         )
         .select_related(
             "watchlist_item",
@@ -1086,6 +1111,9 @@ def inbox_view(request):
             "watchlist_item__demand_post",
             "buyer",
             "supplier",
+            "listing",
+            "listing__created_by_user",
+            "created_by_user",
         )
         .annotate(
             last_message_at=models.Max("messages__created_at"),
@@ -1099,8 +1127,8 @@ def inbox_view(request):
 
     thread_list = []
     for t in threads:
-        t.counterparty = t.supplier if user == t.buyer else t.buyer
-        t.listing = t.watchlist_item.supply_lot or t.watchlist_item.demand_post
+        t.counterparty = t.counterparty_for(user)
+        t.listing = t.get_listing()
         preview = (t.last_message_body or "")[:120]
         if len(t.last_message_body or "") > 120:
             preview += "..."
@@ -1125,19 +1153,18 @@ def suggestion_message(request):
     if listing_type == "supply_lot":
         lot = get_object_or_404(SupplyLot, pk=listing_pk)
         permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
-        item, _ = _get_or_create_watchlist_item(
-            request.user, supply_lot=lot, source=WatchlistSource.SUGGESTION,
-        )
     elif listing_type == "demand_post":
         post = get_object_or_404(DemandPost, pk=listing_pk)
         permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
-        item, _ = _get_or_create_watchlist_item(
-            request.user, demand_post=post, source=WatchlistSource.SUGGESTION,
-        )
     else:
         raise PermissionDenied
-    thread, _ = _get_or_create_thread(item)
-    return redirect("marketplace:thread_detail", pk=thread.pk)
+    result = conversation_coordinator.start_from_legacy_listing(
+        user=request.user,
+        listing_type=listing_type,
+        listing_pk=int(listing_pk),
+        source=WatchlistSource.SUGGESTION,
+    )
+    return redirect("marketplace:thread_detail", pk=result.thread.pk)
 
 
 # ---------------------------------------------------------------------------
