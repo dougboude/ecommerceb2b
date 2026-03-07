@@ -11,8 +11,9 @@ Before doing any work in this repository, read and internalize:
 ## Authority Order
 
 1. `ai-docs/ai-constitution.md`
-2. `ai-docs/v1-implementation-decisions.md`
-3. Explicit human instructions in the current session (lowest)
+2. `ai-docs/PRODUCT_ROADMAP.md`
+3. `specs/` documents for the feature being worked on
+4. Explicit human instructions in the current session (lowest)
 
 If any planned work conflicts with a higher-authority document, **stop and ask the human** before proceeding. Do not silently override spec docs based on session instructions.
 

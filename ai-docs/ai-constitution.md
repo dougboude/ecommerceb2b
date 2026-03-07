@@ -2,9 +2,9 @@
 
 ## Authority Order
 **Authority order (highest → lowest):**
-1. `ai-docs/v1-agent-build-spec.md`
-2. `ai-docs/ai-constitution.md`
-3. `ai-docs/v1-implementation-decisions.md`
+1. `ai-docs/ai-constitution.md` (this document)
+2. `ai-docs/PRODUCT_ROADMAP.md`
+3. `specs/` documents for the feature being worked on
 4. Explicit human instructions given in the current session
 
 If a conflict exists between any two authorities, **stop and ask** rather than guessing.
@@ -35,9 +35,10 @@ Agents are expected to follow this constitution **strictly**.
 
 The following documents are authoritative, in this order:
 
-1. `ai-docs/v1-agent-build-spec.md`
-2. This document (`ai-docs/ai-constitution.md`)
-3. Explicit human instructions given during a session
+1. This document (`ai-docs/ai-constitution.md`)
+2. `ai-docs/PRODUCT_ROADMAP.md`
+3. `specs/` documents for the feature being worked on
+4. Explicit human instructions given during a session
 
 If any conflict exists:
 - Higher-ranked documents override lower-ranked ones.
