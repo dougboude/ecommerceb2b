@@ -20,6 +20,8 @@ from marketplace.models import (
     SupplyStatus,
     User,
     WatchlistItem,
+    WatchlistSource,
+    WatchlistStatus,
 )
 from marketplace.migration_control.identity import IdentityCompatibilityAdapter
 
@@ -185,16 +187,21 @@ class BackfillEngine:
 
         for thread in MessageThread.objects.select_related("watchlist_item"):
             stats.processed += 1
-            mapped = LegacyToTargetMapping.objects.filter(
-                entity_type="watchlist",
-                legacy_pk=thread.watchlist_item_id,
-            ).first()
-            if not mapped:
-                self._audit("thread", thread.pk, None, BackfillAuditStatus.FAILED, "missing_watchlist_mapping")
-                stats.failed += 1
-                continue
-            target_watchlist = ListingWatchlistItem.objects.filter(pk=mapped.target_pk).first()
-            if not target_watchlist:
+            target_watchlist = None
+            if thread.watchlist_item_id:
+                mapped = LegacyToTargetMapping.objects.filter(
+                    entity_type="watchlist",
+                    legacy_pk=thread.watchlist_item_id,
+                ).first()
+                if mapped:
+                    target_watchlist = ListingWatchlistItem.objects.filter(pk=mapped.target_pk).first()
+            if target_watchlist is None and thread.listing_id and thread.created_by_user_id:
+                target_watchlist, _ = ListingWatchlistItem.objects.get_or_create(
+                    user=thread.created_by_user,
+                    listing=thread.listing,
+                    defaults={"status": WatchlistStatus.WATCHING, "source": WatchlistSource.DIRECT},
+                )
+            if target_watchlist is None:
                 self._audit("thread", thread.pk, None, BackfillAuditStatus.FAILED, "missing_target_watchlist")
                 stats.failed += 1
                 continue
@@ -203,6 +210,17 @@ class BackfillEngine:
                 listing=target_watchlist.listing,
                 created_by_user=target_watchlist.user,
             )
+            # Populate listing-centric fields on legacy thread model for compatibility cutover.
+            update_fields = []
+            if thread.listing_id != target_watchlist.listing_id:
+                thread.listing = target_watchlist.listing
+                update_fields.append("listing")
+            if thread.created_by_user_id != target_watchlist.user_id:
+                thread.created_by_user = target_watchlist.user
+                update_fields.append("created_by_user")
+            if update_fields:
+                thread.save(update_fields=update_fields)
+
             LegacyToTargetMapping.objects.update_or_create(
                 entity_type="thread",
                 legacy_pk=thread.pk,

@@ -71,10 +71,9 @@ def publish_new_message(message):
         thread = message.thread
         sender = message.sender
 
-        if sender == thread.buyer:
-            recipient = thread.supplier
-        else:
-            recipient = thread.buyer
+        recipient = thread.counterparty_for(sender)
+        if recipient is None:
+            return
 
         from .context_processors import get_unread_thread_count
         from .models import Message, ThreadReadState
@@ -92,7 +91,9 @@ def publish_new_message(message):
                 thread=thread,
             ).exclude(sender=recipient).count()
 
-        listing = thread.watchlist_item.supply_lot or thread.watchlist_item.demand_post
+        listing = thread.get_listing()
+        if listing is None:
+            return
 
         publish_event(recipient.pk, "new_message", {
             "thread_id": thread.pk,

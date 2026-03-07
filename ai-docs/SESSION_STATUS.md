@@ -1,6 +1,6 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-06
+**Last updated:** 2026-03-07
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
@@ -127,7 +127,6 @@ Do not create new per-version status files.
     - target-canonical discover read behavior
     - cutover gate enforcement for listing scope
   - Updated `specs/unified-listing-model-and-status-contract/tasks.md` to all complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 3.
-
 - Feature 4 (`ownership-based-permission-policy`) implementation executed on branch `feat/04-ownership-based-permission-policy`:
   - Added centralized permission policy service `marketplace/migration_control/permissions.py`:
     - `PolicyEngine` with `is_listing_owner()`, `is_thread_participant()`, `is_watchlist_owner()`, `is_self_message_attempt()`
@@ -151,11 +150,39 @@ Do not create new per-version status files.
   - Added 54 regression tests in `marketplace/tests/test_permission_policy.py` — all pass; full 85-test suite passes
 
 ## Current State
-- Branch: `main` (Feature 4 merged and pushed)
-- Features 1–4 complete and on `main`
-- All tests passing (85 total)
+- Branch: `feat/05-listing-centric-messaging-watchlist-decoupling` (Feature 5 implemented; pending merge)
+- Features 1–4 complete and on `main`; Feature 5 complete on feature branch
+- All tests passing (89 total)
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Feature 5: `listing-centric-messaging-and-watchlist-decoupling` (depends on Features 1, 3, 4)
 - Feature 6: `discover-direction-and-visibility-contract` (depends on Features 1, 3)
+
+- Feature 5 (`listing-centric-messaging-and-watchlist-decoupling`) implementation executed on branch `feat/05-listing-centric-messaging-watchlist-decoupling`:
+  - MessageThread schema evolved for listing-centric threading (migration `0011`):
+    - added `listing` FK + `created_by_user` FK
+    - relaxed legacy fields (`watchlist_item`, `buyer`, `supplier`) to nullable compatibility fields
+    - added unique constraint `unique_message_thread_per_listing_initiator` on `(listing, created_by_user)` when present
+  - Added conversation coordinator `marketplace/migration_control/conversations.py`:
+    - thread initiation keyed by listing + initiator
+    - auto-save to `ListingWatchlistItem` on thread start
+    - deterministic one-thread-per-(listing, initiator) behavior
+    - compatibility shadowing to legacy `WatchlistItem` when available
+  - Updated runtime messaging/watchlist behavior:
+    - discover/suggestion message actions now route through coordinator-based listing-centric creation
+    - thread detail/inbox/listing detail conversation views now resolve listing + participants via listing-centric thread semantics with legacy fallback
+    - watchlist unread/conversation badge logic now supports decoupled threads without OneToOne dependency
+  - Updated supporting services for listing-centric participant/listing resolution:
+    - permission engine participant checks now use thread participant resolver
+    - notifications and SSE recipient/listing resolution now use thread-centric helper methods
+  - Extended migration parity/cutover gates with messaging scope:
+    - `ParityValidator.validate_messaging_contract()`
+    - `migration_validate --scope messaging`
+    - CP4/CP5 checkpoint gates require passing messaging reports
+    - `migration_cutover` emits messaging reports at cutover stages
+  - Added Feature 5 regression tests in `marketplace/tests/test_conversation_decoupling.py`:
+    - thread uniqueness + autosave semantics
+    - watchlist/thread decoupling behavior
+    - thread/listing initiator backfill population
+    - messaging parity validation
+  - Updated `specs/listing-centric-messaging-and-watchlist-decoupling/tasks.md` to all complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 5.
