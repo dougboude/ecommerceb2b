@@ -151,11 +151,11 @@ Do not create new per-version status files.
   - Added 54 regression tests in `marketplace/tests/test_permission_policy.py` — all pass; full 85-test suite passes
 
 ## Current State
-- Branch: `feat/04-ownership-based-permission-policy`
-- Status: Feature 4 implementation complete, all tests passing
+- Branch: `main` (Feature 4 merged and pushed)
+- Features 1–4 complete and on `main`
+- All tests passing (85 total)
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Feature 5: `listing-centric-messaging-and-watchlist-decoupling`
-- Feature 6: `discover-direction-and-visibility-contract`
-- Commit and push Feature 4 branch when ready for review
+- Feature 5: `listing-centric-messaging-and-watchlist-decoupling` (depends on Features 1, 3, 4)
+- Feature 6: `discover-direction-and-visibility-contract` (depends on Features 1, 3)
