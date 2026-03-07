@@ -21,6 +21,7 @@ from marketplace.models import (
 )
 from marketplace.migration_control.identity import IdentityComplianceScanner
 from marketplace.migration_control.permissions import RoleAuthComplianceScanner
+from marketplace.migration_control.discover import DiscoverComplianceScanner
 
 
 @dataclass
@@ -186,6 +187,17 @@ class ParityValidator:
         Uses RoleAuthComplianceScanner to detect residual role-check patterns.
         """
         scanner = RoleAuthComplianceScanner()
+        passed, violations = scanner.scan()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
+        )
+
+    def validate_discover_contract(self) -> ValidationResult:
+        scanner = DiscoverComplianceScanner()
         passed, violations = scanner.scan()
         failures = len(violations)
         return ValidationResult(

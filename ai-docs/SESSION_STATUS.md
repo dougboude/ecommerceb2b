@@ -149,15 +149,6 @@ Do not create new per-version status files.
   - Updated `marketplace/management/commands/migration_cutover.py`: emits permission reports at CP4 and CP5 stages
   - Added 54 regression tests in `marketplace/tests/test_permission_policy.py` — all pass; full 85-test suite passes
 
-## Current State
-- Branch: `feat/05-listing-centric-messaging-watchlist-decoupling` (Feature 5 implemented; pending merge)
-- Features 1–4 complete and on `main`; Feature 5 complete on feature branch
-- All tests passing (89 total)
-- Per-version status files removed; this is the only status tracker
-
-## What's Next (if continuing)
-- Feature 6: `discover-direction-and-visibility-contract` (depends on Features 1, 3)
-
 - Feature 5 (`listing-centric-messaging-and-watchlist-decoupling`) implementation executed on branch `feat/05-listing-centric-messaging-watchlist-decoupling`:
   - MessageThread schema evolved for listing-centric threading (migration `0011`):
     - added `listing` FK + `created_by_user` FK
@@ -186,3 +177,45 @@ Do not create new per-version status files.
     - thread/listing initiator backfill population
     - messaging parity validation
   - Updated `specs/listing-centric-messaging-and-watchlist-decoupling/tasks.md` to all complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 5.
+- Feature 6 (`discover-direction-and-visibility-contract`) implementation executed on branch `feat/06-discover-direction-and-visibility-contract`:
+  - Discover direction is now explicit and role-agnostic:
+    - Added `DiscoverForm.direction` with `Find Supply` / `Find Demand`.
+    - Added deterministic direction normalization fallback (`find_supply`) with no role inference.
+    - Persisted `discover_last_direction` in session and clear-reset in `discover_clear`.
+  - Discover query/sort/watchlist behavior now derives from selected direction:
+    - `_run_discover_search()` maps direction to counterpart listing type.
+    - `_sort_discover_results()` uses direction-specific ending semantics (supply `available_until`, demand `expires_at`).
+    - `_discover_watchlisted_pks()` uses direction instead of user role.
+    - Removed `legacy_listing_type_for_user()` role-derived helper from listing compatibility service.
+  - Discover template now uses listing payload metadata, not `user.role`, for:
+    - result detail links
+    - save/unsave/message listing type + PK payloads
+    - ending-soon data attributes
+    - listing-specific metadata rendering
+  - Added discover migration parity scope and cutover gates:
+    - New scanner `marketplace/migration_control/discover.py` (`DiscoverComplianceScanner`) detects role-inferred discover patterns in discover helpers and template.
+    - Added `ParityValidator.validate_discover_contract()`.
+    - Added `migration_validate --scope discover`.
+    - CP4/CP5 checkpoint gates now require passing discover reports.
+    - `migration_cutover` now emits discover reports at CP4 and CP5.
+  - Added Feature 6 regression tests:
+    - `marketplace/tests/test_discover_direction_visibility.py`:
+      - explicit direction selection for any authenticated user
+      - direction session persistence and clear behavior
+      - counterpart status visibility contract (active included, non-active excluded)
+      - discover parity scope command coverage
+    - Updated `marketplace/tests/test_discover_sorting.py` for direction-based sort contract.
+    - Updated permission gate seed coverage in `marketplace/tests/test_permission_policy.py` for new discover checkpoint scope.
+  - Updated spec trackers:
+    - `specs/discover-direction-and-visibility-contract/tasks.md` all tasks complete.
+    - `specs/SPEC_ORDER.md` Feature 6 status updated to `REQ, DES, TASK, EXEC`.
+
+## Current State
+- Branch: `feat/06-discover-direction-and-visibility-contract` (Feature 6 implemented; pending merge)
+- Features 1–5 are complete and merged to `main`; Feature 6 is complete on feature branch
+- All marketplace tests passing (`94` total)
+- Per-version status files removed; this is the only status tracker
+
+## What's Next (if continuing)
+- Merge Feature 6 branch to `main` and push.
+- Feature 7: `legacy-schema-cleanup-and-final-cutover` (after all six foundation features are merged).

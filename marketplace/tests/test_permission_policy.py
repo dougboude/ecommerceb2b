@@ -387,7 +387,7 @@ class CheckpointPermissionGateTests(TestCase):
 
     def _seed_passing_reports(self, stage, exclude_scope=None):
         """Seed all required passing parity reports for a given stage."""
-        scopes = ["counts", "relationships", "identity", "listing", "permission", "messaging"]
+        scopes = ["counts", "relationships", "identity", "listing", "permission", "messaging", "discover"]
         for scope in scopes:
             if scope == exclude_scope:
                 continue

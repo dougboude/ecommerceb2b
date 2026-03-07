@@ -49,7 +49,7 @@ Rules:
 6. **discover-direction-and-visibility-contract**
    - Phase: FOUNDATION
    - Depends on: `migration-safety-and-compatibility-rails`, `unified-listing-model-and-status-contract`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/discover-direction-and-visibility-contract/`
 
 7. **legacy-schema-cleanup-and-final-cutover**

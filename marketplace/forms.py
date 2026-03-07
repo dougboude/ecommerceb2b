@@ -171,6 +171,8 @@ class SupplyLotForm(forms.ModelForm):
 
 
 class DiscoverForm(forms.Form):
+    DIRECTION_FIND_SUPPLY = "find_supply"
+    DIRECTION_FIND_DEMAND = "find_demand"
     SEARCH_MODE_SIMILAR = "similar"
     SEARCH_MODE_KEYWORD = "keyword"
     SORT_BEST_MATCH = "best_match"
@@ -185,7 +187,16 @@ class DiscoverForm(forms.Form):
         (SORT_NEWEST, _("Newest posted")),
         (SORT_ENDING_SOON, _("Ending soon")),
     ]
+    DIRECTION_CHOICES = [
+        (DIRECTION_FIND_SUPPLY, _("Find Supply")),
+        (DIRECTION_FIND_DEMAND, _("Find Demand")),
+    ]
 
+    direction = forms.ChoiceField(
+        choices=DIRECTION_CHOICES,
+        initial=DIRECTION_FIND_SUPPLY,
+        label=_("Direction"),
+    )
     query = forms.CharField(
         max_length=200, label=_("Search"),
         widget=forms.TextInput(attrs={"placeholder": _("What are you looking for?")}),

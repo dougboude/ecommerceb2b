@@ -10,7 +10,6 @@ from marketplace.models import (
     DemandStatus,
     Listing,
     ListingStatus,
-    ListingType,
     SupplyLot,
     SupplyStatus,
 )
@@ -62,9 +61,6 @@ class ListingCompatibilityService:
         legacy_listing.save(update_fields=["status"])
         result = self.repo.sync_listing_shadow(legacy_listing)
         return ListingTransitionResult(ok=result.ok, error=result.error)
-
-    def legacy_listing_type_for_user(self, user) -> str:
-        return ListingType.SUPPLY if user.role == "buyer" else ListingType.DEMAND
 
     def target_listing_for_legacy(self, legacy_listing):
         if isinstance(legacy_listing, DemandPost):
