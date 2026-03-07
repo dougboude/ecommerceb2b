@@ -1,0 +1,37 @@
+{% load i18n %}
+{# Avatar lightbox modal — included once in base.html. Opened by JS on .avatar-clickable clicks. #}
+<dialog id="avatar-lightbox" aria-labelledby="lightbox-title" aria-modal="true">
+    <button id="avatar-lightbox-close"
+            type="button"
+            class="btn btn-secondary"
+            aria-label="{% trans 'Close' %}">&#x2715;</button>
+    <img id="avatar-lightbox-img" src="" alt="{% trans 'Profile photo' %}" style="max-width:100%;border-radius:50%;">
+    <p id="lightbox-title" class="visually-hidden">{% trans "Profile photo" %}</p>
+</dialog>
+<script>
+(function () {
+    var lightbox = document.getElementById('avatar-lightbox');
+    var lightboxImg = document.getElementById('avatar-lightbox-img');
+    var closeBtn = document.getElementById('avatar-lightbox-close');
+
+    if (!lightbox) return;
+
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('.avatar-clickable');
+        if (!trigger) return;
+        var src = trigger.dataset.fullSrc || trigger.src || trigger.querySelector('img').src;
+        lightboxImg.src = src;
+        lightbox.showModal();
+    });
+
+    closeBtn.addEventListener('click', function () {
+        lightbox.close();
+    });
+
+    lightbox.addEventListener('click', function (e) {
+        if (e.target === lightbox) {
+            lightbox.close();
+        }
+    });
+})();
+</script>

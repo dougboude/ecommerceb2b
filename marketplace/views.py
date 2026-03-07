@@ -1,17 +1,21 @@
 import logging
 from collections import defaultdict
 
+import uuid as _uuid
+
+from django.conf import settings as django_settings
 from django.contrib import messages as django_messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
+from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import Count, F, Q, Window
 from django.db.models.functions import RowNumber
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -478,6 +482,70 @@ def profile_edit(request):
     else:
         form = ProfileForm(instance=request.user)
     return render(request, "marketplace/profile_edit.html", {"form": form})
+
+
+# ---------------------------------------------------------------------------
+# Profile image upload
+# ---------------------------------------------------------------------------
+
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@login_required
+@require_POST
+def upload_profile_image(request):
+    from .image_pipeline import ImageValidationError, process_profile_image
+
+    file = request.FILES.get("avatar")
+    if not file:
+        return JsonResponse({"error": "No file provided."}, status=400)
+
+    # Size check
+    if file.size > django_settings.MAX_UPLOAD_SIZE_BYTES:
+        mb = django_settings.MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
+        return JsonResponse({"error": f"File exceeds the {mb} MB size limit."}, status=400)
+
+    # Content-type pre-screen
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        return JsonResponse(
+            {"error": "Unsupported file type. Please upload a JPEG, PNG, or WebP image."},
+            status=400,
+        )
+
+    # Process through pipeline
+    try:
+        image_bytes, ext = process_profile_image(file, request.user)
+    except ImageValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    # Build storage path: profile_images/{user_id}/{uuid}.{ext}
+    filename = f"profile_images/{request.user.pk}/{_uuid.uuid4().hex}.{ext}"
+
+    # Remember old filename before overwriting (capture as string to avoid side effects)
+    old_name = request.user.profile_image.name if request.user.profile_image else None
+
+    # Save new image
+    content = ContentFile(image_bytes, name=filename)
+    request.user.profile_image.save(filename, content, save=False)
+    request.user.profile_image_updated_at = timezone_now()
+    request.user.save(update_fields=["profile_image", "profile_image_updated_at"])
+
+    # Capture URL while profile_image is set
+    avatar_url = request.user.profile_image_url
+
+    # Delete old file after successful save (use storage directly to avoid FieldFile side effects)
+    if old_name:
+        try:
+            from django.core.files.storage import default_storage
+            default_storage.delete(old_name)
+        except Exception:
+            logger.warning(
+                "Could not delete old profile image for user_id=%s: %s",
+                request.user.pk,
+                old_name,
+            )
+
+    return JsonResponse({"avatar_url": avatar_url})
 
 
 # ---------------------------------------------------------------------------

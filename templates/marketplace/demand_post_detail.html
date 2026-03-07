@@ -1,10 +1,20 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}{% endblock %}
 
 {% block content %}
 <h1>{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</h1>
+
+<div class="listing-owner">
+    <img src="{{ post.created_by_user.profile_image_url }}"
+         alt="{{ post.created_by_user.display_name|default:post.created_by_user.email }}"
+         class="avatar avatar-sm avatar-clickable"
+         data-full-src="{{ post.created_by_user.profile_image_url }}"
+         width="64" height="64">
+    <span>{{ post.created_by_user.display_name|default:post.created_by_user.email }}</span>
+</div>
+
 <dl>
     <dt>{% trans "Status" %}</dt><dd>{% if post.is_expired %}<span class="status status-expired">{% trans "Expired" %}</span>{% else %}<span class="status status-{{ post.status }}">{{ post.get_status_display }}</span>{% endif %}</dd>
     <dt>{% trans "Category" %}</dt><dd>{{ post.get_category_display|default:"-" }}</dd>
