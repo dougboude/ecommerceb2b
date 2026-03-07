@@ -67,7 +67,7 @@ Rules:
 9. **email-verification-and-account-activation**
    - Phase: LAUNCH READINESS
    - Depends on: all foundation specs (CP5 required); `ui-language-and-navigation-derolification`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/email-verification-and-account-activation/`
 
 ## Maintenance Workflow

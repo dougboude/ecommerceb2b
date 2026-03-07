@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 
 from django.contrib import messages as django_messages
@@ -5,14 +6,21 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, F, Q, Window
 from django.db.models.functions import RowNumber
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.safestring import mark_safe
+from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
+
+logger = logging.getLogger(__name__)
 
 from django_ratelimit.decorators import ratelimit
 
@@ -30,6 +38,7 @@ from .migration_control.conversations import ThreadWatchlistCoordinator
 from .migration_control.identity import IdentityCompatibilityAdapter
 from .migration_control.permissions import permission_service
 from .models import (
+    EmailVerificationToken,
     Listing,
     ListingStatus,
     ListingType,
@@ -37,6 +46,7 @@ from .models import (
     Message,
     MessageThread,
     ThreadReadState,
+    User,
     WatchlistItem,
     WatchlistSource,
     WatchlistStatus,
@@ -58,6 +68,44 @@ def _set_skin_cookie(response, skin_name):
         httponly=True,
     )
     return response
+
+
+def _send_verification_email(request, user):
+    """Create a verification token and send the activation email.
+
+    Revokes any prior unused tokens for this user (preserves rows for audit).
+    Swallows email send errors — logs and warns the user instead of failing.
+    """
+    EmailVerificationToken.objects.filter(
+        user=user, used_at=None, revoked_at=None
+    ).update(revoked_at=timezone_now())
+
+    token = EmailVerificationToken.objects.create(user=user)
+    verification_url = request.build_absolute_uri(
+        reverse("marketplace:verify_email_confirm", args=[token.token])
+    )
+    context = {
+        "display_name": user.display_name or user.email,
+        "verification_url": verification_url,
+        "expiry_hours": EmailVerificationToken.TOKEN_EXPIRY_HOURS,
+    }
+    subject = render_to_string(
+        "registration/verification_email_subject.txt", context
+    ).strip()
+    body = render_to_string("registration/verification_email_body.txt", context)
+    try:
+        send_mail(subject, body, None, [user.email])
+    except Exception:
+        logger.error(
+            "Failed to send verification email to %s", user.email, exc_info=True
+        )
+        django_messages.warning(
+            request,
+            _(
+                "Account created but we could not send the verification email. "
+                "Use the resend option to try again."
+            ),
+        )
 
 
 def _resolve_listing_by_pk_or_legacy(pk, listing_type):
@@ -212,10 +260,8 @@ def signup_view(request):
                 user,
                 organization_name=form.cleaned_data.get("organization_name"),
             )
-            login(request, user)
-            django_messages.success(request, _("Account created successfully."))
-            response = redirect("marketplace:dashboard")
-            return _set_skin_cookie(response, user.skin)
+            _send_verification_email(request, user)
+            return redirect("marketplace:verify_email")
     else:
         form = SignupForm()
     return render(request, "registration/signup.html", {"form": form})
@@ -226,12 +272,99 @@ class MarketplaceLoginView(LoginView):
     redirect_authenticated_user = True
 
     def form_valid(self, form):
+        user = form.get_user()
+        if not user.email_verified:
+            resend_url = reverse("marketplace:resend_verification")
+            form.add_error(
+                None,
+                mark_safe(
+                    _("Email not verified. ")
+                    + f'<a href="{resend_url}">'
+                    + _("Resend verification email")
+                    + "</a>."
+                ),
+            )
+            return self.form_invalid(form)
         response = super().form_valid(form)
-        return _set_skin_cookie(response, form.get_user().skin)
+        return _set_skin_cookie(response, user.skin)
 
 
 class MarketplaceLogoutView(LogoutView):
     next_page = "marketplace:login"
+
+
+# ---------------------------------------------------------------------------
+# Email verification
+# ---------------------------------------------------------------------------
+
+def verify_email(request):
+    """'Check your email' confirmation page shown after signup or resend."""
+    return render(request, "registration/email_verify.html")
+
+
+def verify_email_confirm(request, token):
+    """Activate account using the UUID token from the verification email."""
+    try:
+        obj = (
+            EmailVerificationToken.objects
+            .select_related("user")
+            .get(token=token)
+        )
+    except EmailVerificationToken.DoesNotExist:
+        raise Http404
+
+    # Check terminal states outside the transaction — no write needed
+    if obj.used_at is not None:
+        return render(request, "registration/email_verify_used.html")
+
+    if not obj.is_valid:
+        # Expired: used_at is None, revoked_at is None, but past expiry
+        return render(request, "registration/email_verify_expired.html")
+
+    # Valid — activate atomically to prevent double-activation on concurrent clicks
+    with transaction.atomic():
+        try:
+            obj = (
+                EmailVerificationToken.objects
+                .select_related("user")
+                .select_for_update()
+                .get(pk=obj.pk, used_at=None, revoked_at=None)
+            )
+        except EmailVerificationToken.DoesNotExist:
+            # Another request already activated this token
+            return render(request, "registration/email_verify_used.html")
+
+        if not obj.is_valid:
+            return render(request, "registration/email_verify_expired.html")
+
+        obj.user.email_verified = True
+        obj.user.save(update_fields=["email_verified"])
+        obj.used_at = timezone_now()
+        obj.save(update_fields=["used_at"])
+
+    login(request, obj.user, backend="django.contrib.auth.backends.ModelBackend")
+    django_messages.success(request, _("Email verified. Welcome to NicheMarket!"))
+    response = redirect("marketplace:dashboard")
+    return _set_skin_cookie(response, obj.user.skin)
+
+
+def resend_verification(request):
+    """Resend a verification email to a given address."""
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        try:
+            user = User.objects.get(email__iexact=email, email_verified=False)
+            _send_verification_email(request, user)
+        except Exception:
+            pass  # neutral — do not leak account existence or already-verified status
+        return redirect("marketplace:verify_email")
+
+    initial_email = request.GET.get("email", "")
+    return render(
+        request,
+        "registration/resend_verification.html",
+        {"initial_email": initial_email},
+    )
 
 
 # ---------------------------------------------------------------------------

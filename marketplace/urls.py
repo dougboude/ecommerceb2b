@@ -9,6 +9,9 @@ urlpatterns = [
     path("signup/", views.signup_view, name="signup"),
     path("login/", views.MarketplaceLoginView.as_view(), name="login"),
     path("logout/", views.MarketplaceLogoutView.as_view(), name="logout"),
+    path("verify-email/", views.verify_email, name="verify_email"),
+    path("verify-email/<uuid:token>/", views.verify_email_confirm, name="verify_email_confirm"),
+    path("resend-verification/", views.resend_verification, name="resend_verification"),
     # Dashboard
     path("", views.dashboard_view, name="dashboard"),
     # Profile

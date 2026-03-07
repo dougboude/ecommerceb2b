@@ -1,7 +1,11 @@
+import uuid
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext_lazy as _
 
 from .constants import UNIT_CHOICES
@@ -24,6 +28,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("country", "US")
+        extra_fields.setdefault("email_verified", True)
         return self.create_user(email, password, **extra_fields)
 
 
@@ -401,6 +406,37 @@ class ThreadReadState(models.Model):
 
     def __str__(self):
         return f"ReadState thread={self.thread_id} user={self.user_id}"
+
+
+class EmailVerificationToken(models.Model):
+    TOKEN_EXPIRY_HOURS = 24
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="verification_tokens",
+    )
+    token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.pk and not self.expires_at:
+            self.expires_at = timezone_now() + timedelta(hours=self.TOKEN_EXPIRY_HOURS)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        return (
+            self.used_at is None
+            and self.revoked_at is None
+            and self.expires_at > timezone_now()
+        )
+
+    def __str__(self):
+        return f"VerificationToken(user={self.user_id}, expires={self.expires_at})"
 
 
 class MigrationState(models.Model):
