@@ -579,15 +579,57 @@ def supply_lot_delete(request, pk):
 # Discover (search)
 # ---------------------------------------------------------------------------
 
-def _run_discover_search(user, query, category, country, search_mode="similar"):
-    """Run discover search and return results list."""
-    if user.role == Role.BUYER:
-        listing_type = "supply_lot"
+def _normalize_discover_direction(direction):
+    if direction in {
+        DiscoverForm.DIRECTION_FIND_SUPPLY,
+        DiscoverForm.DIRECTION_FIND_DEMAND,
+    }:
+        return direction
+    return DiscoverForm.DIRECTION_FIND_SUPPLY
+
+
+def _discover_listing_types_for_direction(direction):
+    normalized = _normalize_discover_direction(direction)
+    if normalized == DiscoverForm.DIRECTION_FIND_DEMAND:
+        return "demand_post", "demand"
+    return "supply_lot", "supply"
+
+
+def _discover_listing_payload(listing, default_listing_type):
+    legacy_type = getattr(listing, "legacy_source_type", "")
+    legacy_pk = getattr(listing, "legacy_source_pk", None)
+    if legacy_type in {"supply_lot", "demand_post"} and legacy_pk:
+        listing_type = legacy_type
+        listing_pk = legacy_pk
     else:
-        listing_type = "demand_post"
+        listing_type = default_listing_type
+        listing_pk = listing.pk
+    detail_url_name = (
+        "marketplace:supply_lot_detail"
+        if listing_type == "supply_lot"
+        else "marketplace:demand_post_detail"
+    )
+    return listing_type, listing_pk, detail_url_name
+
+
+def _decorate_discover_results(results, direction):
+    default_listing_type, _ = _discover_listing_types_for_direction(direction)
+    for listing in results:
+        listing.discover_listing_type, listing.discover_listing_pk, listing.discover_detail_url_name = (
+            _discover_listing_payload(listing, default_listing_type)
+        )
+        if listing.discover_listing_type == "supply_lot":
+            listing.discover_ending_at = getattr(listing, "available_until", None)
+        else:
+            listing.discover_ending_at = getattr(listing, "expires_at", None)
+
+
+def _run_discover_search(user, query, category, country, direction, search_mode="similar"):
+    """Run discover search and return results list."""
+    listing_type, target_listing_type = _discover_listing_types_for_direction(direction)
 
     target_results = listing_service.discover_queryset(
-        listing_type="supply" if listing_type == "supply_lot" else "demand",
+        listing_type=target_listing_type,
         query=query,
         category=category or None,
         country=country or None,
@@ -616,14 +658,14 @@ def _run_discover_search(user, query, category, country, search_mode="similar"):
     )
 
 
-def _sort_discover_results(results, sort_by, user):
+def _sort_discover_results(results, sort_by, direction):
     """Sort discover results based on user-selected mode."""
     if sort_by == DiscoverForm.SORT_NEWEST:
         return sorted(results, key=lambda listing: listing.created_at, reverse=True)
 
     if sort_by == DiscoverForm.SORT_ENDING_SOON:
-        if user.role == Role.BUYER:
-            # Buyers discover supply lots, so "ending soon" means availability ends soonest.
+        normalized_direction = _normalize_discover_direction(direction)
+        if normalized_direction == DiscoverForm.DIRECTION_FIND_SUPPLY:
             return sorted(
                 results,
                 key=lambda listing: (
@@ -631,7 +673,6 @@ def _sort_discover_results(results, sort_by, user):
                     listing.available_until or listing.created_at,
                 ),
             )
-        # Suppliers discover demand posts, so "ending soon" means post expiry soonest.
         return sorted(
             results,
             key=lambda listing: (
@@ -648,9 +689,10 @@ def _is_short_query(query):
     return len(words) <= 2
 
 
-def _discover_watchlisted_pks(user):
+def _discover_watchlisted_pks(user, direction):
     """Return set of PKs already on the user's watchlist."""
-    if user.role == Role.BUYER:
+    normalized_direction = _normalize_discover_direction(direction)
+    if normalized_direction == DiscoverForm.DIRECTION_FIND_SUPPLY:
         return set(WatchlistItem.objects.filter(
             user=user, supply_lot__isnull=False,
         ).values_list("supply_lot_id", flat=True))
@@ -671,6 +713,7 @@ def discover_view(request):
         form = DiscoverForm(request.POST, user=user)
         if form.is_valid() and form.cleaned_data.get("query"):
             query = form.cleaned_data["query"]
+            direction = _normalize_discover_direction(form.cleaned_data.get("direction"))
             category = form.cleaned_data.get("category") or ""
             country = form.cleaned_data.get("location_country") or ""
             radius = form.cleaned_data.get("radius") or ""
@@ -680,6 +723,7 @@ def discover_view(request):
 
             # Store params in session
             request.session["discover_last_query"] = query
+            request.session["discover_last_direction"] = direction
             request.session["discover_last_category"] = category
             request.session["discover_last_country"] = country
             request.session["discover_last_radius"] = radius
@@ -687,12 +731,13 @@ def discover_view(request):
             request.session["discover_last_sort_by"] = sort_by
             request.session["discover_last_exclude_watched"] = exclude_watched
 
-            results = _run_discover_search(user, query, category, country, search_mode)
-            results = _sort_discover_results(results, sort_by, user)
+            results = _run_discover_search(user, query, category, country, direction, search_mode)
+            results = _sort_discover_results(results, sort_by, direction)
+            _decorate_discover_results(results, direction)
             searched = True
-            watchlisted_pks = _discover_watchlisted_pks(user)
+            watchlisted_pks = _discover_watchlisted_pks(user, direction)
             if exclude_watched and watchlisted_pks:
-                results = [r for r in results if r.pk not in watchlisted_pks]
+                results = [r for r in results if r.discover_listing_pk not in watchlisted_pks]
             if not results and search_mode == "similar" and _is_short_query(query):
                 short_query_hint = True
     else:
@@ -702,6 +747,9 @@ def discover_view(request):
         if keep_results and session_query:
             initial = {
                 "query": session_query,
+                "direction": _normalize_discover_direction(
+                    request.session.get("discover_last_direction")
+                ),
                 "category": request.session.get("discover_last_category", ""),
                 "location_country": request.session.get("discover_last_country", ""),
                 "radius": request.session.get("discover_last_radius", ""),
@@ -713,13 +761,15 @@ def discover_view(request):
             results = _run_discover_search(
                 user, session_query,
                 initial["category"], initial["location_country"],
+                initial["direction"],
                 initial["search_mode"],
             )
-            results = _sort_discover_results(results, initial["sort_by"], user)
+            results = _sort_discover_results(results, initial["sort_by"], initial["direction"])
+            _decorate_discover_results(results, initial["direction"])
             searched = True
-            watchlisted_pks = _discover_watchlisted_pks(user)
+            watchlisted_pks = _discover_watchlisted_pks(user, initial["direction"])
             if initial["exclude_watched"] and watchlisted_pks:
-                results = [r for r in results if r.pk not in watchlisted_pks]
+                results = [r for r in results if r.discover_listing_pk not in watchlisted_pks]
             if not results and initial["search_mode"] == "similar" and _is_short_query(session_query):
                 short_query_hint = True
         else:
@@ -740,6 +790,7 @@ def discover_clear(request):
     for key in ["discover_last_query", "discover_last_category",
                 "discover_last_country", "discover_last_radius",
                 "discover_last_search_mode", "discover_last_sort_by",
+                "discover_last_direction",
                 "discover_last_exclude_watched", "discover_keep_results"]:
         request.session.pop(key, None)
     return redirect("marketplace:discover")

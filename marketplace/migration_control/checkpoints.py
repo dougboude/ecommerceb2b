@@ -106,6 +106,8 @@ class CheckpointController:
                 return "Cannot advance to CP4: missing passing permission policy compliance report"
             if not self._latest_report_passed(scope="messaging"):
                 return "Cannot advance to CP4: missing passing messaging contract report"
+            if not self._latest_report_passed(scope="discover"):
+                return "Cannot advance to CP4: missing passing discover contract report"
 
         if target_checkpoint == "CP5":
             # Cleanup requires cutover-stage passing reports.
@@ -123,6 +125,8 @@ class CheckpointController:
                 return "Cannot advance to CP5: missing passing cutover permission policy report"
             if not self._latest_report_passed(scope="messaging", stage=MigrationStage.CUTOVER):
                 return "Cannot advance to CP5: missing passing cutover messaging report"
+            if not self._latest_report_passed(scope="discover", stage=MigrationStage.CUTOVER):
+                return "Cannot advance to CP5: missing passing cutover discover report"
 
         return None
 

@@ -10,7 +10,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--scope",
-            choices=["counts", "relationships", "identity", "listing", "permission", "messaging", "all"],
+            choices=["counts", "relationships", "identity", "listing", "permission", "messaging", "discover", "all"],
             default="all",
         )
         parser.add_argument("--fail-on-error", action="store_true")
@@ -58,6 +58,12 @@ class Command(BaseCommand):
             result = validator.validate_messaging_contract()
             validator.create_report(stage=state.stage, scope="messaging", result=result)
             self.stdout.write(f"messaging: passed={result.passed} failures={result.failures} summary={result.summary}")
+            failures += result.failures
+
+        if options["scope"] in {"discover", "all"}:
+            result = validator.validate_discover_contract()
+            validator.create_report(stage=state.stage, scope="discover", result=result)
+            self.stdout.write(f"discover: passed={result.passed} failures={result.failures} summary={result.summary}")
             failures += result.failures
 
         if options["fail_on_error"] and failures > 0:
