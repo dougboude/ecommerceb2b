@@ -43,7 +43,7 @@ Rules:
 5. **listing-centric-messaging-and-watchlist-decoupling**
    - Phase: FOUNDATION
    - Depends on: `migration-safety-and-compatibility-rails`, `unified-listing-model-and-status-contract`, `ownership-based-permission-policy`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/listing-centric-messaging-and-watchlist-decoupling/`
 
 6. **discover-direction-and-visibility-contract**
@@ -51,6 +51,12 @@ Rules:
    - Depends on: `migration-safety-and-compatibility-rails`, `unified-listing-model-and-status-contract`
    - Status: `REQ, DES, TASK`
    - Path: `specs/discover-direction-and-visibility-contract/`
+
+7. **legacy-schema-cleanup-and-final-cutover**
+   - Phase: FOUNDATION COMPLETION
+   - Depends on: all six foundation specs (`migration-safety-and-compatibility-rails`, `role-agnostic-user-and-org-flattening`, `unified-listing-model-and-status-contract`, `ownership-based-permission-policy`, `listing-centric-messaging-and-watchlist-decoupling`, `discover-direction-and-visibility-contract`)
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/legacy-schema-cleanup-and-final-cutover/`
 
 ## Maintenance Workflow
 
