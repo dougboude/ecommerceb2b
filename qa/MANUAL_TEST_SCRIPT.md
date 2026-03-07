@@ -21,19 +21,47 @@ or verifying a deployment.
 
 ## Setup
 
-Before starting:
+### Option A — Fresh seed (recommended)
+
+Run this before any test session to wipe all data and load a known-good dataset:
+
+```bash
+bash qa/reset_and_seed.sh
+bash start.sh
+```
+
+`reset_and_seed.sh` applies migrations, flushes the database, and installs
+a rich set of test personas and data (see **Seed Personas** below).
+`start.sh` then launches all three services.
+
+### Option B — Start only (keep existing data)
 
 ```bash
 bash start.sh
 ```
 
-This starts all three services (embedding sidecar, SSE relay, Django) and streams
-their logs to the terminal. Press **Ctrl-C** once to stop everything cleanly.
+### Seed Personas
 
-Service logs are written to `logs/embedding.log`, `logs/sse.log`, and `logs/django.log`
-if you need to diagnose a startup problem.
+After running `reset_and_seed.sh`, the following accounts are available.
+**Password for all accounts: `Seedpass1!`**
 
-Open `http://127.0.0.1:8000` in your browser once `start.sh` reports all three services healthy.
+| Email | Name | State | Notes |
+|---|---|---|---|
+| alice@seed.test | Alice Thornton | Verified, has avatar | 3 active supply, 1 paused, 1 expired |
+| bob@seed.test | Bob Mercado | Verified, has avatar | 2 active demand, 1 paused, 1 expired, unread message |
+| carol@seed.test | Carol Vance | Verified, **no avatar** | 1 supply + 1 demand listing |
+| dave@seed.test | Dave Okonkwo | Verified, has avatar | 1 active, 1 fulfilled, 1 withdrawn supply; unread message |
+| eve@seed.test | Eve Nakamura | **UNVERIFIED** | Tests login-blocking and resend-verification flows |
+
+Pre-wired relationships:
+- Bob has messaged Alice about tomatoes (3 messages; Alice has 1 **unread**)
+- Carol has messaged Alice about lavender (2 messages; both have read)
+- Bob has messaged Dave about salmon (1 message; Dave has 1 **unread**)
+- Bob watches Alice's tomato and lavender listings
+- Dave watches Carol's blueberry listing
+- Bob has dismissed Alice's sunflower oil listing
+
+Open `http://127.0.0.1:8000` once `start.sh` reports all three services healthy.
 
 Use two different browsers (or one browser + one private window) when testing
 messaging between two users.
