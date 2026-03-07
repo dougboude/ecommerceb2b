@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import (
+    EmailVerificationToken,
     Listing,
     DismissedSuggestion,
     Message,
@@ -80,3 +81,11 @@ class MessageAdmin(admin.ModelAdmin):
 class ThreadReadStateAdmin(admin.ModelAdmin):
     list_display = ("id", "thread", "user", "last_read_at")
     raw_id_fields = ("thread", "user")
+
+
+@admin.register(EmailVerificationToken)
+class EmailVerificationTokenAdmin(admin.ModelAdmin):
+    list_display = ("user", "token", "created_at", "expires_at", "used_at", "revoked_at")
+    list_filter = ("used_at", "revoked_at")
+    raw_id_fields = ("user",)
+    readonly_fields = ("token", "created_at")

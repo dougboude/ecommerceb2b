@@ -1,0 +1,9 @@
+Hi {{ display_name }},
+
+Please confirm your NicheMarket account by clicking the link below:
+
+{{ verification_url }}
+
+This link expires in {{ expiry_hours }} hours.
+
+If you did not register for NicheMarket, you can safely ignore this email.

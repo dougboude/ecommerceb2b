@@ -342,11 +342,38 @@ Do not create new per-version status files.
     - `specs/ui-language-and-navigation-derolification/tasks.md` all tasks complete
     - `specs/SPEC_ORDER.md` Feature 8 status updated to `REQ, DES, TASK, EXEC`
 
+- Feature 9 (`email-verification-and-account-activation`) implementation executed on branch `feat/09-email-verification-and-account-activation`:
+  - Added `EmailVerificationToken` model to `marketplace/models.py`:
+    - Fields: `user` (FK CASCADE), `token` (UUID unique), `created_at`, `expires_at`, `used_at`, `revoked_at`
+    - `TOKEN_EXPIRY_HOURS = 24`, auto-set `expires_at` on first save
+    - `is_valid` property checks `used_at is None and revoked_at is None and expires_at > now()`
+    - Tokens are NEVER hard-deleted — prior tokens revoked via `revoked_at=now()` for audit history
+  - Fixed `UserManager.create_superuser` to default `email_verified=True` (prevents bootstrap lockout)
+  - Added migration `marketplace/migrations/0015_emailverificationtoken.py` (additive only)
+  - Registered `EmailVerificationTokenAdmin` in `marketplace/admin.py`
+  - Added `_send_verification_email(request, user)` helper in `views.py`:
+    - Revokes prior unused tokens (soft revoke, not delete)
+    - Creates new token, builds absolute verification URL
+    - Renders subject/body templates, calls `send_mail` inside try/except (failure logs + warns, does not re-raise)
+  - Updated `signup_view`: removed auto-login; redirects to `verify_email` after sending email
+  - Updated `MarketplaceLoginView.form_valid()`: gate on `email_verified`; blocks unverified users with resend link
+  - Added `verify_email`, `verify_email_confirm`, `resend_verification` views:
+    - `verify_email_confirm` uses `transaction.atomic()` + `select_for_update()` to prevent double-activation
+  - Added URL patterns: `verify-email/`, `verify-email/<uuid:token>/`, `resend-verification/`
+  - Created templates: `verification_email_subject.txt`, `verification_email_body.txt`, `email_verify_expired.html`, `email_verify_used.html`, `resend_verification.html`
+  - Updated `email_verify.html` with resend link
+  - Added `settings.py` `EMAIL_BACKEND` override via env var
+  - Added 23 tests in `marketplace/tests/test_email_verification.py` — all pass
+  - Full suite: `47` tests passing, `6` skipped — no regressions
+  - Spec trackers updated:
+    - `specs/email-verification-and-account-activation/tasks.md` all tasks complete
+    - `specs/SPEC_ORDER.md` Feature 9 status updated to `REQ, DES, TASK, EXEC`
+
 ## Current State
-- Branch: `feat/08-ui-language-and-navigation-derolification`
-- Features 1–7 are complete and merged to `main`; Feature 8 implementation is complete on feature branch
-- Current suite status after Feature 8: `24` passing, `6` skipped (legacy migration-era suites retired)
+- Branch: `feat/09-email-verification-and-account-activation`
+- Features 1–8 are complete and merged to `main`; Feature 9 implementation is complete on feature branch
+- Current suite status after Feature 9: `47` passing, `6` skipped (legacy migration-era suites retired)
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Commit Feature 8 branch, merge to `main`, and push.
+- Commit Feature 9 branch, merge to `main`, and push.

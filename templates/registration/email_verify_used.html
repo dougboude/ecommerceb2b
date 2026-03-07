@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Already verified" %}{% endblock %}
+
+{% block content %}
+<div class="auth-form">
+    <h1>{% trans "Already verified" %}</h1>
+    <p style="text-align:center;color:var(--color-text-muted);">{% trans "Your account is already active. You can log in now." %}</p>
+    <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Go to login" %}</a></p>
+</div>
+{% endblock %}
