@@ -5,8 +5,8 @@
 Before doing any work in this repository, read and internalize:
 
 0. `ai-docs/SESSION_STATUS.md` — canonical handoff log (update at end of session)
-
 1. `ai-docs/ai-constitution.md` — governance rules, scope control, stop conditions
+2. `ai-docs/AGENT_NOTES.md` — gotchas, non-obvious patterns, hard-won lessons
 
 ## Authority Order
 
