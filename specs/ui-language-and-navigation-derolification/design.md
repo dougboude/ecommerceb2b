@@ -85,7 +85,7 @@ Phase 2: Verification Lock (irreversible intent)
   ┌─────────────────────────────────────────────────────────────────┐
   │  marketplace/migration_control/ui_compliance.py (new)           │
   │  └── TemplateLanguageComplianceScanner                          │
-  │       ├── scans templates/marketplace/*.html                    │
+  │       ├── scans templates/marketplace/, includes/, registration/ │
   │       ├── scans marketplace/views.py + forms.py                 │
   │       └── returns (passed: bool, violations: list[str])         │
   │                                                                 │

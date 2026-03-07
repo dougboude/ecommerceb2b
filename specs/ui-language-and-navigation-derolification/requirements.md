@@ -14,7 +14,7 @@ This spec executes **exclusively at CP5** (post-legacy-cleanup). By the time thi
 | `User.role` field | Removed from DB | Block execution if `User._meta.get_field('role')` does not raise `FieldDoesNotExist` |
 | `Organization` model | Removed from DB | Block execution if `Organization` can be imported from `marketplace.models` |
 | `DemandPost` model | Removed from DB | Block execution if `DemandPost` can be imported from `marketplace.models` |
-| Legacy parity gates | All passing at cutover stage | `migration_validate --scope all` must have produced passing cutover-stage reports |
+| Legacy parity gates | All passing at cutover stage | Cutover-stage `ParityReport` records must exist and all have `passed=True` (confirmed by querying existing records, not re-running `migration_validate`) |
 
 **Hard gate artifact before Phase 1 begins:**
 ```python
