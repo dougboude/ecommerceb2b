@@ -10,7 +10,19 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--scope",
-            choices=["counts", "relationships", "identity", "listing", "permission", "messaging", "discover", "all"],
+            choices=[
+                "counts",
+                "relationships",
+                "identity",
+                "listing",
+                "permission",
+                "messaging",
+                "discover",
+                "cleanup_listing",
+                "cleanup_messaging",
+                "cleanup_role_org",
+                "all",
+            ],
             default="all",
         )
         parser.add_argument("--fail-on-error", action="store_true")
@@ -64,6 +76,30 @@ class Command(BaseCommand):
             result = validator.validate_discover_contract()
             validator.create_report(stage=state.stage, scope="discover", result=result)
             self.stdout.write(f"discover: passed={result.passed} failures={result.failures} summary={result.summary}")
+            failures += result.failures
+
+        if options["scope"] in {"cleanup_listing"}:
+            result = validator.validate_cleanup_listing_dependencies()
+            validator.create_report(stage=state.stage, scope="cleanup_listing", result=result)
+            self.stdout.write(
+                f"cleanup_listing: passed={result.passed} failures={result.failures} summary={result.summary}"
+            )
+            failures += result.failures
+
+        if options["scope"] in {"cleanup_messaging"}:
+            result = validator.validate_cleanup_messaging_dependencies()
+            validator.create_report(stage=state.stage, scope="cleanup_messaging", result=result)
+            self.stdout.write(
+                f"cleanup_messaging: passed={result.passed} failures={result.failures} summary={result.summary}"
+            )
+            failures += result.failures
+
+        if options["scope"] in {"cleanup_role_org"}:
+            result = validator.validate_cleanup_role_org_dependencies()
+            validator.create_report(stage=state.stage, scope="cleanup_role_org", result=result)
+            self.stdout.write(
+                f"cleanup_role_org: passed={result.passed} failures={result.failures} summary={result.summary}"
+            )
             failures += result.failures
 
         if options["fail_on_error"] and failures > 0:

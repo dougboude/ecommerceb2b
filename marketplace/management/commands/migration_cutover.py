@@ -1,9 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from marketplace.migration_control.backfill import BackfillEngine
 from marketplace.migration_control.checkpoints import CheckpointController
 from marketplace.migration_control.parity import ParityValidator
-from marketplace.migration_control.state import get_or_create_state
+from marketplace.migration_control.state import CHECKPOINT_ORDER, get_or_create_state
 
 
 class Command(BaseCommand):
@@ -16,20 +15,19 @@ class Command(BaseCommand):
         target = options["to"]
         controller = CheckpointController()
         validator = ParityValidator()
-        backfill = BackfillEngine()
 
         state = get_or_create_state()
         order = ["CP1", "CP2", "CP3", "CP4", "CP5"]
         to_index = order.index(target)
 
         for checkpoint in order[: to_index + 1]:
+            # Skip already-reached checkpoints.
             if state.checkpoint == checkpoint:
+                continue
+            if state.checkpoint_order >= CHECKPOINT_ORDER[checkpoint]:
                 continue
 
             if checkpoint == "CP2":
-                backfill.backfill_users()
-                backfill.backfill_listings()
-                backfill.backfill_threads_and_watchlist()
                 r = validator.validate_relationships()
                 validator.create_report(stage=state.stage, scope="relationships", result=r)
 
@@ -61,6 +59,9 @@ class Command(BaseCommand):
                 r_permission = validator.validate_permission_policy()
                 r_messaging = validator.validate_messaging_contract()
                 r_discover = validator.validate_discover_contract()
+                r_cleanup_listing = validator.validate_cleanup_listing_dependencies()
+                r_cleanup_messaging = validator.validate_cleanup_messaging_dependencies()
+                r_cleanup_role_org = validator.validate_cleanup_role_org_dependencies()
                 validator.create_report(stage="cutover", scope="counts", result=r_counts)
                 validator.create_report(stage="cutover", scope="relationships", result=r_rels)
                 validator.create_report(stage="cutover", scope="identity", result=r_identity)
@@ -68,6 +69,9 @@ class Command(BaseCommand):
                 validator.create_report(stage="cutover", scope="permission", result=r_permission)
                 validator.create_report(stage="cutover", scope="messaging", result=r_messaging)
                 validator.create_report(stage="cutover", scope="discover", result=r_discover)
+                validator.create_report(stage="cutover", scope="cleanup_listing", result=r_cleanup_listing)
+                validator.create_report(stage="cutover", scope="cleanup_messaging", result=r_cleanup_messaging)
+                validator.create_report(stage="cutover", scope="cleanup_role_org", result=r_cleanup_role_org)
 
             result = controller.advance_to(checkpoint)
             if not result.ok:

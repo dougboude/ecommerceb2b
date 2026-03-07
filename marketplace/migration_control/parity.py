@@ -4,24 +4,21 @@ from django.db.models import Q
 from django.db.models import Count
 
 from marketplace.models import (
-    DemandPost,
     LegacyToTargetMapping,
     Listing,
     ListingStatus,
     ListingType,
-    ListingMessageThread,
-    ListingWatchlistItem,
-    ListingWatchlistItem,
     Message,
     MessageThread,
     ParityReport,
-    SupplyLot,
+    ThreadReadState,
     User,
     WatchlistItem,
 )
 from marketplace.migration_control.identity import IdentityComplianceScanner
 from marketplace.migration_control.permissions import RoleAuthComplianceScanner
 from marketplace.migration_control.discover import DiscoverComplianceScanner
+from marketplace.migration_control.cleanup import CleanupComplianceScanner
 
 
 @dataclass
@@ -36,9 +33,9 @@ class ParityValidator:
     def validate_counts(self) -> ValidationResult:
         checks = {
             "users": (User.objects.count(), User.objects.count()),
-            "listings": (DemandPost.objects.count() + SupplyLot.objects.count(), Listing.objects.count()),
-            "watchlists": (WatchlistItem.objects.count(), ListingWatchlistItem.objects.count()),
-            "threads": (MessageThread.objects.count(), ListingMessageThread.objects.count()),
+            "listings": (Listing.objects.count(), Listing.objects.count()),
+            "watchlists": (WatchlistItem.objects.count(), WatchlistItem.objects.count()),
+            "threads": (MessageThread.objects.count(), MessageThread.objects.count()),
             "messages": (Message.objects.count(), Message.objects.count()),
         }
         failures = 0
@@ -70,10 +67,10 @@ class ParityValidator:
             failures += 1
             notes.append(f"duplicate mappings={dup_mappings}")
 
-        orphan_target_watchlist = ListingWatchlistItem.objects.filter(listing__isnull=True).count()
-        if orphan_target_watchlist:
+        orphan_watchlist = WatchlistItem.objects.filter(listing__isnull=True).count()
+        if orphan_watchlist:
             failures += 1
-            notes.append(f"orphan target watchlist rows={orphan_target_watchlist}")
+            notes.append(f"orphan watchlist rows={orphan_watchlist}")
 
         return ValidationResult(
             passed=failures == 0,
@@ -108,19 +105,9 @@ class ParityValidator:
             failures += 1
             notes.append(f"invalid_demand_rows={invalid_demand}")
 
-        missing_mappings = Listing.objects.filter(
-            legacy_source_type__in=["demand_post", "supply_lot"],
-            legacy_source_pk__isnull=False,
-        ).exclude(
-            pk__in=LegacyToTargetMapping.objects.filter(entity_type="listing").values_list("target_pk", flat=True)
-        ).count()
-        if missing_mappings:
-            failures += 1
-            notes.append(f"missing_listing_mappings={missing_mappings}")
-
         return ValidationResult(
             passed=failures == 0,
-            total_checked=3,
+            total_checked=2,
             failures=failures,
             summary="; ".join(notes),
         )
@@ -139,33 +126,14 @@ class ParityValidator:
             failures += 1
             notes.append(f"threads_missing_initiator={missing_initiator}")
 
-        source_pairs = set(
-            MessageThread.objects.filter(
-                listing__isnull=False,
-                created_by_user__isnull=False,
-            ).values_list("listing_id", "created_by_user_id")
-        )
-        target_pairs = set(
-            ListingMessageThread.objects.values_list("listing_id", "created_by_user_id")
-        )
-        mismatched_target_threads = len(source_pairs.symmetric_difference(target_pairs))
-        if mismatched_target_threads:
+        orphan_read_states = ThreadReadState.objects.filter(thread__isnull=True).count()
+        if orphan_read_states:
             failures += 1
-            notes.append(f"messaging_thread_mismatch={mismatched_target_threads}")
-
-        orphan_target_watchlists = ListingWatchlistItem.objects.filter(listing__isnull=True).count()
-        if orphan_target_watchlists:
-            failures += 1
-            notes.append(f"orphan_target_watchlists={orphan_target_watchlists}")
-
-        orphan_target_threads = ListingMessageThread.objects.filter(listing__isnull=True).count()
-        if orphan_target_threads:
-            failures += 1
-            notes.append(f"orphan_target_threads={orphan_target_threads}")
+            notes.append(f"orphan_thread_read_states={orphan_read_states}")
 
         return ValidationResult(
             passed=failures == 0,
-            total_checked=5,
+            total_checked=3,
             failures=failures,
             summary="; ".join(notes),
         )
@@ -199,6 +167,39 @@ class ParityValidator:
     def validate_discover_contract(self) -> ValidationResult:
         scanner = DiscoverComplianceScanner()
         passed, violations = scanner.scan()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
+        )
+
+    def validate_cleanup_listing_dependencies(self) -> ValidationResult:
+        scanner = CleanupComplianceScanner()
+        passed, violations = scanner.scan_listing_model_dependencies()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
+        )
+
+    def validate_cleanup_messaging_dependencies(self) -> ValidationResult:
+        scanner = CleanupComplianceScanner()
+        passed, violations = scanner.scan_messaging_watchlist_legacy_fields()
+        failures = len(violations)
+        return ValidationResult(
+            passed=passed,
+            total_checked=max(failures, 1),
+            failures=failures,
+            summary="; ".join(violations),
+        )
+
+    def validate_cleanup_role_org_dependencies(self) -> ValidationResult:
+        scanner = CleanupComplianceScanner()
+        passed, violations = scanner.scan_role_org_dependencies()
         failures = len(violations)
         return ValidationResult(
             passed=passed,

@@ -2,210 +2,112 @@
 
 ## Overview
 
-This spec executes in two sequential phases:
+This spec executes in two phases:
 
-1. **Application Migration Phase** — Convert all production code from legacy models (`DemandPost`, `SupplyLot`, `Organization`, old `WatchlistItem`, old `MessageThread`) to target models (`Listing`, `ListingWatchlistItem`, `ListingMessageThread`). No models are removed yet.
-2. **Schema Cleanup Phase** — Advance to CP5, apply destructive Django migrations to drop legacy tables, remove compatibility shims, and finalize the codebase.
+1. **Final Application Convergence (reversible)**  
+   Move all production paths to canonical models/fields:
+   - `Listing`
+   - listing-centric `MessageThread`
+   - listing-centric `WatchlistItem`
 
-The phases must be executed in order. Phase 1 is fully reversible. Phase 2 is not.
+2. **Irreversible Cleanup (CP5)**  
+   After CP4 gates pass and preflight safety checks complete, advance to CP5 and apply destructive schema cleanup.
 
-## Dependency Alignment
+## Final Canonical Model Decisions
 
-- All six foundation specs must be `EXEC` before this spec begins.
-- The migration control framework (Feature 1) gates CP5 behind confirmed parity reports.
-- `migration_validate --scope all` must produce all-passing reports before Phase 2 begins.
+- `Listing` remains canonical listing entity.
+- `MessageThread` remains canonical thread table/name, but only listing-centric fields survive:
+  - keep: `listing`, `created_by_user`, `created_at`
+  - remove legacy participant/linkage fields: `buyer`, `supplier`, `watchlist_item`
+- `WatchlistItem` remains canonical watchlist table/name, but only listing-centric fields survive:
+  - keep: `user`, `listing`, `status`, `source`, timestamps
+  - remove legacy split FKs: `supply_lot`, `demand_post`
+- `ThreadReadState` is retained and points to canonical listing-centric `MessageThread`.
 
-## Architecture
+This avoids unnecessary churn/renames while matching roadmap semantics.
 
-```
-Phase 1: Application Migration
-  ┌─────────────────────────────────────────────────────────┐
-  │  Views          Forms         Templates     Helpers      │
-  │  (listing_*)    (ListingForm) (listing_*)   (matching,   │
-  │                                              vector)     │
-  │         All query Listing directly (no DemandPost/Lot)  │
-  └─────────────────────────────────────────────────────────┘
+## Dependency and Gate Alignment
 
-Phase 2: Schema Cleanup (CP5)
-  ┌─────────────────────────────────────────────────────────┐
-  │  migration_cutover --to CP5                             │
-  │  Django migration drops legacy tables                   │
-  │  Remove compatibility shims                             │
-  │  Remove User.role, Organization                         │
-  └─────────────────────────────────────────────────────────┘
-```
+- Must run after Features 1–6 are `EXEC`.
+- CP4 required before CP5.
+- Required passing parity scopes before CP5:
+  - `counts`, `relationships`, `identity`, `listing`, `permission`, `messaging`, `discover`
+- CP5 safety preflight required:
+  - verified database backup/snapshot
+  - reviewed destructive migration plan
 
-## Phase 1: Application Migration
+## Architecture Changes
 
-### View Conversion Strategy
+### Application Convergence
 
-The existing listing flows map cleanly to the unified model:
+- Remove remaining legacy `DemandPost` / `SupplyLot` production-path usage.
+- Keep existing route names where practical, but handlers query `Listing`.
+- Convert matching/suggestion and vector index orchestration to listing-only paths.
+- Convert discover/suggestion/watchlist/thread flows to canonical listing-centric `MessageThread`/`WatchlistItem` usage.
 
-| Legacy View | Target View | Change |
-|---|---|---|
-| `demand_post_list` | `demand_post_list` (renamed eventually) | Query `Listing.objects.filter(type=DEMAND, created_by_user=user)` |
-| `supply_lot_list` | `supply_lot_list` (renamed eventually) | Query `Listing.objects.filter(type=SUPPLY, created_by_user=user)` |
-| `demand_post_create` | same | Create `Listing(type=DEMAND, created_by_user=request.user)` |
-| `supply_lot_create` | same | Create `Listing(type=SUPPLY, created_by_user=request.user)` |
-| `demand_post_edit` | same | Edit `Listing` object |
-| `supply_lot_edit` | same | Edit `Listing` object |
-| `demand_post_toggle` | same | Toggle `Listing.status` |
-| `supply_lot_toggle` | same | Toggle `Listing.status` |
-| `demand_post_delete` | same | Soft-delete `Listing.status = DELETED` |
-| `supply_lot_delete` | same | Soft-delete `Listing.status = DELETED` |
-| `demand_post_detail` | same | Fetch `Listing` by pk |
-| `supply_lot_detail` | same | Fetch `Listing` by pk |
+### Compliance Blocking
 
-**Note:** URL names and view names are NOT changed in this spec (per Requirement 8.4). URL/nav restructuring is deferred to the UI derolification spec.
+Add/extend structural compliance scanners used by migration parity:
+- No production-path `DemandPost`/`SupplyLot` dependencies.
+- No production-path `User.role`/`Organization` dependencies.
+- No legacy `MessageThread` fields (`buyer/supplier/watchlist_item`) read/write in production flows.
+- No legacy `WatchlistItem` fields (`supply_lot/demand_post`) read/write in production flows.
 
-### Form Conversion Strategy
+Any violation fails parity and blocks CP5.
 
-Replace `DemandPostForm` and `SupplyLotForm` with type-aware `ListingForm` variants:
+### Command/Module Integrity
 
-```python
-class ListingForm(forms.ModelForm):
-    class Meta:
-        model = Listing
-        fields = [...]  # shared fields
+- Remove runtime compatibility behavior from production paths.
+- Before deleting shim modules, update management commands so they do not import removed modules.
+- Kept commands must run with explicit post-cleanup behavior.
+- Intentionally retired commands must fail clearly with deprecation guidance.
 
-class SupplyListingForm(ListingForm):
-    # supply-specific fields: shipping_scope, price_value, price_unit, quantity, unit
+## Cleanup Migration Strategy
 
-class DemandListingForm(ListingForm):
-    # demand-specific fields: radius_km, frequency, quantity, unit
-```
+Perform destructive cleanup in a tightly sequenced window:
 
-The `Organization` FK requirement in `DemandPostForm` is dropped entirely. `demand_post_create` no longer needs the `Organization` existence guard introduced in Feature 4 — `Listing` has no organization FK.
+1. Preflight complete (backup + parity + plan review).
+2. Advance to CP5.
+3. Apply cleanup migration set:
+   - remove `User.role`
+   - drop `Organization`
+   - drop `DemandPost` / `SupplyLot`
+   - remove legacy columns/FKs from `MessageThread` and `WatchlistItem`
+   - ensure `ThreadReadState.thread` references canonical listing-centric `MessageThread`
+   - finalize `DismissedSuggestion` to listing FK only
+4. Run post-migration parity/health/test checks.
 
-### Messaging Conversion
-
-`ListingMessageThread` (target model, added in Feature 1) replaces the legacy `MessageThread`:
-
-| Legacy Field | Target Field |
-|---|---|
-| `MessageThread.buyer` | `ListingMessageThread.created_by_user` (the non-owner initiator) |
-| `MessageThread.supplier` | derivable as `thread.listing.created_by_user` |
-| `MessageThread.watchlist_item` | Not needed — `(listing, user)` pair is the relationship |
-
-The inbox view and thread detail view will query `ListingMessageThread` and derive participant identity from listing ownership.
-
-**ThreadReadState** will be updated to reference `ListingMessageThread` instead of `MessageThread`. The existing `ThreadReadState` model requires a FK swap via migration.
-
-### Watchlist Conversion
-
-`ListingWatchlistItem` replaces the legacy `WatchlistItem`:
-
-| Legacy Field | Target Field |
-|---|---|
-| `WatchlistItem.supply_lot` | `ListingWatchlistItem.listing` (type=SUPPLY) |
-| `WatchlistItem.demand_post` | `ListingWatchlistItem.listing` (type=DEMAND) |
-| `WatchlistItem.user` | `ListingWatchlistItem.user` |
-| `WatchlistItem.status` | `ListingWatchlistItem.status` |
-| `WatchlistItem.source` | `ListingWatchlistItem.source` |
-
-### Matching and Vector Search Conversion
-
-- `matching.py` queries `Listing.objects.filter(type=SUPPLY/DEMAND)` instead of `SupplyLot`/`DemandPost`.
-- `vector_search.py` already operates on PKs; the sidecar service is model-agnostic. The index/remove calls use `Listing` PKs directly.
-- `bulk_suggestion_counts()` operates on `Listing` querysets instead of separate supply/demand sets.
-
-### Organization and User.role Removal
-
-- All `request.user.organization` references are removed (the guard in `demand_post_create` introduced in Feature 4 is removed since `Listing` has no organization FK).
-- All `user.role` comparisons (remaining in dashboard and discover branching) are removed.
-- `Role` enum import removed from `views.py` and all other files.
-- `Organization` FK removed from `DemandPost` (already being removed with the model itself).
-
-## Phase 2: Schema Cleanup
-
-### CP5 Gate Sequence
-
-```
-1. Run: manage.py migration_validate --scope all --fail-on-error
-2. All gates pass → run: manage.py migration_cutover --to CP5
-3. CP5 advanced → apply cleanup migration
-4. Remove shim code
-```
-
-### Cleanup Django Migration
-
-A single migration handles all legacy table drops:
-
-```python
-# marketplace/migrations/XXXX_drop_legacy_models.py
-operations = [
-    # Remove FKs first (ThreadReadState references MessageThread)
-    migrations.AlterField('ThreadReadState', 'thread', ...),  # re-point to ListingMessageThread
-    # Drop legacy tables
-    migrations.DeleteModel('MessageThread'),
-    migrations.DeleteModel('WatchlistItem'),
-    migrations.DeleteModel('DismissedSuggestion'),  # if backed by legacy FKs
-    migrations.DeleteModel('DemandPost'),
-    migrations.DeleteModel('SupplyLot'),
-    migrations.DeleteModel('Organization'),
-    # Remove User.role
-    migrations.RemoveField('User', 'role'),
-]
-```
-
-`MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, and `ParityReport` are **not** dropped — they serve as permanent migration audit records.
-
-### Shim Code Removal
-
-Files to delete entirely after Phase 2:
-- `marketplace/migration_control/compatibility.py`
-- `marketplace/migration_control/listings.py`
-- `marketplace/migration_control/backfill.py` (backfill engine no longer needed)
-- `marketplace/migration_control/identity.py` (identity adapter no longer needed)
-
-Files to update (remove dual-write logic):
-- `marketplace/signals.py` — remove dual-write signal handlers; retain app-ready signal wiring if needed
-- `marketplace/apps.py` — remove signal registration for dual-write
-
-Files to retain:
-- `marketplace/migration_control/state.py`
-- `marketplace/migration_control/checkpoints.py`
-- `marketplace/migration_control/parity.py`
-- `marketplace/migration_control/permissions.py`
-
-### DismissedSuggestion Handling
-
-`DismissedSuggestion` currently has `supply_lot` and `demand_post` FKs. Options:
-1. Migrate it to a `listing` FK on `Listing` (preferred — preserves dismissal data)
-2. Drop and recreate it with the new FK
-
-The preferred approach is a migration that adds `listing` FK to `DismissedSuggestion`, backfills from legacy FKs, then removes the old FKs. This can be bundled into the backfill step in Phase 1.
+`MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, and `ParityReport` remain as audit artifacts.
 
 ## Error Handling
 
-| Error Type | Condition | Recovery |
+| Error | Condition | Recovery |
 |---|---|---|
-| `ParityGateFailure` | Parity reports not all passing at CP4 | Run `migration_validate` and remediate before proceeding |
-| `CP5AdvancementBlocked` | CP4 not achieved before CP5 attempt | Advance through CP4 first |
-| `LegacyReferenceRemaining` | Production code still imports DemandPost/SupplyLot | Treat as blocking; find and fix all references before applying cleanup migration |
-| `MigrationRollbackAttempt` | Attempt to reverse cleanup migration | Not supported; full restore requires a database backup |
+| `ParityGateFailure` | Any required scope failing | Remediate and rerun validation before CP5 |
+| `PreflightSafetyFailure` | Missing backup or plan review | Block CP5 |
+| `CleanupMigrationFailure` | Error after CP5 advancement | Restore from preflight backup |
+| `LegacyDependencyViolation` | Scanner detects legacy production dependency | Block CP5 until fixed |
 
 ## Testing Strategy
 
-### Phase 1 Tests (before schema cleanup)
-- Listing CRUD via unified Listing model (create, edit, toggle, delete)
-- Listing list views return correct `type`-filtered results
-- Listing detail shows correct supply-only / demand-only fields
-- Messaging flows via `ListingMessageThread`
-- Watchlist flows via `ListingWatchlistItem`
-- Permission service continues to function (Feature 4 behavior preserved)
+### Before CP5
 
-### Phase 2 Tests (after schema cleanup)
-- `User.role` field does not exist (AttributeError on access)
-- `Organization` model does not exist (ImportError on import)
-- `DemandPost`, `SupplyLot` models do not exist
-- All previously passing tests continue to pass after legacy model removal
+- Full regression suite green.
+- Explicit compliance scanner coverage for:
+  - listing legacy dependencies
+  - role/org dependencies
+  - thread/watchlist legacy-field dependencies
 
-### Regression Guard
-- Full test suite must pass after Phase 1 before Phase 2 begins
-- Full test suite must pass after Phase 2 completes
+### After CP5 + Cleanup Migration
+
+- Full regression suite green.
+- Migration/command smoke tests for retained command set.
+- Assertions:
+  - `User.role` and `Organization` absent
+  - no `DemandPost`/`SupplyLot` production dependencies
+  - messaging/watchlist flows work on canonical listing-centric schemas
 
 ## Scope Boundaries
 
-- **In scope:** Application code migration to unified models, legacy model removal, shim removal, schema cleanup migration.
-- **Out of scope:** URL restructuring, navigation redesign, UI language changes, new features, profile image, email verification, radius filtering.
+- In scope: final migration convergence, destructive cleanup, compatibility retirement.
+- Out of scope: new product features, marketplace transactions, major IA/URL redesign.

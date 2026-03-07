@@ -56,9 +56,7 @@ def get_unread_thread_count(user):
     ).order_by("-created_at").values("created_at")[:1]
 
     return MessageThread.objects.filter(
-        Q(buyer=user)
-        | Q(supplier=user)
-        | Q(created_by_user=user)
+        Q(created_by_user=user)
         | Q(listing__created_by_user=user),
     ).annotate(
         last_other_message_at=Subquery(last_other_msg_sq),

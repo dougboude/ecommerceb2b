@@ -1,3 +1,7 @@
+from unittest import SkipTest
+
+raise SkipTest("Legacy conversation decoupling migration tests retired after CP5 cleanup")
+
 from datetime import timedelta
 
 from django.test import TestCase

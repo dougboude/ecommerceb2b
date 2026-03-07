@@ -6,56 +6,53 @@
 {% block content %}
 <h1>{% trans "Dashboard" %}</h1>
 
-{% if user.role == "buyer" %}
-    <section>
-        <h2>{% trans "Your Wanted Listings" %}</h2>
-        {% if demand_posts %}
-        <div class="card-grid">
-            {% for post in demand_posts %}
-            <a href="{% url 'marketplace:demand_post_detail' post.pk %}" class="tile">
-                <div class="tile-title">{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</div>
-                <span class="status status-{{ post.status }}">{{ post.get_status_display }}</span>
-                {% if post.quantity_value %}<div class="tile-meta">{{ post.quantity_value }} {{ post.get_quantity_unit_display }}</div>{% endif %}
-                {% if post.category %}<div class="tile-meta">{{ post.get_category_display }}</div>{% endif %}
-                <div class="tile-meta">{{ post.get_location_country_display|default:post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}</div>
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="empty-state">{% trans "No wanted listings yet." %}</p>
-        {% endif %}
-        <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Post a Wanted Listing" %}</a>
-    </section>
+<section>
+    <h2>{% trans "Your Wanted Listings" %}</h2>
+    {% if demand_posts %}
+    <div class="card-grid">
+        {% for post in demand_posts %}
+        <a href="{% url 'marketplace:demand_post_detail' post.pk %}" class="tile">
+            <div class="tile-title">{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</div>
+            <span class="status status-{{ post.status }}">{{ post.get_status_display }}</span>
+            {% if post.quantity_value %}<div class="tile-meta">{{ post.quantity_value }} {{ post.get_quantity_unit_display }}</div>{% endif %}
+            {% if post.category %}<div class="tile-meta">{{ post.get_category_display }}</div>{% endif %}
+            <div class="tile-meta">{{ post.get_location_country_display|default:post.location_country }}{% if post.location_locality %}, {{ post.location_locality }}{% endif %}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state">{% trans "No wanted listings yet." %}</p>
+    {% endif %}
+    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Post a Wanted Listing" %}</a>
+</section>
 
-{% else %}
-    <section>
-        <h2>{% trans "Your Available Listings" %}</h2>
-        {% if supply_lots %}
-        <div class="card-grid">
-            {% for lot in supply_lots %}
-            <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}" class="tile">
-                <div class="tile-title">{{ lot.item_text }} #{{ lot.lot_number }}</div>
-                <span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>
-                {% if lot.quantity_value %}<div class="tile-meta">{{ lot.quantity_value }} {{ lot.get_quantity_unit_display }}</div>{% endif %}
-                {% if lot.category %}<div class="tile-meta">{{ lot.get_category_display }}</div>{% endif %}
-                <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="empty-state">{% trans "No available listings yet." %}</p>
-        {% endif %}
-        <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Post an Available Listing" %}</a>
-    </section>
-{% endif %}
+<section>
+    <h2>{% trans "Your Available Listings" %}</h2>
+    {% if supply_lots %}
+    <div class="card-grid">
+        {% for lot in supply_lots %}
+        <a href="{% url 'marketplace:supply_lot_detail' lot.pk %}" class="tile">
+            <div class="tile-title">{{ lot.item_text }} #{{ lot.lot_number }}</div>
+            <span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>
+            {% if lot.quantity_value %}<div class="tile-meta">{{ lot.quantity_value }} {{ lot.get_quantity_unit_display }}</div>{% endif %}
+            {% if lot.category %}<div class="tile-meta">{{ lot.get_category_display }}</div>{% endif %}
+            <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state">{% trans "No available listings yet." %}</p>
+    {% endif %}
+    <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Post an Available Listing" %}</a>
+</section>
 
 <section>
     <h2>{% trans "Suggestions" %}</h2>
     {% if suggestions %}
     {% for listing in suggestions %}
-    <div class="match-card" data-href="{% if suggestion_type == 'supply_lot' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">
+    <div class="match-card" data-href="{% if listing.suggestion_type == 'supply_lot' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}">
         <div class="match-card-details">
-            {% if suggestion_type == "supply_lot" %}
+            {% if listing.suggestion_type == "supply_lot" %}
                 <strong><a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }}</a></strong>
                 {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
                 {% if listing.category %}<span class="tile-meta">{{ listing.get_category_display }}</span>{% endif %}
@@ -76,7 +73,7 @@
             {% else %}
                 <form method="post" action="{% url 'marketplace:suggestion_save' %}" style="display:inline;">
                     {% csrf_token %}
-                    <input type="hidden" name="listing_type" value="{{ suggestion_type }}">
+                    <input type="hidden" name="listing_type" value="{{ listing.suggestion_type }}">
                     <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
                     <input type="hidden" name="next" value="{% url 'marketplace:dashboard' %}">
                     <button type="submit" class="btn btn-secondary btn-small">{% trans "Save" %}</button>
@@ -84,13 +81,13 @@
             {% endif %}
             <form method="post" action="{% url 'marketplace:suggestion_message' %}" style="display:inline;">
                 {% csrf_token %}
-                <input type="hidden" name="listing_type" value="{{ suggestion_type }}">
+                <input type="hidden" name="listing_type" value="{{ listing.suggestion_type }}">
                 <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
                 <button type="submit" class="btn btn-primary btn-small">{% trans "Message" %}</button>
             </form>
             <form method="post" action="{% url 'marketplace:suggestion_dismiss' %}" style="display:inline;">
                 {% csrf_token %}
-                <input type="hidden" name="listing_type" value="{{ suggestion_type }}">
+                <input type="hidden" name="listing_type" value="{{ listing.suggestion_type }}">
                 <input type="hidden" name="listing_pk" value="{{ listing.pk }}">
                 <input type="hidden" name="next" value="{% url 'marketplace:dashboard' %}">
                 <button type="submit" class="btn btn-secondary btn-small">{% trans "Dismiss" %}</button>
