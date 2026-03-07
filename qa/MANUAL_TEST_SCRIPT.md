@@ -21,20 +21,29 @@ or verifying a deployment.
 
 ## Setup
 
-### Option A — Fresh seed (recommended)
+### Option A — Full reset (recommended)
 
-Run this before any test session to wipe all data and load a known-good dataset:
+Starts the ecosystem, seeds the database, and rebuilds the vector index for
+semantic search. One command does everything:
+
+```bash
+bash qa/full_reset.sh
+```
+
+The embedding sidecar takes 60–90 seconds on first start (model loading).
+`full_reset.sh` waits for it automatically before seeding or indexing.
+Press **Ctrl-C** when you are done testing to stop all services.
+
+### Option B — DB reset only (ecosystem already running)
+
+If the ecosystem is already up and you just want to re-seed without restarting:
 
 ```bash
 bash qa/reset_and_seed.sh
-bash start.sh
+.venv/bin/python manage.py rebuild_vector_index
 ```
 
-`reset_and_seed.sh` applies migrations, flushes the database, and installs
-a rich set of test personas and data (see **Seed Personas** below).
-`start.sh` then launches all three services.
-
-### Option B — Start only (keep existing data)
+### Option C — Start only (keep existing data)
 
 ```bash
 bash start.sh

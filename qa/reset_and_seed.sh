@@ -2,13 +2,21 @@
 # qa/reset_and_seed.sh
 #
 # Wipe all application data, apply migrations, and install the seed dataset.
-# Run this before any manual test session to get a clean, known-good state.
+#
+# NOTE: This script resets the Django database only. It does NOT rebuild the
+# ChromaDB vector index used for semantic search on the Discover page.
+# For a complete reset (database + vector index), use qa/full_reset.sh instead.
+#
+# Use this script when:
+#   - The ecosystem is already running and you want to re-seed without restarting
+#   - You want a fast DB-only reset during development
 #
 # Usage:
 #   bash qa/reset_and_seed.sh
+#   .venv/bin/python manage.py rebuild_vector_index   # if semantic search is needed
 #
-# The application does NOT need to be stopped before running this. Django's
-# management commands are safe to run against a live SQLite dev database.
+# The application does NOT need to be stopped. Django management commands are
+# safe to run against a live SQLite dev database.
 
 set -euo pipefail
 
@@ -33,6 +41,8 @@ echo ""
 
 echo "Step 3/3 — Done."
 echo ""
-echo "The app is ready for manual testing."
-echo "Start the full ecosystem with:  bash start.sh"
+echo "Database seeded. Next steps:"
+echo "  Full reset with vector index:  bash qa/full_reset.sh"
+echo "  Start ecosystem only:          bash start.sh"
+echo "  Rebuild vector index only:     .venv/bin/python manage.py rebuild_vector_index"
 echo ""
