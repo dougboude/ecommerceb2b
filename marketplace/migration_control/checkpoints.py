@@ -127,6 +127,12 @@ class CheckpointController:
                 return "Cannot advance to CP5: missing passing cutover messaging report"
             if not self._latest_report_passed(scope="discover", stage=MigrationStage.CUTOVER):
                 return "Cannot advance to CP5: missing passing cutover discover report"
+            if not self._latest_report_passed(scope="cleanup_listing", stage=MigrationStage.CUTOVER):
+                return "Cannot advance to CP5: missing passing cutover cleanup-listing dependency report"
+            if not self._latest_report_passed(scope="cleanup_messaging", stage=MigrationStage.CUTOVER):
+                return "Cannot advance to CP5: missing passing cutover cleanup-messaging dependency report"
+            if not self._latest_report_passed(scope="cleanup_role_org", stage=MigrationStage.CUTOVER):
+                return "Cannot advance to CP5: missing passing cutover cleanup-role-org dependency report"
 
         return None
 

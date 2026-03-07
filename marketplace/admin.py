@@ -2,12 +2,10 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import (
-    DemandPost,
+    Listing,
     DismissedSuggestion,
     Message,
     MessageThread,
-    Organization,
-    SupplyLot,
     ThreadReadState,
     User,
     WatchlistItem,
@@ -51,37 +49,26 @@ class UserAdmin(BaseUserAdmin):
     )
 
 
-@admin.register(Organization)
-class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ("name", "country", "owner")
-
-
-@admin.register(DemandPost)
-class DemandPostAdmin(admin.ModelAdmin):
-    list_display = ("item_text", "organization", "status", "created_at")
-    list_filter = ("status", "category")
-
-
-@admin.register(SupplyLot)
-class SupplyLotAdmin(admin.ModelAdmin):
-    list_display = ("item_text", "created_by", "status", "available_until")
+@admin.register(Listing)
+class ListingAdmin(admin.ModelAdmin):
+    list_display = ("id", "type", "title", "status", "created_by_user", "created_at")
     list_filter = ("status", "category")
 
 
 @admin.register(WatchlistItem)
 class WatchlistItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "supply_lot", "demand_post", "status", "source", "created_at")
+    list_display = ("id", "user", "listing", "status", "source", "created_at")
     list_filter = ("status", "source")
 
 
 @admin.register(DismissedSuggestion)
 class DismissedSuggestionAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "supply_lot", "demand_post", "created_at")
+    list_display = ("id", "user", "listing", "created_at")
 
 
 @admin.register(MessageThread)
 class MessageThreadAdmin(admin.ModelAdmin):
-    list_display = ("id", "watchlist_item", "buyer", "supplier")
+    list_display = ("id", "listing", "created_by_user", "created_at")
 
 
 @admin.register(Message)

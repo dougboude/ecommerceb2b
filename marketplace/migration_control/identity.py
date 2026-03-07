@@ -2,13 +2,11 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from marketplace.migration_control.config import dual_write_enabled, get_runtime_mode
+from marketplace.migration_control.config import get_runtime_mode
 from marketplace.models import (
     BackfillAuditRecord,
     BackfillAuditStatus,
     LegacyToTargetMapping,
-    Organization,
-    Role,
     User,
 )
 
@@ -31,31 +29,13 @@ class IdentityCompatibilityAdapter:
         )
 
     def get_organization_name(self, user: User) -> str | None:
-        current = self._normalize_name(user.organization_name)
-        if current:
-            return current
-
-        try:
-            return self._normalize_name(user.organization.name)
-        except Organization.DoesNotExist:
-            return None
+        return self._normalize_name(user.organization_name)
 
     @transaction.atomic
     def update_identity(self, user: User, *, organization_name: str | None = None) -> User:
         normalized_org_name = self._normalize_name(organization_name)
         user.organization_name = normalized_org_name
         user.save(update_fields=["organization_name"])
-
-        # Keep legacy Organization shadow state until target cleanup.
-        if dual_write_enabled() and user.role == Role.BUYER:
-            if normalized_org_name:
-                org, _ = Organization.objects.get_or_create(
-                    owner=user,
-                    defaults={"name": normalized_org_name, "country": user.country, "type": ""},
-                )
-                if org.name != normalized_org_name:
-                    org.name = normalized_org_name
-                    org.save(update_fields=["name"])
 
         return user
 
@@ -67,26 +47,9 @@ class IdentityCompatibilityAdapter:
 
         for user in User.objects.all().order_by("pk"):
             processed += 1
-            legacy_org_name = None
-            try:
-                legacy_org_name = self._normalize_name(user.organization.name)
-            except Organization.DoesNotExist:
-                legacy_org_name = None
-
             existing = self._normalize_name(user.organization_name)
-
-            if existing and legacy_org_name and existing != legacy_org_name:
-                resolved = existing
-                reason = "identity_org_conflict_prefer_user_field"
-            elif existing:
-                resolved = existing
-                reason = "identity_org_kept_existing"
-            elif legacy_org_name:
-                resolved = legacy_org_name
-                reason = "identity_org_backfilled_from_legacy"
-            else:
-                resolved = None
-                reason = "identity_org_empty"
+            resolved = existing
+            reason = "identity_org_kept_existing" if existing else "identity_org_empty"
 
             user.organization_name = resolved
             user.save(update_fields=["organization_name"])
@@ -97,7 +60,7 @@ class IdentityCompatibilityAdapter:
                 target_pk=user.pk,
                 status=BackfillAuditStatus.SUCCESS,
                 reason_code=reason,
-                details={"legacy_org_name": legacy_org_name, "resolved": resolved},
+                details={"resolved": resolved},
             )
             LegacyToTargetMapping.objects.update_or_create(
                 entity_type="user",

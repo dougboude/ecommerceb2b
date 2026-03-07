@@ -8,15 +8,12 @@ from .constants import UNIT_CHOICES
 from .skin_config import DEFAULT_SKIN_SLUG
 
 
-# ---------------------------------------------------------------------------
-# Custom User Manager (email-based auth)
-# ---------------------------------------------------------------------------
-
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
         email = self.normalize_email(email)
+        extra_fields.pop("role", None)
         extra_fields.setdefault("skin", DEFAULT_SKIN_SLUG)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
@@ -26,14 +23,9 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("role", "supplier")
         extra_fields.setdefault("country", "US")
         return self.create_user(email, password, **extra_fields)
 
-
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
 
 class Role(models.TextChoices):
     BUYER = "buyer", _("Buyer")
@@ -153,40 +145,22 @@ class BackfillAuditStatus(models.TextChoices):
     SKIPPED = "skipped", _("Skipped")
 
 
-# ---------------------------------------------------------------------------
-# User
-# ---------------------------------------------------------------------------
-
 class User(AbstractUser):
     username = None
     email = models.EmailField(_("email address"), unique=True)
-    role = models.CharField(max_length=10, choices=Role.choices)
     country = models.CharField(_("country"), max_length=2)
     display_name = models.CharField(_("display name"), max_length=100, default="")
     email_verified = models.BooleanField(default=False)
-    timezone = models.CharField(
-        _("timezone"), max_length=63, default="UTC",
-    )
+    timezone = models.CharField(_("timezone"), max_length=63, default="UTC")
     distance_unit = models.CharField(
         _("distance unit"),
         max_length=2,
         choices=DistanceUnit.choices,
         default=DistanceUnit.MI,
     )
-    skin = models.CharField(
-        _("theme"),
-        max_length=20,
-        choices=Skin.choices,
-    )
-    email_on_message = models.BooleanField(
-        _("email me when I receive a message"), default=False,
-    )
-    organization_name = models.CharField(
-        _("organization name"),
-        max_length=255,
-        blank=True,
-        null=True,
-    )
+    skin = models.CharField(_("theme"), max_length=20, choices=Skin.choices)
+    email_on_message = models.BooleanField(_("email me when I receive a message"), default=False)
+    organization_name = models.CharField(_("organization name"), max_length=255, blank=True, null=True)
 
     objects = UserManager()
 
@@ -206,29 +180,6 @@ class User(AbstractUser):
         return self.display_name or self.email
 
 
-# ---------------------------------------------------------------------------
-# Organization (buyers only)
-# ---------------------------------------------------------------------------
-
-class Organization(models.Model):
-    name = models.CharField(_("name"), max_length=255)
-    type = models.CharField(_("type"), max_length=100, blank=True)
-    country = models.CharField(_("country"), max_length=2)
-    owner = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="organization",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-
-# ---------------------------------------------------------------------------
-# Location mixin (shared fields for DemandPost & SupplyLot)
-# ---------------------------------------------------------------------------
-
 class LocationMixin(models.Model):
     location_country = models.CharField(_("country"), max_length=2)
     location_locality = models.CharField(_("city / town"), max_length=255, blank=True)
@@ -241,52 +192,31 @@ class LocationMixin(models.Model):
         abstract = True
 
 
-# ---------------------------------------------------------------------------
-# Unified target Listing (additive schema for migration)
-# ---------------------------------------------------------------------------
-
 class Listing(LocationMixin):
     type = models.CharField(max_length=10, choices=ListingType.choices)
     created_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="target_listings",
+        related_name="listings",
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=20, choices=Category.choices, blank=True)
-    status = models.CharField(
-        max_length=10,
-        choices=ListingStatus.choices,
-        default=ListingStatus.ACTIVE,
-    )
+    status = models.CharField(max_length=10, choices=ListingStatus.choices, default=ListingStatus.ACTIVE)
     price_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     price_currency = models.CharField(max_length=3, blank=True)
     quantity = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     unit = models.CharField(max_length=20, choices=UNIT_CHOICES, blank=True)
     price_unit = models.CharField(max_length=20, choices=UNIT_CHOICES, blank=True)
-    shipping_scope = models.CharField(
-        max_length=20,
-        choices=ListingShippingScope.choices,
-        blank=True,
-    )
+    shipping_scope = models.CharField(max_length=20, choices=ListingShippingScope.choices, blank=True)
     radius_km = models.PositiveIntegerField(null=True, blank=True)
     frequency = models.CharField(max_length=10, choices=Frequency.choices, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
-    legacy_source_type = models.CharField(max_length=20, blank=True)
-    legacy_source_pk = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["legacy_source_type", "legacy_source_pk"],
-                condition=models.Q(legacy_source_type__gt="", legacy_source_pk__isnull=False),
-                name="unique_listing_legacy_source",
-            ),
-        ]
 
     def clean(self):
         super().clean()
@@ -313,13 +243,13 @@ class Listing(LocationMixin):
     def item_text(self):
         return self.title
 
+    @item_text.setter
+    def item_text(self, value):
+        self.title = value
+
     @property
     def available_until(self):
         return self.expires_at if self.type == ListingType.SUPPLY else None
-
-    @property
-    def asking_price(self):
-        return self.price_value if self.type == ListingType.SUPPLY else None
 
     @property
     def quantity_value(self):
@@ -329,6 +259,21 @@ class Listing(LocationMixin):
     def quantity_unit(self):
         return self.unit
 
+    def get_quantity_unit_display(self):
+        return self.get_unit_display()
+
+    @property
+    def asking_price(self):
+        return self.price_value if self.type == ListingType.SUPPLY else None
+
+    @asking_price.setter
+    def asking_price(self, value):
+        self.price_value = value
+
+    @property
+    def shipping_allowed(self):
+        return True
+
     @property
     def created_by(self):
         return self.created_by_user
@@ -337,189 +282,30 @@ class Listing(LocationMixin):
         return self.title
 
 
-# ---------------------------------------------------------------------------
-# DemandPost (buyer)
-# ---------------------------------------------------------------------------
-
-class DemandPost(LocationMixin):
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        related_name="demand_posts",
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="demand_posts",
-    )
-    item_text = models.CharField(_("item description"), max_length=500)
-    category = models.CharField(
-        max_length=20,
-        choices=Category.choices,
-        blank=True,
-    )
-    quantity_value = models.PositiveIntegerField(
-        _("quantity"), null=True, blank=True,
-    )
-    quantity_unit = models.CharField(
-        _("unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
-    )
-    frequency = models.CharField(max_length=10, choices=Frequency.choices)
-    radius_km = models.PositiveIntegerField(null=True, blank=True)
-    shipping_allowed = models.BooleanField(default=False)
-    notes = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=10,
-        choices=DemandStatus.choices,
-        default=DemandStatus.ACTIVE,
-    )
-    expires_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return self.item_text
-
-
-# ---------------------------------------------------------------------------
-# SupplyLot (supplier)
-# ---------------------------------------------------------------------------
-
-class SupplyLot(LocationMixin):
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="supply_lots",
-    )
-    item_text = models.CharField(_("item description"), max_length=500)
-    category = models.CharField(
-        max_length=20,
-        choices=Category.choices,
-        blank=True,
-    )
-    quantity_value = models.PositiveIntegerField(
-        _("quantity"), null=True, blank=True,
-    )
-    quantity_unit = models.CharField(
-        _("unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
-    )
-    available_until = models.DateTimeField(_("available until"))
-    shipping_scope = models.CharField(
-        _("shipping scope"),
-        max_length=20,
-        choices=ShippingScope.choices,
-        default=ShippingScope.LOCAL_ONLY,
-    )
-    asking_price = models.PositiveIntegerField(
-        _("asking price"), null=True, blank=True,
-    )
-    price_unit = models.CharField(
-        _("price unit"), max_length=20, choices=UNIT_CHOICES, blank=True,
-    )
-    notes = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=10,
-        choices=SupplyStatus.choices,
-        default=SupplyStatus.ACTIVE,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return self.item_text
-
-
-# ---------------------------------------------------------------------------
-# WatchlistItem
-# ---------------------------------------------------------------------------
-
 class WatchlistItem(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="watchlist_items",
-    )
-    supply_lot = models.ForeignKey(
-        SupplyLot, on_delete=models.CASCADE, related_name="watchlist_items",
-        null=True, blank=True,
-    )
-    demand_post = models.ForeignKey(
-        DemandPost, on_delete=models.CASCADE, related_name="watchlist_items",
-        null=True, blank=True,
-    )
-    status = models.CharField(
-        max_length=10, choices=WatchlistStatus.choices,
-        default=WatchlistStatus.WATCHING,
-    )
-    source = models.CharField(
-        max_length=10, choices=WatchlistSource.choices,
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="watchlist_items")
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="watchlist_items")
+    status = models.CharField(max_length=10, choices=WatchlistStatus.choices, default=WatchlistStatus.WATCHING)
+    source = models.CharField(max_length=10, choices=WatchlistSource.choices)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-updated_at"]
         constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(supply_lot__isnull=False, demand_post__isnull=True)
-                    | models.Q(supply_lot__isnull=True, demand_post__isnull=False)
-                ),
-                name="watchlist_exactly_one_listing",
-            ),
-            models.UniqueConstraint(
-                fields=["user", "supply_lot"],
-                condition=models.Q(supply_lot__isnull=False),
-                name="unique_user_supply_lot",
-            ),
-            models.UniqueConstraint(
-                fields=["user", "demand_post"],
-                condition=models.Q(demand_post__isnull=False),
-                name="unique_user_demand_post",
-            ),
+            models.UniqueConstraint(fields=["user", "listing"], name="unique_user_listing"),
         ]
 
     def __str__(self):
-        listing = self.supply_lot or self.demand_post
-        return f"Watchlist: {listing}"
-
-    @property
-    def listing(self):
-        return self.supply_lot or self.demand_post
+        return f"Watchlist: {self.listing}"
 
     @property
     def thread(self):
-        thread = self.threads.order_by("-created_at").first()
-        if thread:
-            return thread
-        if self.supply_lot_id:
-            listing = Listing.objects.filter(
-                legacy_source_type="supply_lot",
-                legacy_source_pk=self.supply_lot_id,
-            ).first()
-        elif self.demand_post_id:
-            listing = Listing.objects.filter(
-                legacy_source_type="demand_post",
-                legacy_source_pk=self.demand_post_id,
-            ).first()
-        else:
-            listing = None
-        if not listing:
-            return None
-        return MessageThread.objects.filter(
-            listing=listing,
-            created_by_user=self.user,
-        ).order_by("-created_at").first()
+        return MessageThread.objects.filter(listing=self.listing, created_by_user=self.user).order_by("-created_at").first()
 
+    def resolve_listing(self):
+        return self.listing
 
-# ---------------------------------------------------------------------------
-# DismissedSuggestion
-# ---------------------------------------------------------------------------
 
 class DismissedSuggestion(models.Model):
     user = models.ForeignKey(
@@ -527,77 +313,27 @@ class DismissedSuggestion(models.Model):
         on_delete=models.CASCADE,
         related_name="dismissed_suggestions",
     )
-    supply_lot = models.ForeignKey(
-        SupplyLot, on_delete=models.CASCADE,
-        null=True, blank=True,
-    )
-    demand_post = models.ForeignKey(
-        DemandPost, on_delete=models.CASCADE,
-        null=True, blank=True,
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="dismissed_suggestions",
+        null=True,
+        blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(supply_lot__isnull=False, demand_post__isnull=True)
-                    | models.Q(supply_lot__isnull=True, demand_post__isnull=False)
-                ),
-                name="dismissed_exactly_one_listing",
-            ),
-            models.UniqueConstraint(
-                fields=["user", "supply_lot"],
-                condition=models.Q(supply_lot__isnull=False),
-                name="unique_dismissed_supply_lot",
-            ),
-            models.UniqueConstraint(
-                fields=["user", "demand_post"],
-                condition=models.Q(demand_post__isnull=False),
-                name="unique_dismissed_demand_post",
-            ),
+            models.UniqueConstraint(fields=["user", "listing"], name="unique_dismissed_listing"),
         ]
 
 
-# ---------------------------------------------------------------------------
-# MessageThread & Message
-# ---------------------------------------------------------------------------
-
 class MessageThread(models.Model):
-    watchlist_item = models.ForeignKey(
-        WatchlistItem,
-        on_delete=models.SET_NULL,
-        related_name="threads",
-        null=True,
-        blank=True,
-    )
-    buyer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        related_name="buyer_threads",
-        null=True,
-        blank=True,
-    )
-    supplier = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        related_name="supplier_threads",
-        null=True,
-        blank=True,
-    )
-    listing = models.ForeignKey(
-        Listing,
-        on_delete=models.SET_NULL,
-        related_name="message_threads",
-        null=True,
-        blank=True,
-    )
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="message_threads")
     created_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="created_message_threads",
-        null=True,
-        blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -605,47 +341,21 @@ class MessageThread(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["listing", "created_by_user"],
-                condition=models.Q(listing__isnull=False, created_by_user__isnull=False),
                 name="unique_message_thread_per_listing_initiator",
             ),
         ]
 
     def get_listing(self):
-        if self.listing_id:
-            return self.listing
-        if self.watchlist_item_id:
-            return self.watchlist_item.supply_lot or self.watchlist_item.demand_post
-        return None
+        return self.listing
 
     def get_initiator(self):
-        if self.created_by_user_id:
-            return self.created_by_user
-        if self.watchlist_item_id:
-            return self.watchlist_item.user
-        if self.buyer_id and self.supplier_id:
-            # Legacy fallback; no deterministic initiator in old schema.
-            return self.buyer
-        return None
+        return self.created_by_user
 
     def get_owner(self):
-        listing = self.get_listing()
-        if listing is None:
-            return None
-        return getattr(listing, "created_by_user", None) or getattr(listing, "created_by", None)
+        return self.listing.created_by_user
 
     def participant_ids(self):
-        ids = set()
-        owner = self.get_owner()
-        initiator = self.get_initiator()
-        if owner:
-            ids.add(owner.pk)
-        if initiator:
-            ids.add(initiator.pk)
-        if self.buyer_id:
-            ids.add(self.buyer_id)
-        if self.supplier_id:
-            ids.add(self.supplier_id)
-        return ids
+        return {self.created_by_user_id, self.listing.created_by_user_id}
 
     def is_participant(self, user_id):
         return user_id in self.participant_ids()
@@ -653,32 +363,18 @@ class MessageThread(models.Model):
     def counterparty_for(self, user):
         owner = self.get_owner()
         initiator = self.get_initiator()
-        if owner and initiator:
-            return owner if user.pk == initiator.pk else initiator
-        if self.buyer_id and self.supplier_id:
-            return self.supplier if user.pk == self.buyer_id else self.buyer
-        return None
+        return owner if user.pk == initiator.pk else initiator
 
     def is_supply_thread(self):
-        listing = self.get_listing()
-        if listing is None:
-            return bool(self.watchlist_item_id and self.watchlist_item.supply_lot_id)
-        listing_type = getattr(listing, "type", None)
-        if listing_type:
-            return listing_type == ListingType.SUPPLY
-        return hasattr(listing, "shipping_scope")
+        return self.listing.type == ListingType.SUPPLY
 
     def __str__(self):
         return f"Thread #{self.pk}"
 
 
 class Message(models.Model):
-    thread = models.ForeignKey(
-        MessageThread, on_delete=models.CASCADE, related_name="messages",
-    )
-    sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-    )
+    thread = models.ForeignKey(MessageThread, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -689,66 +385,34 @@ class Message(models.Model):
         return f"Message #{self.pk}"
 
 
-# ---------------------------------------------------------------------------
-# ThreadReadState (per-user read tracking)
-# ---------------------------------------------------------------------------
-
 class ThreadReadState(models.Model):
-    thread = models.ForeignKey(
-        MessageThread, on_delete=models.CASCADE, related_name="read_states",
-    )
+    thread = models.ForeignKey(MessageThread, on_delete=models.CASCADE, related_name="read_states")
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         related_name="thread_read_states",
     )
     last_read_at = models.DateTimeField()
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["thread", "user"],
-                name="unique_thread_read_state",
-            ),
+            models.UniqueConstraint(fields=["thread", "user"], name="unique_thread_read_state"),
         ]
 
     def __str__(self):
         return f"ReadState thread={self.thread_id} user={self.user_id}"
 
 
-# ---------------------------------------------------------------------------
-# Migration control-plane persistence models
-# ---------------------------------------------------------------------------
-
 class MigrationState(models.Model):
-    """
-    Persisted migration control state so deploy/restart remains checkpoint-safe.
-    """
-
     name = models.CharField(max_length=50, unique=True, default="default")
-    mode = models.CharField(
-        max_length=20,
-        choices=MigrationMode.choices,
-        default=MigrationMode.LEGACY,
-    )
-    stage = models.CharField(
-        max_length=20,
-        choices=MigrationStage.choices,
-        default=MigrationStage.SCHEMA,
-    )
+    mode = models.CharField(max_length=20, choices=MigrationMode.choices, default=MigrationMode.LEGACY)
+    stage = models.CharField(max_length=20, choices=MigrationStage.choices, default=MigrationStage.SCHEMA)
     checkpoint = models.CharField(max_length=10, default="CP0")
     checkpoint_order = models.PositiveSmallIntegerField(default=0)
     dual_write_enabled = models.BooleanField(default=False)
     dual_read_enabled = models.BooleanField(default=False)
-    read_canonical = models.CharField(
-        max_length=10,
-        choices=CanonicalSource.choices,
-        default=CanonicalSource.LEGACY,
-    )
-    write_canonical = models.CharField(
-        max_length=10,
-        choices=CanonicalSource.choices,
-        default=CanonicalSource.LEGACY,
-    )
+    read_canonical = models.CharField(max_length=10, choices=CanonicalSource.choices, default=CanonicalSource.LEGACY)
+    write_canonical = models.CharField(max_length=10, choices=CanonicalSource.choices, default=CanonicalSource.LEGACY)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -760,17 +424,11 @@ class MigrationState(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"MigrationState({self.name} "
-            f"mode={self.mode} checkpoint={self.checkpoint})"
-        )
+        return f"MigrationState({self.name} mode={self.mode} checkpoint={self.checkpoint})"
 
 
 class LegacyToTargetMapping(models.Model):
-    entity_type = models.CharField(
-        max_length=20,
-        choices=MigrationEntityType.choices,
-    )
+    entity_type = models.CharField(max_length=20, choices=MigrationEntityType.choices)
     legacy_pk = models.PositiveIntegerField()
     target_pk = models.PositiveIntegerField()
     mapping_version = models.PositiveIntegerField(default=1)
@@ -778,10 +436,7 @@ class LegacyToTargetMapping(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["entity_type", "legacy_pk"],
-                name="unique_legacy_to_target_mapping",
-            ),
+            models.UniqueConstraint(fields=["entity_type", "legacy_pk"], name="unique_legacy_to_target_mapping"),
         ]
 
     def __str__(self):
@@ -789,16 +444,10 @@ class LegacyToTargetMapping(models.Model):
 
 
 class BackfillAuditRecord(models.Model):
-    entity_type = models.CharField(
-        max_length=20,
-        choices=MigrationEntityType.choices,
-    )
+    entity_type = models.CharField(max_length=20, choices=MigrationEntityType.choices)
     source_pk = models.PositiveIntegerField()
     target_pk = models.PositiveIntegerField(null=True, blank=True)
-    status = models.CharField(
-        max_length=10,
-        choices=BackfillAuditStatus.choices,
-    )
+    status = models.CharField(max_length=10, choices=BackfillAuditStatus.choices)
     reason_code = models.CharField(max_length=100, blank=True, null=True)
     details = models.JSONField(default=dict, blank=True)
     migrated_at = models.DateTimeField(auto_now_add=True)
@@ -810,17 +459,11 @@ class BackfillAuditRecord(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"BackfillAuditRecord({self.entity_type}:{self.source_pk} "
-            f"status={self.status})"
-        )
+        return f"BackfillAuditRecord({self.entity_type}:{self.source_pk} status={self.status})"
 
 
 class ParityReport(models.Model):
-    stage = models.CharField(
-        max_length=20,
-        choices=MigrationStage.choices,
-    )
+    stage = models.CharField(max_length=20, choices=MigrationStage.choices)
     scope = models.CharField(max_length=100)
     passed = models.BooleanField(default=False)
     total_checked = models.PositiveIntegerField(default=0)
@@ -835,62 +478,4 @@ class ParityReport(models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"ParityReport(stage={self.stage} scope={self.scope} "
-            f"passed={self.passed})"
-        )
-
-
-class ListingWatchlistItem(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="target_watchlist_items",
-    )
-    listing = models.ForeignKey(
-        Listing,
-        on_delete=models.CASCADE,
-        related_name="target_watchlist_items",
-    )
-    status = models.CharField(
-        max_length=10,
-        choices=WatchlistStatus.choices,
-        default=WatchlistStatus.WATCHING,
-    )
-    source = models.CharField(max_length=10, choices=WatchlistSource.choices)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "listing"],
-                name="unique_user_target_listing_watchlist",
-            ),
-        ]
-        ordering = ["-updated_at"]
-
-
-class ListingMessageThread(models.Model):
-    listing = models.ForeignKey(
-        Listing,
-        on_delete=models.CASCADE,
-        related_name="target_threads",
-    )
-    created_by_user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="target_created_threads",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["listing", "created_by_user"],
-                name="unique_target_thread_per_listing_initiator",
-            ),
-        ]
-
-    def __str__(self):
-        return f"TargetThread listing={self.listing_id} initiator={self.created_by_user_id}"
+        return f"ParityReport(stage={self.stage} scope={self.scope} passed={self.passed})"

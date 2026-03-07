@@ -5,10 +5,12 @@ from django.utils.translation import gettext as _
 
 def send_watchlist_notification(watchlist_item):
     """Send email notification when a listing is added to watchlist via suggestion."""
-    listing = watchlist_item.listing
+    listing = watchlist_item.resolve_listing() if hasattr(watchlist_item, "resolve_listing") else watchlist_item.listing
+    if listing is None:
+        return
     user = watchlist_item.user
 
-    if watchlist_item.supply_lot:
+    if getattr(listing, "type", None) == "supply":
         subject = _("A buyer saved your listing: %(item)s") % {
             "item": listing.item_text,
         }

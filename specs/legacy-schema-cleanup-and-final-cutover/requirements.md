@@ -2,120 +2,106 @@
 
 ## Introduction
 
-This spec defines the final phase of the migration arc: converting all application code to use the unified `Listing` model, removing legacy models and role-based constructs, and executing the CP5 cleanup checkpoint. It is the culmination of the migration safety framework built in Feature 1 and the additive schema work done in Features 2–6. After this spec is executed, the codebase will have no legacy role-based models, no dual-write compatibility shims, and no `DemandPost`/`SupplyLot`/`Organization` constructs remaining.
+This spec defines the final migration phase: make unified `Listing` and listing-centric conversations/watchlists the only production architecture, then execute irreversible cleanup. It removes legacy role-based constructs and compatibility dual-read/dual-write shims while preserving product behavior.
 
 ## Dependencies
 
-- **Required predecessor specs:** All six foundation specs must be `EXEC`:
+- **Required predecessor specs:** all six foundation specs must be `EXEC`:
   - `migration-safety-and-compatibility-rails`
   - `role-agnostic-user-and-org-flattening`
   - `unified-listing-model-and-status-contract`
   - `ownership-based-permission-policy`
   - `listing-centric-messaging-and-watchlist-decoupling`
   - `discover-direction-and-visibility-contract`
-- All migration parity gates (`counts`, `relationships`, `identity`, `listing`, `permission`) must be passing at CP4 before cleanup begins.
+- CP4 must be reached before CP5.
+- All CP4 parity gates must be passing before cleanup: `counts`, `relationships`, `identity`, `listing`, `permission`, `messaging`, `discover`.
 - CP5 advancement is irreversible. Rollback to pre-cleanup state is not available after CP5 executes.
 
 ## Glossary
 
-- **Legacy Models**: `DemandPost`, `SupplyLot`, `Organization`, old `WatchlistItem` (supply_lot/demand_post FKs), old `MessageThread` (buyer/supplier FKs).
-- **Target Models**: `Listing`, `ListingWatchlistItem`, `ListingMessageThread` (and eventual renamed final forms).
-- **Compatibility Shim**: Any code whose sole purpose is maintaining dual-write or dual-read behavior during migration transition.
-- **CP5**: The cleanup checkpoint in the migration control state machine. Advancing to CP5 signals that legacy models are safe to remove.
-- **Application Migration**: The conversion of views, forms, templates, signals, and helper code from legacy models to target models.
+- **Legacy listing models**: `DemandPost`, `SupplyLot`
+- **Legacy role/org constructs**: `User.role`, `Organization`
+- **Legacy thread/watchlist linkage**: `MessageThread` fields `buyer/supplier/watchlist_item`, and `WatchlistItem` fields `supply_lot/demand_post`
+- **Canonical post-cleanup models**:
+  - `Listing`
+  - `MessageThread` (listing-centric: `listing`, `created_by_user`; unique `(listing, created_by_user)`)
+  - `WatchlistItem` (listing-centric: `user`, `listing`, status/source)
+- **Compatibility shim**: code whose only purpose is dual-read/dual-write bridging during migration
 
 ## Requirements
 
-### Requirement 1: Prerequisite Gate Enforcement
-
-**User Story:** As a platform operator, I want cleanup gated behind confirmed migration parity, so destructive model removal is never executed prematurely.
+### Requirement 1: Prerequisite and Gate Enforcement
 
 #### Acceptance Criteria
 
-1. WHEN cleanup begins, THE System SHALL verify all parity reports pass: `counts`, `relationships`, `identity`, `listing`, `permission`.
-2. WHEN any parity gate is failing, THE System SHALL block cleanup and require remediation before proceeding.
-3. WHEN the system is not at CP4, THE System SHALL block CP5 advancement.
-4. WHEN CP5 is advanced, THE System SHALL log the cutover event in migration state records.
+1. WHEN cleanup begins, THE System SHALL verify passing parity reports for `counts`, `relationships`, `identity`, `listing`, `permission`, `messaging`, and `discover`.
+2. IF any required gate is failing, THEN THE System SHALL block CP5 advancement and cleanup migration.
+3. WHEN the system is not at CP4, THEN THE System SHALL block CP5 advancement.
+4. WHEN CP5 is advanced, THEN THE System SHALL persist an explicit irreversible-cutover state transition record.
 
-### Requirement 2: Convert Application Code to Unified Listing Model
-
-**User Story:** As a maintainer, I want all views, forms, and templates to reference the unified `Listing` model, so legacy models can be safely removed.
+### Requirement 2: Convert Production Code to Unified Listing
 
 #### Acceptance Criteria
 
-1. WHEN the application code migration is complete, THE System SHALL have no view, form, template, or helper that imports or queries `DemandPost` or `SupplyLot` in a production code path.
-2. THE System SHALL convert listing creation, edit, toggle, delete, and detail views to operate on `Listing` objects.
-3. THE System SHALL convert listing list views for both supply and demand to query `Listing` filtered by `type`.
-4. THE System SHALL convert matching and suggestion logic to operate on `Listing` objects.
-5. THE System SHALL convert vector search index/remove/search calls to use `Listing` objects.
-6. IF any production code path still references `DemandPost` or `SupplyLot` after migration, THEN THE System SHALL treat that as a compliance violation blocking CP5.
+1. THE System SHALL remove production-path imports/queries of `DemandPost` and `SupplyLot`.
+2. Listing create/edit/toggle/delete/detail/list flows SHALL operate on `Listing` filtered by `type`.
+3. Matching, suggestions, and vector-search integration SHALL operate on `Listing`.
+4. IF any production path still depends on `DemandPost`/`SupplyLot`, THEN cleanup SHALL be blocked.
 
-### Requirement 3: Convert Messaging and Watchlist to Target Models
-
-**User Story:** As a maintainer, I want messaging and watchlist flows to use `ListingMessageThread` and `ListingWatchlistItem`, so legacy thread and watchlist models can be removed.
+### Requirement 3: Canonicalize Messaging and Watchlist Models
 
 #### Acceptance Criteria
 
-1. WHEN messaging flows are converted, THE System SHALL use `ListingMessageThread` for all thread creation, access, and display.
-2. WHEN watchlist flows are converted, THE System SHALL use `ListingWatchlistItem` for all watchlist save, archive, and delete operations.
-3. THE System SHALL preserve all existing user-visible messaging and watchlist behavior during and after conversion.
-4. THE System SHALL convert the inbox view, thread detail view, and watchlist view to use target model queries.
+1. Messaging flows SHALL operate on listing-centric `MessageThread` semantics (`listing`, `created_by_user`) with no participant-role FKs.
+2. Watchlist flows SHALL operate on listing-centric `WatchlistItem` semantics (`user`, `listing`) with no supply/demand split FKs.
+3. THE System SHALL preserve existing user-visible messaging/watchlist behavior.
+4. Inbox, thread detail, watchlist, discover save/unsave/message, and suggestion save/dismiss/message flows SHALL use canonical listing-centric models only.
 
-### Requirement 4: Remove User.role and Organization Model
-
-**User Story:** As a maintainer, I want `User.role` and the `Organization` model removed, so the codebase fully reflects the role-agnostic architecture.
+### Requirement 4: Remove Role and Organization Constructs
 
 #### Acceptance Criteria
 
-1. WHEN cleanup is executed, THE System SHALL remove the `role` field from the `User` model via Django migration.
-2. WHEN cleanup is executed, THE System SHALL remove the `Organization` model and its table via Django migration.
-3. THE System SHALL remove all references to `User.role`, `Role` enum, and `Organization` from production code paths.
-4. IF any code path reads or writes `User.role` after removal, THE System SHALL fail at import or migration time, not silently.
-5. THE System SHALL retain `User.organization_name` (the flat text field added in Feature 2) as the replacement for org identity.
+1. THE System SHALL remove `User.role` via migration.
+2. THE System SHALL remove `Organization` via migration.
+3. THE System SHALL remove production references to `Role` and `Organization`.
+4. `User.organization_name` SHALL remain as the org identity field.
 
-### Requirement 5: Remove Legacy Models via Django Migration
-
-**User Story:** As a maintainer, I want legacy database tables dropped cleanly, so the schema matches the target architecture without orphaned tables.
+### Requirement 5: Execute Destructive Schema Cleanup Safely
 
 #### Acceptance Criteria
 
-1. WHEN CP5 is achieved and application migration is complete, THE System SHALL apply a Django migration that drops: `DemandPost`, `SupplyLot`, `Organization`, old `WatchlistItem`, old `MessageThread`, `ThreadReadState` (if superseded).
-2. THE migration SHALL be irreversible (no `database_backwards` implementation required — this is a destructive cleanup migration).
-3. THE System SHALL remove legacy FK constraints and indexes in the same migration.
-4. THE System SHALL not remove `MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, or `ParityReport` — these are retained as permanent audit records.
+1. BEFORE CP5 advancement, THE System SHALL require:
+   - a verified pre-cleanup database backup/snapshot checkpoint
+   - a reviewed migration plan for destructive operations
+2. AFTER CP5 advancement, THE System SHALL apply an irreversible cleanup migration dropping legacy listing/role/org schemas and obsolete thread/watchlist legacy fields/tables.
+3. THE System SHALL preserve migration audit records (`MigrationState`, `LegacyToTargetMapping`, `BackfillAuditRecord`, `ParityReport`).
+4. The final state SHALL choose one `ThreadReadState` outcome and implement it consistently:
+   - retained and pointed at canonical listing-centric threads, or
+   - removed and replaced by a defined alternative.
 
-### Requirement 6: Remove Compatibility Shims
-
-**User Story:** As a maintainer, I want dual-write signals, compatibility repositories, and adapter code removed, so runtime overhead and dead code are eliminated.
-
-#### Acceptance Criteria
-
-1. WHEN legacy models are removed, THE System SHALL remove dual-write signal handlers in `marketplace/signals.py`.
-2. THE System SHALL remove `CompatibilityRepository`, `ListingCompatibilityService`, and `IdentityCompatibilityAdapter` from production code paths.
-3. THE System SHALL remove the `migration_control/compatibility.py` and `migration_control/listings.py` adapter modules.
-4. THE System SHALL retain `migration_control/state.py`, `migration_control/checkpoints.py`, `migration_control/parity.py`, and `migration_control/permissions.py` as permanent migration governance infrastructure.
-5. THE System SHALL retain all management commands (`migration_validate`, `migration_cutover`, etc.) for audit and operational use.
-
-### Requirement 7: Testing and Validation Requirements
-
-**User Story:** As a quality owner, I want full regression coverage after cleanup, so no user-visible functionality is broken by legacy model removal.
+### Requirement 6: Remove or Retire Compatibility Shims with Operational Integrity
 
 #### Acceptance Criteria
 
-1. THE System SHALL include tests verifying listing CRUD flows operate correctly on the unified `Listing` model.
-2. THE System SHALL include tests verifying messaging flows operate on `ListingMessageThread`.
-3. THE System SHALL include tests verifying watchlist flows operate on `ListingWatchlistItem`.
-4. THE System SHALL include tests verifying `User.role` and `Organization` no longer exist.
-5. IF any test references legacy model imports that no longer exist, THEN THE System SHALL fail at import time with a clear error.
+1. THE System SHALL remove dual-write/dual-read runtime shims from production paths.
+2. Any management command kept for audit/operations SHALL continue to run without importing deleted shim modules.
+3. If a command is intentionally retired post-cleanup, THEN the retirement SHALL be explicit in docs and command output.
+4. Core migration governance components (`state`, `checkpoints`, `parity`, `permission/discover compliance`) SHALL be retained.
 
-### Requirement 8: Scope Boundaries and Non-Goals
-
-**User Story:** As a product owner, I want cleanup scoped tightly to model removal, so no unrelated feature work is bundled in.
+### Requirement 7: Validation and Regression
 
 #### Acceptance Criteria
 
-1. THE System SHALL limit scope to converting application code and removing legacy models.
-2. THE System SHALL not add new product features during cleanup.
-3. THE System SHALL not change user-visible behavior beyond what is required by model conversion.
-4. THE System SHALL not redesign URL structures or navigation during this spec — that is deferred to the UI derolification spec.
-5. IF requested changes are unrelated to legacy model removal, THEN THE System SHALL defer them to a separate spec.
+1. THE System SHALL include regression tests for unified listing CRUD and listing-type-specific behavior.
+2. THE System SHALL include regression tests for listing-centric messaging/watchlist behavior.
+3. THE System SHALL include tests asserting legacy role/org constructs are gone.
+4. THE System SHALL include compliance checks that block CP5 when legacy model dependencies remain in scoped production paths.
+5. Full test suite SHALL pass before and after destructive cleanup.
+
+### Requirement 8: Scope Boundaries
+
+#### Acceptance Criteria
+
+1. Scope SHALL be limited to final migration, cleanup, and behavior-preserving refactors.
+2. No deferred marketplace features (payments, escrow, auctions/bidding, logistics) SHALL be added.
+3. URL/navigation redesign and broad copy overhaul SHALL remain out of scope for this spec.

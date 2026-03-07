@@ -209,13 +209,120 @@ Do not create new per-version status files.
   - Updated spec trackers:
     - `specs/discover-direction-and-visibility-contract/tasks.md` all tasks complete.
     - `specs/SPEC_ORDER.md` Feature 6 status updated to `REQ, DES, TASK, EXEC`.
+- Feature 7 spec set (`legacy-schema-cleanup-and-final-cutover`) was corrected for execution safety and roadmap alignment:
+  - Added missing CP4/CP5 parity scope expectations (`messaging`, `discover`) in prerequisites.
+  - Clarified canonical end-state model semantics for listing-centric `MessageThread` and `WatchlistItem`.
+  - Removed CP5 sequencing ambiguity by requiring explicit preflight backup + destructive-plan review before irreversible cutover.
+  - Resolved requirement traceability gaps and replaced invalid requirement references in `tasks.md`.
+  - Clarified `ThreadReadState` end-state and command/module retirement integrity expectations.
+  - Rewrote:
+    - `specs/legacy-schema-cleanup-and-final-cutover/requirements.md`
+    - `specs/legacy-schema-cleanup-and-final-cutover/design.md`
+    - `specs/legacy-schema-cleanup-and-final-cutover/tasks.md`
+- Feature 7 implementation (Phase 1, reversible convergence) started on branch `feat/07-legacy-schema-cleanup-and-final-cutover`:
+  - Added additive migration `marketplace/migrations/0012_remove_dismissedsuggestion_dismissed_exactly_one_listing_and_more.py`:
+    - adds `WatchlistItem.listing` and `DismissedSuggestion.listing`
+    - updates exactly-one constraints and uniqueness constraints for listing-centric compatibility
+  - Converged major runtime paths to unified `Listing`:
+    - listing CRUD/detail/toggle/delete routes now resolve canonical `Listing` by `type` with legacy-PK compatibility fallback
+    - discover keyword search now uses `Listing.title` and listing-centric filters
+    - discover/suggestion save-dismiss-message actions resolve canonical listings from either canonical or legacy payload PKs
+    - discover payload now emits legacy PK when present for behavior-preserving URL compatibility
+  - Converged suggestion/matching/vector behavior toward listing-centric reads/writes (`marketplace/matching.py`, `marketplace/vector_search.py`, `marketplace/views.py`).
+  - Restored compatibility rails required by existing migration-mode tests:
+    - `SignupForm` keeps legacy role field + buyer org-name requirement in `legacy` mode; remains role-agnostic in target/compat modes
+    - `ThreadWatchlistCoordinator.start_from_legacy_listing(...)` restored as compatibility entrypoint while routing through canonical thread/watchlist semantics
+  - Phase-1 validation executed successfully in local environment:
+    - `manage.py migrate` applied through migration `0012`
+    - `manage.py migration_backfill --scope all`
+    - `manage.py migration_validate --scope all --fail-on-error` (passing)
+    - checkpoint advanced to `CP4`
+    - full test suite passing (`manage.py test`, 94 tests)
+  - Updated Feature 7 checklist with completed Phase 1 items:
+    - prerequisites + CP4 gate checks
+    - listing flow convergence tasks 2.2/2.3
+    - canonical thread read-state and discover/suggestion canonical linkage tasks 3.3/3.4
+    - Phase 1 validation tasks 7.1/7.2
+- Feature 7 Phase 1 convergence completed in this session (branch `feat/07-legacy-schema-cleanup-and-final-cutover`):
+  - Removed production-path legacy listing model dependencies from runtime views:
+    - removed `DemandPost` / `SupplyLot` imports and legacy-row backfill lookups from `marketplace/views.py`
+    - listing routes/actions now resolve canonical `Listing` (direct PK or legacy-source mapping) without querying legacy tables
+  - Removed production-path legacy messaging/watchlist field coupling:
+    - thread/listing detail and inbox queries no longer `select_related` legacy `buyer/supplier/watchlist_item` chains
+    - watchlist rendering now uses canonical listing payload (`item.resolved_listing`) with updated template contract
+  - Finalized role-agnostic signup runtime behavior in `marketplace/forms.py`:
+    - removed role field and Role enum dependency from signup form
+    - kept compatibility write (`user.role = "supplier"`) only as schema-preserving bridge until destructive cleanup
+  - Added explicit cleanup compliance scanners + parity surfaces:
+    - new module: `marketplace/migration_control/cleanup.py`
+    - new parity methods:
+      - `validate_cleanup_listing_dependencies()`
+      - `validate_cleanup_messaging_dependencies()`
+      - `validate_cleanup_role_org_dependencies()`
+    - new command scopes in `migration_validate`:
+      - `cleanup_listing`, `cleanup_messaging`, `cleanup_role_org`
+    - CP5 gate hardening:
+      - checkpoint advancement now requires passing cutover reports for all three cleanup scopes
+      - `migration_cutover --to CP5` now emits cleanup-scope cutover reports
+  - Added regression coverage for cleanup compliance scopes:
+    - `marketplace/tests/test_cleanup_compliance.py`
+  - Updated tests to canonical listing fixture expectations where routes now require canonical listing IDs:
+    - `marketplace/tests/test_permission_policy.py`
+    - `marketplace/tests/test_discover_direction_visibility.py`
+    - `marketplace/tests/test_identity_migration.py`
+  - Validation evidence:
+    - `manage.py test` passed (`98` tests)
+    - `manage.py migration_validate --scope cleanup_listing --fail-on-error` passed
+    - `manage.py migration_validate --scope cleanup_messaging --fail-on-error` passed
+    - `manage.py migration_validate --scope cleanup_role_org --fail-on-error` passed
+- Feature 7 Phase 2 kickoff executed (irreversible window entered):
+  - Preflight backup/snapshot captured:
+    - `ai-docs/backups/db-pre-cp5-20260307-074242.sqlite3`
+  - Migration evidence captured:
+    - `ai-docs/backups/showmigrations-marketplace-20260307-074246.txt`
+  - Destructive sequencing runbook added:
+    - `ai-docs/CP5_DESTRUCTIVE_RUNBOOK.md`
+  - `migration_cutover` command fixed to correctly skip already-reached checkpoints during forward progression (allows CP4 -> CP5 without replay failure).
+  - Checkpoint advanced to `CP5` successfully:
+    - `manage.py migration_cutover --to CP5` -> `Advanced to CP5`
+  - Post-advance validation executed:
+    - `manage.py migration_validate --scope all --fail-on-error` passing at CP5
+    - `manage.py test` passing (`98` tests) with migration state at CP5/cleanup
+- Feature 7 Phase 2 destructive cleanup execution completed on branch `feat/07-legacy-schema-cleanup-and-final-cutover`:
+  - Applied destructive schema migration set:
+    - `marketplace/migrations/0013_remove_demandpost_created_by_and_more.py`
+      - removed `User.role`
+      - dropped `Organization`, `DemandPost`, `SupplyLot`
+      - removed legacy `MessageThread` fields (`buyer`, `supplier`, `watchlist_item`)
+      - removed legacy `WatchlistItem` split fields (`supply_lot`, `demand_post`)
+      - removed shadow target tables (`ListingWatchlistItem`, `ListingMessageThread`)
+    - `marketplace/migrations/0014_remove_listing_unique_listing_legacy_source_and_more.py`
+      - removed legacy listing-source compatibility fields from `Listing`
+  - Retired compatibility runtime surfaces:
+    - migration dual-write signals replaced with retirement stub (`marketplace/signals.py`)
+    - backfill command explicitly retired (`migration_backfill` now fails with deprecation error)
+    - compatibility/backfill/listings modules converted to post-CP5 stubs for command/import integrity
+  - Updated canonical runtime/admin behavior for post-cleanup schema:
+    - `marketplace/models.py`, `marketplace/admin.py`, `marketplace/forms.py`, `marketplace/views.py`, `marketplace/matching.py`, `marketplace/notifications.py`
+  - Validation evidence after destructive cleanup:
+    - `manage.py migrate` successful through `0014`
+    - `manage.py migration_validate --scope all --fail-on-error` passing
+    - `manage.py migration_validate --scope cleanup_listing --fail-on-error` passing
+    - `manage.py migration_validate --scope cleanup_messaging --fail-on-error` passing
+    - `manage.py migration_validate --scope cleanup_role_org --fail-on-error` passing
+    - command smoke checks:
+      - `migration_set_state --checkpoint CP5` works
+      - `migration_cutover --to CP5` no-op succeeds at CP5
+      - `migration_backfill` now explicitly retired
+      - rollback from CP5 explicitly blocked
+    - `manage.py test` passing (`17` tests, `6` skipped retired legacy migration modules)
 
 ## Current State
-- Branch: `feat/06-discover-direction-and-visibility-contract` (Feature 6 implemented; pending merge)
-- Features 1–5 are complete and merged to `main`; Feature 6 is complete on feature branch
-- All marketplace tests passing (`94` total)
+- Branch: `feat/07-legacy-schema-cleanup-and-final-cutover`
+- Features 1–6 are complete and merged to `main`; Feature 7 cleanup implementation is complete on feature branch
+- Current post-cleanup test suite status: `17` passing, `6` skipped (legacy migration-era suites retired)
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Merge Feature 6 branch to `main` and push.
-- Feature 7: `legacy-schema-cleanup-and-final-cutover` (after all six foundation features are merged).
+- Review retired/skipped legacy migration test modules and replace with post-cleanup equivalents where coverage is still needed.
+- Commit Feature 7 branch, merge to `main`, and push.

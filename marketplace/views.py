@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count, F, Q, Window
 from django.db.models.functions import RowNumber
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -19,6 +20,7 @@ from .forms import DemandPostForm, DiscoverForm, MessageForm, ProfileForm, Signu
 from .context_processors import SKIN_COOKIE_NAME
 from .matching import (
     bulk_suggestion_counts,
+    get_suggestions_for_listing,
     get_suggestions_for_lot,
     get_suggestions_for_post,
     watchlisted_demand_post_ids,
@@ -26,17 +28,14 @@ from .matching import (
 )
 from .migration_control.conversations import ThreadWatchlistCoordinator
 from .migration_control.identity import IdentityCompatibilityAdapter
-from .migration_control.listings import ListingCompatibilityService
 from .migration_control.permissions import permission_service
 from .models import (
-    DemandPost,
-    DemandStatus,
+    Listing,
+    ListingStatus,
+    ListingType,
     DismissedSuggestion,
     Message,
     MessageThread,
-    Role,
-    SupplyLot,
-    SupplyStatus,
     ThreadReadState,
     WatchlistItem,
     WatchlistSource,
@@ -47,7 +46,6 @@ from .notifications import send_new_message_notification
 PAGE_SIZE = 25
 SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 identity_adapter = IdentityCompatibilityAdapter()
-listing_service = ListingCompatibilityService()
 conversation_coordinator = ThreadWatchlistCoordinator()
 
 
@@ -62,70 +60,81 @@ def _set_skin_cookie(response, skin_name):
     return response
 
 
+def _resolve_listing_by_pk_or_legacy(pk, listing_type):
+    return Listing.objects.filter(pk=pk, type=listing_type).first()
+
+
+def _get_listing_or_404(pk, listing_type):
+    listing = _resolve_listing_by_pk_or_legacy(pk, listing_type)
+    if listing is None:
+        raise Http404
+    return listing
+
+
+def _resolve_listing_for_action(listing_pk, listing_type_raw):
+    if not listing_pk:
+        raise Http404
+    try:
+        parsed_pk = int(listing_pk)
+    except (TypeError, ValueError) as exc:
+        raise Http404 from exc
+
+    if listing_type_raw in {"supply_lot", "supply"}:
+        listing_type = ListingType.SUPPLY
+    elif listing_type_raw in {"demand_post", "demand"}:
+        listing_type = ListingType.DEMAND
+    else:
+        listing = Listing.objects.filter(pk=parsed_pk).first()
+        if listing is None:
+            raise Http404
+        return listing
+
+    listing = _resolve_listing_by_pk_or_legacy(parsed_pk, listing_type)
+    if listing is None:
+        raise Http404
+    return listing
+
+
 # ---------------------------------------------------------------------------
 # Watchlist helpers
 # ---------------------------------------------------------------------------
 
-def _get_or_create_watchlist_item(user, supply_lot=None, demand_post=None, source=WatchlistSource.DIRECT):
+def _get_or_create_watchlist_item(user, listing=None, source=WatchlistSource.DIRECT):
     """Get or create a WatchlistItem. Returns (item, created)."""
-    lookup = {"user": user}
-    if supply_lot:
-        lookup["supply_lot"] = supply_lot
-    else:
-        lookup["demand_post"] = demand_post
     item, created = WatchlistItem.objects.get_or_create(
+        user=user,
+        listing=listing,
         defaults={"source": source},
-        **lookup,
     )
     return item, created
 
 
 def _get_or_create_thread(watchlist_item):
     """Get or create listing-centric thread for a watchlist item."""
-    if watchlist_item.supply_lot_id:
-        result = conversation_coordinator.start_from_legacy_listing(
-            user=watchlist_item.user,
-            listing_type="supply_lot",
-            listing_pk=watchlist_item.supply_lot_id,
-            source=watchlist_item.source,
-        )
-        return result.thread, result.created
-    result = conversation_coordinator.start_from_legacy_listing(
+    listing = watchlist_item.resolve_listing()
+    if listing is None:
+        raise PermissionDenied
+    result = conversation_coordinator.start_thread_with_autosave(
         user=watchlist_item.user,
-        listing_type="demand_post",
-        listing_pk=watchlist_item.demand_post_id,
+        listing=listing,
         source=watchlist_item.source,
     )
     return result.thread, result.created
 
 
-def _archive_watchlist_items_for_lot(lot):
-    """Archive all watchlist items pointing at this supply lot."""
+def _archive_watchlist_items_for_listing(listing):
+    """Archive all watchlist items pointing at this listing."""
     WatchlistItem.objects.filter(
-        supply_lot=lot,
+        listing=listing,
         status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
     ).update(status=WatchlistStatus.ARCHIVED)
 
 
-def _archive_watchlist_items_for_post(post):
-    """Archive all watchlist items pointing at this demand post."""
+def _restore_watchlist_items_for_listing(listing):
+    """Restore archived watchlist items when a listing is reactivated."""
     WatchlistItem.objects.filter(
-        demand_post=post,
-        status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
-    ).update(status=WatchlistStatus.ARCHIVED)
-
-
-def _restore_watchlist_items_for_lot(lot):
-    """Restore archived watchlist items when a lot is reactivated."""
-    WatchlistItem.objects.filter(
-        supply_lot=lot, status=WatchlistStatus.ARCHIVED,
-    ).update(status=WatchlistStatus.WATCHING)
-
-
-def _restore_watchlist_items_for_post(post):
-    """Restore archived watchlist items when a post is reactivated."""
-    WatchlistItem.objects.filter(
-        demand_post=post, status=WatchlistStatus.ARCHIVED,
+        listing=listing,
+        status=WatchlistStatus.ARCHIVED,
     ).update(status=WatchlistStatus.WATCHING)
 
 
@@ -136,11 +145,11 @@ def _restore_watchlist_items_for_post(post):
 def _build_lot_number_map(user):
     """Return {lot_pk: sequential_number} partitioned by item_text."""
     lots = (
-        SupplyLot.objects.filter(created_by=user)
+        Listing.objects.filter(created_by_user=user, type=ListingType.SUPPLY)
         .annotate(
             row_num=Window(
                 expression=RowNumber(),
-                partition_by=[F("item_text")],
+                partition_by=[F("title")],
                 order_by=F("created_at").asc(),
             )
         )
@@ -152,11 +161,11 @@ def _build_lot_number_map(user):
 def _build_post_number_map(user):
     """Return {post_pk: sequential_number} partitioned by item_text."""
     posts = (
-        DemandPost.objects.filter(created_by=user)
+        Listing.objects.filter(created_by_user=user, type=ListingType.DEMAND)
         .annotate(
             row_num=Window(
                 expression=RowNumber(),
-                partition_by=[F("item_text")],
+                partition_by=[F("title")],
                 order_by=F("created_at").asc(),
             )
         )
@@ -167,9 +176,10 @@ def _build_post_number_map(user):
 
 def _get_lot_number(lot):
     """Get the sequential number for a single supply lot."""
-    earlier = SupplyLot.objects.filter(
-        created_by=lot.created_by,
-        item_text=lot.item_text,
+    earlier = Listing.objects.filter(
+        created_by_user=lot.created_by_user,
+        type=ListingType.SUPPLY,
+        title=lot.title,
         created_at__lte=lot.created_at,
     ).count()
     return earlier
@@ -177,9 +187,10 @@ def _get_lot_number(lot):
 
 def _get_post_number(post):
     """Get the sequential number for a single demand post."""
-    earlier = DemandPost.objects.filter(
-        created_by=post.created_by,
-        item_text=post.item_text,
+    earlier = Listing.objects.filter(
+        created_by_user=post.created_by_user,
+        type=ListingType.DEMAND,
+        title=post.title,
         created_at__lte=post.created_at,
     ).count()
     return earlier
@@ -231,63 +242,52 @@ class MarketplaceLogoutView(LogoutView):
 def dashboard_view(request):
     user = request.user
     context = {}
-    if user.role == Role.BUYER:
-        posts = DemandPost.objects.filter(
-            created_by=user,
-        ).exclude(status=DemandStatus.DELETED).order_by("-created_at")[:5]
-        post_numbers = _build_post_number_map(user)
-        for p in posts:
-            p.post_number = post_numbers.get(p.pk, 1)
-        context["demand_posts"] = posts
+    posts = Listing.objects.filter(
+        created_by_user=user,
+        type=ListingType.DEMAND,
+    ).exclude(status=ListingStatus.DELETED).order_by("-created_at")[:5]
+    post_numbers = _build_post_number_map(user)
+    for p in posts:
+        p.post_number = post_numbers.get(p.pk, 1)
+    context["demand_posts"] = posts
 
-        # Watchlist summary
-        watchlist_count = WatchlistItem.objects.filter(
-            user=user, status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
-        ).count()
-        context["watchlist_count"] = watchlist_count
+    lots = Listing.objects.filter(
+        created_by_user=user,
+        type=ListingType.SUPPLY,
+    ).exclude(status=ListingStatus.DELETED).order_by("-created_at")[:5]
+    lot_numbers = _build_lot_number_map(user)
+    for lot in lots:
+        lot.lot_number = lot_numbers.get(lot.pk, 1)
+    context["supply_lots"] = lots
 
-        # Suggestions
-        suggestions = []
-        for post in DemandPost.objects.filter(created_by=user, status=DemandStatus.ACTIVE):
-            suggestions.extend(get_suggestions_for_post(post, user, limit=3))
-        # Deduplicate by supply lot pk
-        seen = set()
-        unique_suggestions = []
-        for s in suggestions:
-            if s.pk not in seen:
-                seen.add(s.pk)
-                unique_suggestions.append(s)
-        context["suggestions"] = unique_suggestions[:5]
-        context["suggestion_type"] = "supply_lot"
-        context["watchlisted_pks"] = watchlisted_supply_lot_ids(user)
-    else:
-        lots = SupplyLot.objects.filter(
-            created_by=user,
-        ).exclude(status=SupplyStatus.DELETED).order_by("-created_at")[:5]
-        lot_numbers = _build_lot_number_map(user)
-        for lot in lots:
-            lot.lot_number = lot_numbers.get(lot.pk, 1)
-        context["supply_lots"] = lots
+    watchlist_count = WatchlistItem.objects.filter(
+        user=user,
+        status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
+    ).count()
+    context["watchlist_count"] = watchlist_count
 
-        # Watchlist summary
-        watchlist_count = WatchlistItem.objects.filter(
-            user=user, status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
-        ).count()
-        context["watchlist_count"] = watchlist_count
+    suggestions = []
+    active_own = Listing.objects.filter(
+        created_by_user=user,
+        status=ListingStatus.ACTIVE,
+    )
+    for own_listing in active_own:
+        for suggestion in get_suggestions_for_listing(own_listing, user, limit=3):
+            suggestion.suggestion_type = "supply_lot" if suggestion.type == ListingType.SUPPLY else "demand_post"
+            suggestions.append(suggestion)
 
-        # Suggestions
-        suggestions = []
-        for lot in SupplyLot.objects.filter(created_by=user, status=SupplyStatus.ACTIVE):
-            suggestions.extend(get_suggestions_for_lot(lot, user, limit=3))
-        seen = set()
-        unique_suggestions = []
-        for s in suggestions:
-            if s.pk not in seen:
-                seen.add(s.pk)
-                unique_suggestions.append(s)
-        context["suggestions"] = unique_suggestions[:5]
-        context["suggestion_type"] = "demand_post"
-        context["watchlisted_pks"] = watchlisted_demand_post_ids(user)
+    seen = set()
+    unique_suggestions = []
+    for suggestion in suggestions:
+        if suggestion.pk in seen:
+            continue
+        seen.add(suggestion.pk)
+        unique_suggestions.append(suggestion)
+
+    context["suggestions"] = unique_suggestions[:5]
+    context["watchlisted_pks"] = set(
+        WatchlistItem.objects.filter(user=user, listing__isnull=False).values_list("listing_id", flat=True)
+    )
     return render(request, "marketplace/dashboard.html", context)
 
 
@@ -320,12 +320,16 @@ def profile_edit(request):
 
 
 # ---------------------------------------------------------------------------
-# DemandPost (buyer)
+# Demand/Supply listing views (route names retained for compatibility)
 # ---------------------------------------------------------------------------
+
 
 @login_required
 def demand_post_list(request):
-    qs = DemandPost.objects.filter(created_by=request.user).exclude(status=DemandStatus.DELETED).order_by("-created_at")
+    qs = Listing.objects.filter(
+        created_by_user=request.user,
+        type=ListingType.DEMAND,
+    ).exclude(status=ListingStatus.DELETED).order_by("-created_at")
     post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -338,19 +342,12 @@ def demand_post_list(request):
 
 @login_required
 def demand_post_create(request):
-    from django.core.exceptions import ObjectDoesNotExist
-    try:
-        org = request.user.organization
-    except ObjectDoesNotExist:
-        raise PermissionDenied
     if request.method == "POST":
         form = DemandPostForm(request.POST, user=request.user)
         if form.is_valid():
             post = form.save(commit=False)
-            post.created_by = request.user
-            post.organization = org
+            post.created_by_user = request.user
             post.save()
-            listing_service.sync_shadow(post)
             _sync_listing_to_vector_index(post)
             django_messages.success(request, _("Wanted listing created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
@@ -361,47 +358,44 @@ def demand_post_create(request):
 
 @login_required
 def demand_post_edit(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk)
+    post = _get_listing_or_404(pk, ListingType.DEMAND)
     permission_service.authorize_listing_mutation(request.user.pk, post, "edit").deny_if_not_allowed()
     if request.method == "POST":
         form = DemandPostForm(request.POST, instance=post, user=request.user)
         if form.is_valid():
-            form.save()
-            listing_service.sync_shadow(post)
+            post = form.save()
             _sync_listing_to_vector_index(post)
             django_messages.success(request, _("Wanted listing updated."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
         form = DemandPostForm(instance=post, user=request.user)
-    return render(request, "marketplace/demand_post_form.html", {
-        "form": form,
-        "editing": True,
-    })
+    return render(request, "marketplace/demand_post_form.html", {"form": form, "editing": True})
 
 
 @login_required
 def demand_post_detail(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk)
-    is_owner = post.created_by == request.user
+    post = _get_listing_or_404(pk, ListingType.DEMAND)
+    is_owner = post.created_by_user == request.user
     post.post_number = _get_post_number(post)
     suggestions = []
-    if is_owner and post.status == DemandStatus.ACTIVE:
+    if is_owner and post.status == ListingStatus.ACTIVE:
         suggestions = get_suggestions_for_post(post, request.user, limit=5)
+        for listing in suggestions:
+            listing.suggestion_type = "supply_lot"
     watchlisted_pks = watchlisted_supply_lot_ids(request.user) if suggestions else set()
 
     listing_threads = []
     if is_owner:
         listing_threads = list(
-            MessageThread.objects.filter(
-                Q(watchlist_item__demand_post=post)
-                | Q(listing__legacy_source_type="demand_post", listing__legacy_source_pk=post.pk),
-            ).select_related("buyer", "supplier", "created_by_user", "listing", "listing__created_by_user").annotate(
+            MessageThread.objects.filter(listing=post).select_related(
+                "created_by_user", "listing", "listing__created_by_user",
+            ).annotate(
                 message_count=Count("messages"),
                 last_message_at=models.Max("messages__created_at"),
             ).filter(message_count__gt=0).order_by("-last_message_at")
         )
-        for t in listing_threads:
-            t.counterparty = t.counterparty_for(request.user)
+        for thread in listing_threads:
+            thread.counterparty = thread.counterparty_for(request.user)
 
     return render(request, "marketplace/demand_post_detail.html", {
         "post": post,
@@ -415,31 +409,29 @@ def demand_post_detail(request, pk):
 @login_required
 @require_POST
 def demand_post_toggle(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk)
+    post = _get_listing_or_404(pk, ListingType.DEMAND)
     permission_service.authorize_listing_mutation(request.user.pk, post, "toggle").deny_if_not_allowed()
-    if post.status == "active":
-        post.status = "paused"
-    elif post.status in ("paused", "fulfilled"):
-        post.status = "active"
+    if post.status == ListingStatus.ACTIVE:
+        post.status = ListingStatus.PAUSED
+    elif post.status in (ListingStatus.PAUSED, ListingStatus.FULFILLED):
+        post.status = ListingStatus.ACTIVE
     post.save(update_fields=["status"])
-    listing_service.sync_shadow(post)
     _sync_listing_to_vector_index(post)
-    if post.status == "active":
-        _restore_watchlist_items_for_post(post)
+    if post.status == ListingStatus.ACTIVE:
+        _restore_watchlist_items_for_listing(post)
     else:
-        _archive_watchlist_items_for_post(post)
+        _archive_watchlist_items_for_listing(post)
     return redirect("marketplace:demand_post_detail", pk=post.pk)
 
 
 @login_required
 def demand_post_delete(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk)
+    post = _get_listing_or_404(pk, ListingType.DEMAND)
     permission_service.authorize_listing_mutation(request.user.pk, post, "delete").deny_if_not_allowed()
     if request.method == "POST":
-        post.status = DemandStatus.DELETED
+        post.status = ListingStatus.DELETED
         post.save(update_fields=["status"])
-        listing_service.sync_shadow(post)
-        _archive_watchlist_items_for_post(post)
+        _archive_watchlist_items_for_listing(post)
         _remove_listing_from_vector_index(post)
         django_messages.success(request, _("Wanted listing deleted."))
         return redirect("marketplace:demand_post_list")
@@ -450,13 +442,12 @@ def demand_post_delete(request, pk):
     })
 
 
-# ---------------------------------------------------------------------------
-# SupplyLot (supplier)
-# ---------------------------------------------------------------------------
-
 @login_required
 def supply_lot_list(request):
-    qs = SupplyLot.objects.filter(created_by=request.user).exclude(status=SupplyStatus.DELETED).order_by("-created_at")
+    qs = Listing.objects.filter(
+        created_by_user=request.user,
+        type=ListingType.SUPPLY,
+    ).exclude(status=ListingStatus.DELETED).order_by("-created_at")
     lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -473,9 +464,8 @@ def supply_lot_create(request):
         form = SupplyLotForm(request.POST)
         if form.is_valid():
             lot = form.save(commit=False)
-            lot.created_by = request.user
+            lot.created_by_user = request.user
             lot.save()
-            listing_service.sync_shadow(lot)
             _sync_listing_to_vector_index(lot)
             django_messages.success(request, _("Available listing created."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
@@ -486,47 +476,44 @@ def supply_lot_create(request):
 
 @login_required
 def supply_lot_edit(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk)
+    lot = _get_listing_or_404(pk, ListingType.SUPPLY)
     permission_service.authorize_listing_mutation(request.user.pk, lot, "edit").deny_if_not_allowed()
     if request.method == "POST":
         form = SupplyLotForm(request.POST, instance=lot)
         if form.is_valid():
-            form.save()
-            listing_service.sync_shadow(lot)
+            lot = form.save()
             _sync_listing_to_vector_index(lot)
             django_messages.success(request, _("Available listing updated."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm(instance=lot)
-    return render(request, "marketplace/supply_lot_form.html", {
-        "form": form,
-        "editing": True,
-    })
+    return render(request, "marketplace/supply_lot_form.html", {"form": form, "editing": True})
 
 
 @login_required
 def supply_lot_detail(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk)
-    is_owner = lot.created_by == request.user
+    lot = _get_listing_or_404(pk, ListingType.SUPPLY)
+    is_owner = lot.created_by_user == request.user
     lot.lot_number = _get_lot_number(lot)
     suggestions = []
-    if is_owner and lot.status == SupplyStatus.ACTIVE:
+    if is_owner and lot.status == ListingStatus.ACTIVE:
         suggestions = get_suggestions_for_lot(lot, request.user, limit=5)
+        for listing in suggestions:
+            listing.suggestion_type = "demand_post"
     watchlisted_pks = watchlisted_demand_post_ids(request.user) if suggestions else set()
 
     listing_threads = []
     if is_owner:
         listing_threads = list(
-            MessageThread.objects.filter(
-                Q(watchlist_item__supply_lot=lot)
-                | Q(listing__legacy_source_type="supply_lot", listing__legacy_source_pk=lot.pk),
-            ).select_related("buyer", "supplier", "created_by_user", "listing", "listing__created_by_user").annotate(
+            MessageThread.objects.filter(listing=lot).select_related(
+                "created_by_user", "listing", "listing__created_by_user",
+            ).annotate(
                 message_count=Count("messages"),
                 last_message_at=models.Max("messages__created_at"),
             ).filter(message_count__gt=0).order_by("-last_message_at")
         )
-        for t in listing_threads:
-            t.counterparty = t.counterparty_for(request.user)
+        for thread in listing_threads:
+            thread.counterparty = thread.counterparty_for(request.user)
 
     return render(request, "marketplace/supply_lot_detail.html", {
         "lot": lot,
@@ -540,31 +527,29 @@ def supply_lot_detail(request, pk):
 @login_required
 @require_POST
 def supply_lot_toggle(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk)
+    lot = _get_listing_or_404(pk, ListingType.SUPPLY)
     permission_service.authorize_listing_mutation(request.user.pk, lot, "toggle").deny_if_not_allowed()
-    if lot.status == "active":
-        lot.status = "withdrawn"
-    elif lot.status == "withdrawn":
-        lot.status = "active"
+    if lot.status == ListingStatus.ACTIVE:
+        lot.status = ListingStatus.WITHDRAWN
+    elif lot.status == ListingStatus.WITHDRAWN:
+        lot.status = ListingStatus.ACTIVE
     lot.save(update_fields=["status"])
-    listing_service.sync_shadow(lot)
     _sync_listing_to_vector_index(lot)
-    if lot.status == "active":
-        _restore_watchlist_items_for_lot(lot)
+    if lot.status == ListingStatus.ACTIVE:
+        _restore_watchlist_items_for_listing(lot)
     else:
-        _archive_watchlist_items_for_lot(lot)
+        _archive_watchlist_items_for_listing(lot)
     return redirect("marketplace:supply_lot_detail", pk=lot.pk)
 
 
 @login_required
 def supply_lot_delete(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk)
+    lot = _get_listing_or_404(pk, ListingType.SUPPLY)
     permission_service.authorize_listing_mutation(request.user.pk, lot, "delete").deny_if_not_allowed()
     if request.method == "POST":
-        lot.status = SupplyStatus.DELETED
+        lot.status = ListingStatus.DELETED
         lot.save(update_fields=["status"])
-        listing_service.sync_shadow(lot)
-        _archive_watchlist_items_for_lot(lot)
+        _archive_watchlist_items_for_listing(lot)
         _remove_listing_from_vector_index(lot)
         django_messages.success(request, _("Available listing deleted."))
         return redirect("marketplace:supply_lot_list")
@@ -591,25 +576,20 @@ def _normalize_discover_direction(direction):
 def _discover_listing_types_for_direction(direction):
     normalized = _normalize_discover_direction(direction)
     if normalized == DiscoverForm.DIRECTION_FIND_DEMAND:
-        return "demand_post", "demand"
-    return "supply_lot", "supply"
+        return ListingType.DEMAND, ListingType.DEMAND
+    return ListingType.SUPPLY, ListingType.SUPPLY
 
 
 def _discover_listing_payload(listing, default_listing_type):
-    legacy_type = getattr(listing, "legacy_source_type", "")
-    legacy_pk = getattr(listing, "legacy_source_pk", None)
-    if legacy_type in {"supply_lot", "demand_post"} and legacy_pk:
-        listing_type = legacy_type
-        listing_pk = legacy_pk
-    else:
-        listing_type = default_listing_type
-        listing_pk = listing.pk
+    listing_type = default_listing_type
+    listing_pk = listing.pk
     detail_url_name = (
         "marketplace:supply_lot_detail"
-        if listing_type == "supply_lot"
+        if listing_type == ListingType.SUPPLY
         else "marketplace:demand_post_detail"
     )
-    return listing_type, listing_pk, detail_url_name
+    encoded_type = "supply_lot" if listing_type == ListingType.SUPPLY else "demand_post"
+    return encoded_type, listing_pk, detail_url_name
 
 
 def _decorate_discover_results(results, direction):
@@ -627,15 +607,6 @@ def _decorate_discover_results(results, direction):
 def _run_discover_search(user, query, category, country, direction, search_mode="similar"):
     """Run discover search and return results list."""
     listing_type, target_listing_type = _discover_listing_types_for_direction(direction)
-
-    target_results = listing_service.discover_queryset(
-        listing_type=target_listing_type,
-        query=query,
-        category=category or None,
-        country=country or None,
-    )
-    if target_results is not None:
-        return target_results
 
     if search_mode == "keyword":
         return _keyword_search(
@@ -694,11 +665,15 @@ def _discover_watchlisted_pks(user, direction):
     normalized_direction = _normalize_discover_direction(direction)
     if normalized_direction == DiscoverForm.DIRECTION_FIND_SUPPLY:
         return set(WatchlistItem.objects.filter(
-            user=user, supply_lot__isnull=False,
-        ).values_list("supply_lot_id", flat=True))
+            user=user,
+            listing__type=ListingType.SUPPLY,
+            listing__isnull=False,
+        ).values_list("listing_id", flat=True))
     return set(WatchlistItem.objects.filter(
-        user=user, demand_post__isnull=False,
-    ).values_list("demand_post_id", flat=True))
+        user=user,
+        listing__type=ListingType.DEMAND,
+        listing__isnull=False,
+    ).values_list("listing_id", flat=True))
 
 
 @login_required
@@ -805,34 +780,25 @@ def _keyword_search(query, listing_type, user, category=None, country=None, limi
     if not words:
         return []
 
-    # Build AND filter: every word must appear in item_text
+    # Build AND filter: every word must appear in title
     word_filter = Q()
     for word in words:
-        word_filter &= Q(item_text__icontains=word)
+        word_filter &= Q(title__icontains=word)
 
-    if listing_type == "supply_lot":
-        qs = SupplyLot.objects.filter(
-            word_filter,
-            status=SupplyStatus.ACTIVE,
-            available_until__gt=now,
-        ).exclude(created_by=user)
-        if category:
-            qs = qs.filter(category=category)
-        if country:
-            qs = qs.filter(location_country=country)
-        return list(qs.order_by("-created_at")[:limit])
+    qs = Listing.objects.filter(
+        word_filter,
+        type=listing_type,
+        status=ListingStatus.ACTIVE,
+    ).exclude(created_by_user=user)
+    if listing_type == ListingType.SUPPLY:
+        qs = qs.filter(expires_at__gt=now)
     else:
-        qs = DemandPost.objects.filter(
-            word_filter,
-            status=DemandStatus.ACTIVE,
-        ).filter(
-            Q(expires_at__isnull=True) | Q(expires_at__gt=now),
-        ).exclude(created_by=user)
-        if category:
-            qs = qs.filter(category=category)
-        if country:
-            qs = qs.filter(location_country=country)
-        return list(qs.order_by("-created_at")[:limit])
+        qs = qs.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+    if category:
+        qs = qs.filter(category=category)
+    if country:
+        qs = qs.filter(location_country=country)
+    return list(qs.order_by("-created_at")[:limit])
 
 
 # ---------------------------------------------------------------------------
@@ -877,14 +843,17 @@ def _attach_unread_counts(user, items):
 def watchlist_view(request):
     user = request.user
     qs = WatchlistItem.objects.filter(user=user).select_related(
-        "supply_lot", "supply_lot__created_by",
-        "demand_post", "demand_post__created_by",
+        "listing",
+        "listing__created_by_user",
     )
 
     watching = list(qs.filter(
         status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
     ).order_by("-updated_at"))
     archived = list(qs.filter(status=WatchlistStatus.ARCHIVED).order_by("-updated_at"))
+
+    for item in watching + archived:
+        item.resolved_listing = item.resolve_listing()
 
     _attach_unread_counts(user, watching)
     _attach_unread_counts(user, archived)
@@ -908,6 +877,7 @@ def watchlist_star(request, pk):
     if request.headers.get("HX-Request"):
         is_starred = item.status == WatchlistStatus.STARRED
         inactive = item.status == WatchlistStatus.ARCHIVED
+        item.resolved_listing = item.resolve_listing()
         _attach_unread_counts(request.user, [item])
         return render(request, "marketplace/_watchlist_card.html", {
             "item": item,
@@ -967,14 +937,10 @@ def watchlist_message(request, pk):
 @require_POST
 def discover_save(request):
     """Save a listing from search results to watchlist."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        lot = get_object_or_404(SupplyLot, pk=listing_pk)
-        _get_or_create_watchlist_item(request.user, supply_lot=lot, source=WatchlistSource.SEARCH)
-    elif listing_type == "demand_post":
-        post = get_object_or_404(DemandPost, pk=listing_pk)
-        _get_or_create_watchlist_item(request.user, demand_post=post, source=WatchlistSource.SEARCH)
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    _get_or_create_watchlist_item(request.user, listing=listing, source=WatchlistSource.SEARCH)
     django_messages.success(request, _("Saved to watchlist."))
     request.session["discover_keep_results"] = True
     return redirect("marketplace:discover")
@@ -984,16 +950,13 @@ def discover_save(request):
 @require_POST
 def discover_unsave(request):
     """Remove a listing from watchlist via discover results."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        WatchlistItem.objects.filter(
-            user=request.user, supply_lot_id=listing_pk,
-        ).delete()
-    elif listing_type == "demand_post":
-        WatchlistItem.objects.filter(
-            user=request.user, demand_post_id=listing_pk,
-        ).delete()
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    WatchlistItem.objects.filter(
+        user=request.user,
+        listing=listing,
+    ).delete()
     django_messages.success(request, _("Removed from watchlist."))
     request.session["discover_keep_results"] = True
     return redirect("marketplace:discover")
@@ -1003,20 +966,13 @@ def discover_unsave(request):
 @require_POST
 def discover_message(request):
     """Save + create thread + redirect to thread."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        lot = get_object_or_404(SupplyLot, pk=listing_pk)
-        permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
-    elif listing_type == "demand_post":
-        post = get_object_or_404(DemandPost, pk=listing_pk)
-        permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
-    else:
-        raise PermissionDenied
-    result = conversation_coordinator.start_from_legacy_listing(
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    permission_service.authorize_message_initiation(request.user.pk, listing).deny_if_not_allowed()
+    result = conversation_coordinator.start_thread_with_autosave(
         user=request.user,
-        listing_type=listing_type,
-        listing_pk=int(listing_pk),
+        listing=listing,
         source=WatchlistSource.DIRECT,
     )
     return redirect("marketplace:thread_detail", pk=result.thread.pk)
@@ -1030,14 +986,10 @@ def discover_message(request):
 @require_POST
 def suggestion_save(request):
     """Save a suggestion to watchlist."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        lot = get_object_or_404(SupplyLot, pk=listing_pk)
-        _get_or_create_watchlist_item(request.user, supply_lot=lot, source=WatchlistSource.SUGGESTION)
-    elif listing_type == "demand_post":
-        post = get_object_or_404(DemandPost, pk=listing_pk)
-        _get_or_create_watchlist_item(request.user, demand_post=post, source=WatchlistSource.SUGGESTION)
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    _get_or_create_watchlist_item(request.user, listing=listing, source=WatchlistSource.SUGGESTION)
     django_messages.success(request, _("Saved to watchlist."))
     next_url = request.POST.get("next", "marketplace:dashboard")
     return redirect(next_url)
@@ -1047,14 +999,10 @@ def suggestion_save(request):
 @require_POST
 def suggestion_dismiss(request):
     """Dismiss a suggestion so it won't show again."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        lot = get_object_or_404(SupplyLot, pk=listing_pk)
-        DismissedSuggestion.objects.get_or_create(user=request.user, supply_lot=lot)
-    elif listing_type == "demand_post":
-        post = get_object_or_404(DemandPost, pk=listing_pk)
-        DismissedSuggestion.objects.get_or_create(user=request.user, demand_post=post)
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    DismissedSuggestion.objects.get_or_create(user=request.user, listing=listing)
     next_url = request.POST.get("next", "marketplace:dashboard")
     return redirect(next_url)
 
@@ -1068,13 +1016,6 @@ def suggestion_dismiss(request):
 def thread_detail(request, pk):
     thread = get_object_or_404(
         MessageThread.objects.select_related(
-            "watchlist_item",
-            "watchlist_item__supply_lot",
-            "watchlist_item__supply_lot__created_by",
-            "watchlist_item__demand_post",
-            "watchlist_item__demand_post__created_by",
-            "buyer",
-            "supplier",
             "listing",
             "listing__created_by_user",
             "created_by_user",
@@ -1151,17 +1092,10 @@ def inbox_view(request):
 
     threads = (
         MessageThread.objects.filter(
-            Q(buyer=user)
-            | Q(supplier=user)
-            | Q(created_by_user=user)
+            Q(created_by_user=user)
             | Q(listing__created_by_user=user),
         )
         .select_related(
-            "watchlist_item",
-            "watchlist_item__supply_lot",
-            "watchlist_item__demand_post",
-            "buyer",
-            "supplier",
             "listing",
             "listing__created_by_user",
             "created_by_user",
@@ -1199,20 +1133,13 @@ def inbox_view(request):
 @require_POST
 def suggestion_message(request):
     """Create watchlist item + thread from a suggestion card and redirect to thread."""
-    listing_type = request.POST.get("listing_type")
     listing_pk = request.POST.get("listing_pk")
-    if listing_type == "supply_lot":
-        lot = get_object_or_404(SupplyLot, pk=listing_pk)
-        permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
-    elif listing_type == "demand_post":
-        post = get_object_or_404(DemandPost, pk=listing_pk)
-        permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
-    else:
-        raise PermissionDenied
-    result = conversation_coordinator.start_from_legacy_listing(
+    listing_type = request.POST.get("listing_type")
+    listing = _resolve_listing_for_action(listing_pk, listing_type)
+    permission_service.authorize_message_initiation(request.user.pk, listing).deny_if_not_allowed()
+    result = conversation_coordinator.start_thread_with_autosave(
         user=request.user,
-        listing_type=listing_type,
-        listing_pk=int(listing_pk),
+        listing=listing,
         source=WatchlistSource.SUGGESTION,
     )
     return redirect("marketplace:thread_detail", pk=result.thread.pk)

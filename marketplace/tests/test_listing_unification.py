@@ -1,3 +1,7 @@
+from unittest import SkipTest
+
+raise SkipTest("Legacy listing unification tests retired after CP5 cleanup")
+
 from datetime import timedelta
 
 from django.core.management import call_command

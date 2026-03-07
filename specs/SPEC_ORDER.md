@@ -55,7 +55,7 @@ Rules:
 7. **legacy-schema-cleanup-and-final-cutover**
    - Phase: FOUNDATION COMPLETION
    - Depends on: all six foundation specs (`migration-safety-and-compatibility-rails`, `role-agnostic-user-and-org-flattening`, `unified-listing-model-and-status-contract`, `ownership-based-permission-policy`, `listing-centric-messaging-and-watchlist-decoupling`, `discover-direction-and-visibility-contract`)
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/legacy-schema-cleanup-and-final-cutover/`
 
 ## Maintenance Workflow

@@ -8,11 +8,11 @@ from django.utils.translation import gettext_lazy as _
 from .constants import COUNTRY_CHOICES, KM_PER_MILE, TIMEZONE_CHOICES
 from .models import (
     Category,
-    DemandPost,
     Frequency,
-    Organization,
-    Role,
-    SupplyLot,
+    Listing,
+    ListingShippingScope,
+    ListingStatus,
+    ListingType,
     User,
 )
 from .migration_control.config import get_runtime_mode
@@ -24,8 +24,6 @@ class SignupForm(UserCreationForm):
     organization_name = forms.CharField(
         max_length=255, required=False, label=_("Organization name"),
     )
-    role = forms.ChoiceField(choices=Role.choices, label=_("I am a"), required=False)
-
     class Meta:
         model = User
         fields = (
@@ -35,43 +33,27 @@ class SignupForm(UserCreationForm):
             "password2",
             "country",
             "organization_name",
-            "role",
         )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.runtime_mode = get_runtime_mode()
-        if self.runtime_mode == "target":
-            self.fields.pop("role", None)
 
     def clean(self):
         cleaned = super().clean()
         org_name = (cleaned.get("organization_name") or "").strip()
         cleaned["organization_name"] = org_name or None
 
-        if self.runtime_mode != "target":
-            selected_role = cleaned.get("role") or Role.SUPPLIER
-            if selected_role == Role.BUYER and not cleaned.get("organization_name"):
-                self.add_error("organization_name", _("Organization name is required for buyers."))
         return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        selected_role = self.cleaned_data.get("role") or Role.SUPPLIER
-        user.role = selected_role
         user.country = self.cleaned_data["country"]
         user.organization_name = self.cleaned_data.get("organization_name")
         if not user.skin:
             user.skin = DEFAULT_SKIN_SLUG
         if commit:
             user.save()
-            if self.runtime_mode != "target" and user.role == Role.BUYER and user.organization_name:
-                Organization.objects.create(
-                    name=user.organization_name,
-                    type="",
-                    country=user.country,
-                    owner=user,
-                )
         return user
 
 
@@ -81,30 +63,32 @@ class DemandPostForm(forms.ModelForm):
     )
 
     class Meta:
-        model = DemandPost
+        model = Listing
         fields = [
-            "item_text",
+            "title",
             "category",
-            "quantity_value",
-            "quantity_unit",
+            "quantity",
+            "unit",
             "frequency",
             "location_country",
             "location_locality",
             "location_region",
             "location_postal_code",
             "radius_km",
-            "shipping_allowed",
-            "notes",
+            "description",
         ]
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
         self.use_miles = user is not None and getattr(user, "distance_unit", "mi") == "mi"
+        self.fields["title"].label = _("Item description")
+        self.fields["description"].label = _("Notes")
+        self.fields["description"].required = False
 
         # Quantity label for buyers
-        self.fields["quantity_value"].label = _("Minimum quantity")
-        self.fields["quantity_value"].help_text = _(
+        self.fields["quantity"].label = _("Minimum quantity")
+        self.fields["quantity"].help_text = _(
             "The minimum amount you want to purchase."
         )
 
@@ -118,19 +102,23 @@ class DemandPostForm(forms.ModelForm):
         else:
             self.fields["radius_km"].label = _("Search radius (km)")
         self.fields["radius_km"].help_text = _("Leave blank for worldwide")
-
-        # Shipping allowed clarity
-        self.fields["shipping_allowed"].label = _("Include shipped items")
-        self.fields["shipping_allowed"].help_text = _(
-            "Allow matches from suppliers who can ship to your area, "
-            "even if they're outside your search radius."
-        )
+        self.fields["unit"].label = _("Unit")
 
     def clean_radius_km(self):
         value = self.cleaned_data.get("radius_km")
         if value is not None and self.use_miles:
             value = round(value * KM_PER_MILE)
         return value
+
+    def save(self, commit=True):
+        listing = super().save(commit=False)
+        listing.type = ListingType.DEMAND
+        listing.status = listing.status or ListingStatus.ACTIVE
+        listing.shipping_scope = ""
+        listing.price_unit = ""
+        if commit:
+            listing.save()
+        return listing
 
 
 class SupplyLotForm(forms.ModelForm):
@@ -143,31 +131,49 @@ class SupplyLotForm(forms.ModelForm):
     )
 
     class Meta:
-        model = SupplyLot
+        model = Listing
         fields = [
-            "item_text",
+            "title",
             "category",
-            "quantity_value",
-            "quantity_unit",
-            "available_until",
+            "quantity",
+            "unit",
+            "expires_at",
             "location_country",
             "location_locality",
             "location_region",
             "location_postal_code",
             "shipping_scope",
-            "asking_price",
+            "price_value",
             "price_unit",
-            "notes",
+            "description",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self.instance.available_until:
-            self.initial["available_until"] = self.instance.available_until.date()
+        self.fields["title"].label = _("Item description")
+        self.fields["expires_at"].label = _("Available until")
+        self.fields["expires_at"].widget = forms.DateInput(attrs={"type": "date"})
+        self.fields["price_value"].label = _("Asking price")
+        self.fields["description"].label = _("Notes")
+        self.fields["description"].required = False
+        # Keep supply scopes aligned to unified listing enum values.
+        self.fields["shipping_scope"].choices = ListingShippingScope.choices
+        if self.instance and self.instance.pk and self.instance.expires_at:
+            self.initial["expires_at"] = self.instance.expires_at.date()
 
-    def clean_available_until(self):
-        date_val = self.cleaned_data["available_until"]
+    def clean_expires_at(self):
+        date_val = self.cleaned_data["expires_at"]
         return timezone.make_aware(datetime.combine(date_val, time(23, 59, 59)))
+
+    def save(self, commit=True):
+        listing = super().save(commit=False)
+        listing.type = ListingType.SUPPLY
+        listing.status = listing.status or ListingStatus.ACTIVE
+        listing.radius_km = None
+        listing.frequency = ""
+        if commit:
+            listing.save()
+        return listing
 
 
 class DiscoverForm(forms.Form):
