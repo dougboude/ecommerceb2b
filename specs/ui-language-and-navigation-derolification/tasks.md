@@ -85,7 +85,7 @@ If any gate fails, STOP. Do not proceed with Phase 1 tasks.
   - Final nav items: Dashboard, Discover, Messages [N], Watchlist, Your Listings (Supply, Demand), Profile
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 2.3 Audit `templates/marketplace/base.html` for any role-conditional blocks
+- [ ] 2.3 Audit `templates/base.html` for any role-conditional blocks
   - Remove any `{% if user.role ... %}` wrapper found at the base level
   - _Requirements: 2.2, 3.3_
 
@@ -189,7 +189,7 @@ If any test fails after Phase 1, fix the regression before proceeding. Do not ca
 - [ ] 7.1 Create `marketplace/migration_control/ui_compliance.py`
   - Implement `TemplateLanguageComplianceScanner` class
   - `scan()` method: returns `(passed: bool, violations: list[str])`
-  - Scan scope: all `.html` files under `templates/marketplace/` (recursive)
+  - Scan scope: all `.html` files under `templates/marketplace/`, `templates/includes/`, and `templates/registration/` (recursive)
   - Scan scope: `marketplace/views.py`, `marketplace/forms.py`
   - Exclude: all files matching `*/tests/*`, `test_*.py`, `*/migrations/*`
   - Violation patterns (see design doc): `user.role`, role-label strings, `Role.BUYER/SUPPLIER` imports
@@ -261,7 +261,7 @@ If any test fails after Phase 1, fix the regression before proceeding. Do not ca
 
 - [ ] 9.6 Write `test_profile_shows_both_listing_sections`
   - Create a user with one supply listing and one demand listing
-  - GET profile URL for that user
+  - Log in as that user and GET `/profile/` (self-profile only)
   - Assert response contains "Supply Listings" section
   - Assert response contains "Demand Listings" section
   - _Requirements: 4.2, 4.3, 8.1_

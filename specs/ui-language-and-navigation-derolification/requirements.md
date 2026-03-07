@@ -61,7 +61,7 @@ manage.py migration_validate --scope ui --fail-on-error
 1. WHEN this spec begins execution, THE System SHALL verify `MigrationState.checkpoint_order == 5` and fail with a clear message if not.
 2. WHEN this spec begins execution, THE System SHALL verify `User._meta.get_field('role')` raises `FieldDoesNotExist`; if `role` still exists on the model, execution SHALL be blocked.
 3. WHEN this spec begins execution, THE System SHALL verify `Organization`, `DemandPost`, and `SupplyLot` cannot be imported from `marketplace.models`; if any imports succeed, execution SHALL be blocked.
-4. WHEN pre-execution checks pass, THE System SHALL run `migration_validate --scope all --fail-on-error` and confirm all gates pass before proceeding.
+4. WHEN pre-execution checks pass, THE System SHALL confirm that cutover-stage `ParityReport` records exist and all passed (querying existing records — not re-running `migration_validate`, which would write new reports for the current stage).
 
 ### Requirement 2: Remove Role-Based Language from All Templates
 
@@ -122,7 +122,7 @@ manage.py migration_validate --scope ui --fail-on-error
 #### Acceptance Criteria
 
 1. THE System SHALL implement `TemplateLanguageComplianceScanner` in `marketplace/migration_control/ui_compliance.py`.
-2. THE scanner SHALL inspect all `.html` files under `templates/marketplace/` for the following violation patterns:
+2. THE scanner SHALL inspect all `.html` files under `templates/marketplace/`, `templates/includes/`, and `templates/registration/` (recursive) for the following violation patterns:
    - `user.role` or `request.user.role` in any template expression, filter, or conditional
    - Literal strings: `"Register as Buyer"`, `"Register as Supplier"`, `"Buyer Dashboard"`, `"Supplier Dashboard"`, `"Buyer listing"`, `"Supplier listing"` (case-insensitive)
    - Django template conditionals of the form `{% if ... role ... %}` in any combination

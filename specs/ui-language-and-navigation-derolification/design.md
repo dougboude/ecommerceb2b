@@ -65,8 +65,10 @@ Phase 1: Convergence (reversible)
   │  templates/registration/                                        │
   │  └── signup.html          "Create Account", no role selector   │
   │                                                                 │
+  │  templates/                                                     │
+  │  └── base.html            title/meta cleanup                   │
+  │                                                                 │
   │  templates/marketplace/                                         │
-  │  ├── base.html            title/meta cleanup                   │
   │  ├── dashboard.html       "Dashboard", no role heading         │
   │  ├── profile.html         both listing types, no role label    │
   │  └── [listing forms]      "Supply" / "Demand" labels only      │
