@@ -37,7 +37,7 @@ Rules:
 4. **ownership-based-permission-policy**
    - Phase: FOUNDATION
    - Depends on: `migration-safety-and-compatibility-rails`, `role-agnostic-user-and-org-flattening`, `unified-listing-model-and-status-contract`
-   - Status: `REQ, DES, TASK`
+   - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/ownership-based-permission-policy/`
 
 5. **listing-centric-messaging-and-watchlist-decoupling**

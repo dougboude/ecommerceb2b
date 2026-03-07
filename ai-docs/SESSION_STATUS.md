@@ -128,13 +128,34 @@ Do not create new per-version status files.
     - cutover gate enforcement for listing scope
   - Updated `specs/unified-listing-model-and-status-contract/tasks.md` to all complete and `specs/SPEC_ORDER.md` to `REQ, DES, TASK, EXEC` for Feature 3.
 
+- Feature 4 (`ownership-based-permission-policy`) implementation executed on branch `feat/04-ownership-based-permission-policy`:
+  - Added centralized permission policy service `marketplace/migration_control/permissions.py`:
+    - `PolicyEngine` with `is_listing_owner()`, `is_thread_participant()`, `is_watchlist_owner()`, `is_self_message_attempt()`
+    - `PermissionService` with `authorize_listing_mutation()`, `authorize_message_initiation()`, `authorize_thread_access()`, `authorize_watchlist_action()`
+    - `Decision` dataclass: `allowed`, `rule_id`, `reason_code`, `subject_type`, `subject_id` + `deny_if_not_allowed()`
+    - `RoleAuthComplianceScanner` scanning launch-critical views for residual `role != Role.*` denial patterns
+    - Module-level `permission_service` singleton for import convenience
+  - Updated `marketplace/views.py`:
+    - Removed `role != Role.BUYER` gate from `demand_post_list` and `demand_post_create`
+    - Removed `role != Role.SUPPLIER` gate from `supply_lot_list` and `supply_lot_create`
+    - `demand_post_create` now guards via Organization existence check (ownership-based) instead of role
+    - Listing mutation views (edit/toggle/delete) now route through `permission_service.authorize_listing_mutation()`
+    - `thread_detail` participant check routed through `permission_service.authorize_thread_access()`
+    - `discover_message` and `suggestion_message` now enforce self-message block via `authorize_message_initiation()`
+    - `watchlist_archive`, `watchlist_unarchive`, `watchlist_delete` routed through `permission_service.authorize_watchlist_action()`
+    - `watchlist_view` role-based `select_related` branching replaced with role-agnostic dual select_related
+  - Updated `marketplace/migration_control/parity.py`: added `validate_permission_policy()` using `RoleAuthComplianceScanner`
+  - Updated `marketplace/migration_control/checkpoints.py`: CP4 and CP5 gates now require passing `permission` parity report
+  - Updated `marketplace/management/commands/migration_validate.py`: added `--scope permission`
+  - Updated `marketplace/management/commands/migration_cutover.py`: emits permission reports at CP4 and CP5 stages
+  - Added 54 regression tests in `marketplace/tests/test_permission_policy.py` — all pass; full 85-test suite passes
+
 ## Current State
-- Branch: `main` (uncommitted changes from this session)
-- Status: SSE real-time messaging verified with distinct buyer/supplier sessions; live thread ordering and in-thread badge suppression behavior implemented
+- Branch: `feat/04-ownership-based-permission-policy`
+- Status: Feature 4 implementation complete, all tests passing
 - Per-version status files removed; this is the only status tracker
 
 ## What's Next (if continuing)
-- Manual testing: optionally verify out-of-order timestamp simulation still renders in canonical order
-- Run `manage.py check` and `manage.py test marketplace` to verify no regressions
-- Consider adding tests for SSE client token generation and publish logic
-- Commit current session's changes
+- Feature 5: `listing-centric-messaging-and-watchlist-decoupling`
+- Feature 6: `discover-direction-and-visibility-contract`
+- Commit and push Feature 4 branch when ready for review

@@ -26,6 +26,7 @@ from .matching import (
 )
 from .migration_control.identity import IdentityCompatibilityAdapter
 from .migration_control.listings import ListingCompatibilityService
+from .migration_control.permissions import permission_service
 from .models import (
     DemandPost,
     DemandStatus,
@@ -320,8 +321,6 @@ def profile_edit(request):
 
 @login_required
 def demand_post_list(request):
-    if request.user.role != Role.BUYER:
-        raise PermissionDenied
     qs = DemandPost.objects.filter(created_by=request.user).exclude(status=DemandStatus.DELETED).order_by("-created_at")
     post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
@@ -335,14 +334,17 @@ def demand_post_list(request):
 
 @login_required
 def demand_post_create(request):
-    if request.user.role != Role.BUYER:
+    from django.core.exceptions import ObjectDoesNotExist
+    try:
+        org = request.user.organization
+    except ObjectDoesNotExist:
         raise PermissionDenied
     if request.method == "POST":
         form = DemandPostForm(request.POST, user=request.user)
         if form.is_valid():
             post = form.save(commit=False)
             post.created_by = request.user
-            post.organization = request.user.organization
+            post.organization = org
             post.save()
             listing_service.sync_shadow(post)
             _sync_listing_to_vector_index(post)
@@ -355,7 +357,8 @@ def demand_post_create(request):
 
 @login_required
 def demand_post_edit(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
+    post = get_object_or_404(DemandPost, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, post, "edit").deny_if_not_allowed()
     if request.method == "POST":
         form = DemandPostForm(request.POST, instance=post, user=request.user)
         if form.is_valid():
@@ -405,7 +408,8 @@ def demand_post_detail(request, pk):
 @login_required
 @require_POST
 def demand_post_toggle(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
+    post = get_object_or_404(DemandPost, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, post, "toggle").deny_if_not_allowed()
     if post.status == "active":
         post.status = "paused"
     elif post.status in ("paused", "fulfilled"):
@@ -422,7 +426,8 @@ def demand_post_toggle(request, pk):
 
 @login_required
 def demand_post_delete(request, pk):
-    post = get_object_or_404(DemandPost, pk=pk, created_by=request.user)
+    post = get_object_or_404(DemandPost, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, post, "delete").deny_if_not_allowed()
     if request.method == "POST":
         post.status = DemandStatus.DELETED
         post.save(update_fields=["status"])
@@ -444,8 +449,6 @@ def demand_post_delete(request, pk):
 
 @login_required
 def supply_lot_list(request):
-    if request.user.role != Role.SUPPLIER:
-        raise PermissionDenied
     qs = SupplyLot.objects.filter(created_by=request.user).exclude(status=SupplyStatus.DELETED).order_by("-created_at")
     lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
@@ -459,8 +462,6 @@ def supply_lot_list(request):
 
 @login_required
 def supply_lot_create(request):
-    if request.user.role != Role.SUPPLIER:
-        raise PermissionDenied
     if request.method == "POST":
         form = SupplyLotForm(request.POST)
         if form.is_valid():
@@ -478,7 +479,8 @@ def supply_lot_create(request):
 
 @login_required
 def supply_lot_edit(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
+    lot = get_object_or_404(SupplyLot, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, lot, "edit").deny_if_not_allowed()
     if request.method == "POST":
         form = SupplyLotForm(request.POST, instance=lot)
         if form.is_valid():
@@ -528,7 +530,8 @@ def supply_lot_detail(request, pk):
 @login_required
 @require_POST
 def supply_lot_toggle(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
+    lot = get_object_or_404(SupplyLot, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, lot, "toggle").deny_if_not_allowed()
     if lot.status == "active":
         lot.status = "withdrawn"
     elif lot.status == "withdrawn":
@@ -545,7 +548,8 @@ def supply_lot_toggle(request, pk):
 
 @login_required
 def supply_lot_delete(request, pk):
-    lot = get_object_or_404(SupplyLot, pk=pk, created_by=request.user)
+    lot = get_object_or_404(SupplyLot, pk=pk)
+    permission_service.authorize_listing_mutation(request.user.pk, lot, "delete").deny_if_not_allowed()
     if request.method == "POST":
         lot.status = SupplyStatus.DELETED
         lot.save(update_fields=["status"])
@@ -804,11 +808,11 @@ def _attach_unread_counts(user, items):
 @login_required
 def watchlist_view(request):
     user = request.user
-    qs = WatchlistItem.objects.filter(user=user)
-    if user.role == Role.BUYER:
-        qs = qs.select_related("supply_lot", "supply_lot__created_by", "thread")
-    else:
-        qs = qs.select_related("demand_post", "demand_post__created_by", "thread")
+    qs = WatchlistItem.objects.filter(user=user).select_related(
+        "supply_lot", "supply_lot__created_by",
+        "demand_post", "demand_post__created_by",
+        "thread",
+    )
 
     watching = list(qs.filter(
         status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
@@ -853,7 +857,8 @@ def watchlist_star(request, pk):
 @login_required
 @require_POST
 def watchlist_archive(request, pk):
-    item = get_object_or_404(WatchlistItem, pk=pk, user=request.user)
+    item = get_object_or_404(WatchlistItem, pk=pk)
+    permission_service.authorize_watchlist_action(request.user.pk, item, "archive").deny_if_not_allowed()
     item.status = WatchlistStatus.ARCHIVED
     item.save(update_fields=["status"])
     return redirect("marketplace:watchlist")
@@ -862,7 +867,8 @@ def watchlist_archive(request, pk):
 @login_required
 @require_POST
 def watchlist_unarchive(request, pk):
-    item = get_object_or_404(WatchlistItem, pk=pk, user=request.user)
+    item = get_object_or_404(WatchlistItem, pk=pk)
+    permission_service.authorize_watchlist_action(request.user.pk, item, "unarchive").deny_if_not_allowed()
     item.status = WatchlistStatus.WATCHING
     item.save(update_fields=["status"])
     return redirect("marketplace:watchlist")
@@ -871,7 +877,8 @@ def watchlist_unarchive(request, pk):
 @login_required
 @require_POST
 def watchlist_delete(request, pk):
-    item = get_object_or_404(WatchlistItem, pk=pk, user=request.user)
+    item = get_object_or_404(WatchlistItem, pk=pk)
+    permission_service.authorize_watchlist_action(request.user.pk, item, "delete").deny_if_not_allowed()
     item.delete()
     return redirect("marketplace:watchlist")
 
@@ -933,9 +940,11 @@ def discover_message(request):
     listing_pk = request.POST.get("listing_pk")
     if listing_type == "supply_lot":
         lot = get_object_or_404(SupplyLot, pk=listing_pk)
+        permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
         item, _ = _get_or_create_watchlist_item(request.user, supply_lot=lot, source=WatchlistSource.DIRECT)
     elif listing_type == "demand_post":
         post = get_object_or_404(DemandPost, pk=listing_pk)
+        permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
         item, _ = _get_or_create_watchlist_item(request.user, demand_post=post, source=WatchlistSource.DIRECT)
     else:
         raise PermissionDenied
@@ -999,8 +1008,7 @@ def thread_detail(request, pk):
         ),
         pk=pk,
     )
-    if request.user not in (thread.buyer, thread.supplier):
-        raise PermissionDenied
+    permission_service.authorize_thread_access(request.user.pk, thread, "access").deny_if_not_allowed()
 
     # Mark thread as read for current user
     from django.utils import timezone
@@ -1116,11 +1124,13 @@ def suggestion_message(request):
     listing_pk = request.POST.get("listing_pk")
     if listing_type == "supply_lot":
         lot = get_object_or_404(SupplyLot, pk=listing_pk)
+        permission_service.authorize_message_initiation(request.user.pk, lot).deny_if_not_allowed()
         item, _ = _get_or_create_watchlist_item(
             request.user, supply_lot=lot, source=WatchlistSource.SUGGESTION,
         )
     elif listing_type == "demand_post":
         post = get_object_or_404(DemandPost, pk=listing_pk)
+        permission_service.authorize_message_initiation(request.user.pk, post).deny_if_not_allowed()
         item, _ = _get_or_create_watchlist_item(
             request.user, demand_post=post, source=WatchlistSource.SUGGESTION,
         )
