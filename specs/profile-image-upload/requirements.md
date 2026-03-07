@@ -99,7 +99,7 @@ except ImportError:
 
 1. THE upload view SHALL reject any file exceeding **5 MB** before passing it to Pillow. The response SHALL be a form error, not a 500.
 2. THE upload view SHALL reject files whose reported content type is not one of: `image/jpeg`, `image/png`, `image/webp`. The response SHALL be a form error.
-3. After content-type pre-screening, the file SHALL be opened with Pillow and verified with `image.verify()`. Any file Pillow cannot parse as a valid image SHALL be rejected with a form error.
+3. After content-type pre-screening, the file SHALL be opened with Pillow and verified with `image.verify()`. Any file Pillow cannot parse as a valid image SHALL be rejected with a form error AND SHALL be logged at `WARNING` level including: authenticated user ID, user email, reported content type, file size, and timestamp. This log entry is the forensic record for investigating malformed or malicious upload attempts.
 4. THE original filename provided by the client SHALL be discarded entirely. The stored filename SHALL always be a server-generated UUID4 with the extension determined by the pipeline, never derived from client input.
 5. All uploads SHALL be re-encoded through Pillow unconditionally before storage. This re-encoding serves as the primary security control: it strips EXIF metadata and defuses parser-level exploits regardless of the source format.
 6. THE upload endpoint SHALL require an authenticated session. Unauthenticated requests SHALL receive a 302 redirect to login.
@@ -147,7 +147,7 @@ except ImportError:
 #### Acceptance Criteria
 
 1. **Profile page** (`/profile/`): THE user's own profile page SHALL display their avatar (or the default placeholder) prominently, with an affordance to upload or change the image.
-2. **Listing detail pages** (`/supply/<pk>/` and `/demand/<pk>/`): THE listing owner's avatar SHALL be displayed alongside their name in the listing detail view.
+2. **Listing detail pages** (`/supply/<pk>/` and `/demand/<pk>/`): THE listing owner's avatar SHALL be displayed alongside their name in the listing detail view. Clicking the avatar SHALL open a lightbox modal displaying the full 512×512 image. The modal SHALL trap focus and block all interaction with the page behind it until dismissed. The modal SHALL be dismissable by clicking a close button or clicking outside the image. No page navigation occurs.
 3. **Message thread** (`/threads/<pk>/`): Each message SHALL display the sender's avatar (or placeholder) alongside the message body.
 4. In all surfaces, avatars SHALL be rendered as circles via CSS `border-radius: 50%` and SHALL use `User.profile_image_url` so the default fallback is applied automatically.
 5. Avatar images in message threads and listing detail SHALL be rendered at a display size appropriate to the context (e.g., 40×40px for message avatars, 64×64px for listing owner). The same 512×512 source file is used in all cases; CSS constrains the display size.
