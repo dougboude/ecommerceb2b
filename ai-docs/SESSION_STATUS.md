@@ -387,9 +387,9 @@ Do not create new per-version status files.
 - Feature 11 (`profile-image-upload`) spec in progress — requirements approved, design doc written:
   - `specs/profile-image-upload/requirements.md` created (9 requirements)
   - Design proposal produced in session covering storage strategy, data model, security, processing pipeline, crop UX, surfaces, and reusability
-  - `specs/SPEC_ORDER.md` updated with Feature 11 entry, status `REQ, DES`
+  - `specs/SPEC_ORDER.md` updated with Feature 11 entry, status `REQ, DES, TASK`
 
 ## What's Next (if continuing)
 - User reviews `specs/profile-image-upload/requirements.md`
-- On approval of design: write tasks.md, then execute on a new branch
+- On approval of tasks: execute on a new branch `feat/11-profile-image-upload`
 - Remaining launch requirements after Feature 11: §5.4 Radius Filtering, §5.6 Operator Tools
