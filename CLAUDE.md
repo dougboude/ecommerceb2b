@@ -54,14 +54,12 @@ Django  ──(Unix socket)──>  Embedding Service (FastAPI/uvicorn)
 
 ## How to Run
 ```bash
-# Terminal 1: Start the embedding service
+# Recommended — start all three services at once:
+bash start.sh
+
+# Or start the embedding sidecar individually (e.g. for debugging):
 cd services/embedding
 bash run.sh
-# Or directly:
-EMBEDDING_SOCKET_PATH=/tmp/ecommerceb2b-embedding.sock uvicorn app:app --uds /tmp/ecommerceb2b-embedding.sock
-
-# Terminal 2: Django as usual
-.venv/bin/python manage.py runserver
 ```
 
 ## Configuration (env vars / settings.py)
@@ -114,18 +112,12 @@ Django   ──(HTTP POST /publish)──────>  SSE Service
 
 ## How to Run
 ```bash
-# Terminal 1: Start the SSE service
+# Recommended — start all three services at once:
+bash start.sh
+
+# Or start the SSE relay individually (e.g. for debugging):
 cd services/sse
 bash run.sh
-# Or directly:
-.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8001
-
-# Terminal 2: Start the embedding service
-cd services/embedding
-bash run.sh
-
-# Terminal 3: Django as usual
-.venv/bin/python manage.py runserver
 ```
 
 ## Configuration (env vars / settings.py)
@@ -188,6 +180,9 @@ bash run.sh
 - **Definition lists:** `dl`, `dt`, `dd`
 - **Match UI:** `.match-group`, `.match-group-header`, `.match-card`, `.match-card--watchlist`, `.match-card-inactive`, `.match-card-details`, `.match-card-actions`, `.match-card-actions-left`, `.match-card-actions-right`, `.match-badge`, `.match-badge-unsaved`, `.match-badge-saved`, `.tile-match-counts`, `.matches-scroll`, `details.match-group`
 - **Inbox/Messages:** `.nav-badge`, `.thread-unread`, `.thread-preview`
+- **Avatars:** `.avatar`, `.avatar-xs`, `.avatar-sm`, `.avatar-lg`, `.avatar-clickable`, `.listing-owner`
+- **Accessibility:** `.visually-hidden`
+- **Avatar lightbox:** `#avatar-lightbox`, `#avatar-lightbox::backdrop`, `#avatar-lightbox-close`
 - **Misc:** `.actions`, `.empty-state`, `.item-list`, `.pagination`
 - **Responsive:** `@media (max-width: 600px)`
 
@@ -196,3 +191,60 @@ bash run.sh
 - Prefer applying existing classes over adding new CSS.
 - Do not change business logic; styling changes should be class additions + CSS edits only.
 - When adding a new component class, add it to **both** skin files.
+
+# QA Infrastructure
+
+## Overview
+The `qa/` directory contains the manual test script and reset tooling for human testers.
+The seed command lives in `marketplace/management/commands/seed_test_data.py`.
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `bash start.sh` | Start full ecosystem (embedding + SSE + Django) |
+| `bash qa/full_reset.sh` | **Recommended test prep**: start ecosystem + seed DB + rebuild vector index |
+| `bash qa/reset_and_seed.sh` | DB-only reset when ecosystem is already running |
+| `.venv/bin/python manage.py seed_test_data` | Seed command (called by reset scripts) |
+| `.venv/bin/python manage.py rebuild_vector_index` | Rebuild ChromaDB after a DB reset |
+
+## Seed Personas
+
+All accounts use password `Seedpass1!`.
+
+| Email | Name | State | Key data |
+|-------|------|-------|----------|
+| alice@seed.test | Alice Thornton | verified, has avatar | 3 active supply, 1 paused, 1 expired |
+| bob@seed.test | Bob Mercado | verified, has avatar | 2 active demand, 1 paused, 1 expired; unread message |
+| carol@seed.test | Carol Vance | verified, **no avatar** | 1 supply + 1 demand |
+| dave@seed.test | Dave Okonkwo | verified, has avatar | 1 active, 1 fulfilled, 1 withdrawn supply; unread message |
+| eve@seed.test | Eve Nakamura | **UNVERIFIED** | Tests login-blocking + resend-verification |
+
+## Maintenance Contract — What to Update When a Feature Ships
+
+Every spec execution cycle **must** include updates to:
+
+1. **`marketplace/management/commands/seed_test_data.py`**
+   - Add at least one representative row for every new model, status, or feature
+   - Add a new persona or extend an existing one if the feature introduces a new user state
+   - If the feature changes a model field, update existing seed rows accordingly
+
+2. **`qa/MANUAL_TEST_SCRIPT.md`**
+   - Add a new section (or subsection) covering the new feature's happy path and key edge cases
+   - Mark high-value automation candidates with `[AUTO]`
+   - Add new items to the "Future Automation Targets" list
+   - Update "Known Limitations" if anything previously out-of-scope is now in-scope
+
+3. **`CLAUDE.md` (this file)**
+   - Add any new CSS contract classes to the Skin Contract section
+   - Add any new services, scripts, or management commands to the relevant tables
+   - Update the Seed Personas table if new accounts are added
+
+4. **`specs/SPEC_ORDER.md`**
+   - Update the feature's status to `EXEC`
+
+5. **`ai-docs/SESSION_STATUS.md`**
+   - Record what was built and the new test suite count
+
+The test script and seed command are **living documents**, not one-time artifacts.
+A feature is not fully shipped until all five of the above are updated.
