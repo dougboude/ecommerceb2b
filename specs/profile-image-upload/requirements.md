@@ -102,7 +102,8 @@ except ImportError:
 3. After content-type pre-screening, the file SHALL be opened with Pillow and verified with `image.verify()`. Any file Pillow cannot parse as a valid image SHALL be rejected with a form error AND SHALL be logged at `WARNING` level including: authenticated user ID, user email, reported content type, file size, and timestamp. This log entry is the forensic record for investigating malformed or malicious upload attempts.
 4. THE original filename provided by the client SHALL be discarded entirely. The stored filename SHALL always be a server-generated UUID4 with the extension determined by the pipeline, never derived from client input.
 5. All uploads SHALL be re-encoded through Pillow unconditionally before storage. This re-encoding serves as the primary security control: it strips EXIF metadata and defuses parser-level exploits regardless of the source format.
-6. THE upload endpoint SHALL require an authenticated session. Unauthenticated requests SHALL receive a 302 redirect to login.
+6. THE upload view SHALL reject any image whose width or height is less than **256 pixels** after opening with Pillow. The response SHALL be a form error. This check SHALL occur after Pillow successfully parses the file and before any processing begins.
+7. THE upload endpoint SHALL require an authenticated session. Unauthenticated requests SHALL receive a 302 redirect to login.
 
 ---
 
@@ -119,8 +120,8 @@ except ImportError:
    - Otherwise, the image SHALL be converted to `RGB` and output SHALL be **JPEG at quality 85**.
 4. THE pipeline SHALL strip all EXIF and metadata. This is achieved implicitly by re-encoding through Pillow — no explicit EXIF removal step is required beyond the re-encode.
 5. THE output image SHALL use the sRGB color space. Images in other color spaces SHALL be converted during re-encoding.
-6. THE pipeline SHALL accept the crop region as a parameter (pixel coordinates of the square crop within the pre-cropped blob received from the client). If no crop coordinates are provided, the pipeline SHALL center-crop to square before resizing.
-7. When a user uploads a new profile image, the pipeline SHALL delete the previously stored file from the storage backend before saving the new file. If the old file does not exist on the storage backend, the deletion failure SHALL be logged and silently swallowed — it SHALL NOT prevent the new image from being saved.
+6. THE pipeline SHALL NOT accept crop coordinates from the client. The crop blob received from the client is already a square image produced by the Canvas API. The server SHALL resize that blob directly to 512×512 without any server-side cropping step.
+7. When a user uploads a new profile image, the pipeline SHALL perform operations in the following order: (a) validate and process the new image, (b) save the new image file to storage, (c) update the user record with the new path and `profile_image_updated_at`, (d) delete the previously stored file from the storage backend. The old file SHALL only be deleted after the new image has been successfully saved and the user record updated. If the old file does not exist on the storage backend, the deletion failure SHALL be logged and silently swallowed — it SHALL NOT raise an error.
 
 ---
 
