@@ -7,6 +7,12 @@ If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Completed Admin Console spec set through tasks planning:
+  - `specs/admin-console/tasks.md` added (execution-ready implementation checklist)
+  - `specs/SPEC_ORDER.md` updated with `admin-console` as item 12, status `REQ, DES, TASK` (ready, not executed)
+- Added Admin Console design spec draft:
+  - `specs/admin-console/design.md`
+  - reuse-first design centered on existing `User`, `Listing`, and `MessageThread` models with minimal additions (`ContentFlag`, `AdminAuditLog`, `ModerationNote`)
 - Added new requirements spec draft for internal operator tooling:
   - `specs/admin-console/requirements.md`
   - includes admin access model, user/listing moderation, flag queue, constrained messaging oversight, dashboard metrics, global search, and audit logging

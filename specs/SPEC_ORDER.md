@@ -82,6 +82,12 @@ Rules:
    - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/profile-image-upload/`
 
+12. **admin-console**
+   - Phase: POST-LAUNCH
+   - Depends on: `legacy-schema-cleanup-and-final-cutover`, `email-verification-and-account-activation`, `profile-image-upload`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/admin-console/`
+
 ## Maintenance Workflow
 
 When creating a new spec:
