@@ -245,11 +245,17 @@ messaging between two users.
 - [ ] Confirm if prompted
 - [ ] **Expected:** Listing no longer appears in `/available/`
 
-### 3.7 Expired supply listing display
+### 3.7 Expired supply listing — lazy flip and vector index sync `[AUTO]`
 
-- [ ] If you set an "Available Until" date in the past on a listing, navigate to its detail page
+- [ ] Set an "Available Until" date in the past on an active supply listing and save
+- [ ] Navigate away, then return to its detail page
 - [ ] **Expected:** Status badge shows "Expired"
-- [ ] **Expected:** Edit/Pause/Withdraw buttons are hidden
+- [ ] **Expected:** Edit, Pause, and Withdraw buttons are hidden
+- [ ] **Expected (lazy DB flip):** Refreshing the detail page a second time still shows "Expired" — the status was written to the DB on first visit, not re-evaluated each time
+- [ ] Go to Discover and search for the expired item's keywords
+- [ ] **Expected (vector sync):** The expired listing does not appear in results
+- [ ] Edit the listing and set a future "Available Until" date, then save
+- [ ] **Expected (re-activation):** Listing status returns to Active and reappears in Discover search results
 
 ---
 
@@ -286,6 +292,17 @@ messaging between two users.
 - [ ] Create a second demand listing for deletion testing
 - [ ] Delete it
 - [ ] **Expected:** No longer appears in `/wanted/`
+
+### 4.6 Expired demand listing — lazy flip and vector index sync `[AUTO]`
+
+- [ ] Set an expiry date in the past on an active demand listing and save
+- [ ] Navigate away, then return to its detail page
+- [ ] **Expected:** Status badge shows "Expired"
+- [ ] **Expected (lazy DB flip):** Refreshing the detail page a second time still shows "Expired"
+- [ ] Go to Discover and search for the expired item's keywords
+- [ ] **Expected (vector sync):** The expired listing does not appear in results
+- [ ] Edit the listing and set a future expiry date, then save
+- [ ] **Expected (re-activation):** Listing status returns to Active and reappears in Discover search results
 
 ---
 
@@ -496,11 +513,13 @@ messaging between two users.
 - [ ] Press Escape or click the X button
 - [ ] **Expected:** Filter is cleared and all tiles are shown again
 
-### 10.2 Expired listing — no edit actions
+### 10.2 Expired listing — no edit actions and lazy flip idempotency
 
-- [ ] View a listing with an expiry date in the past
+- [ ] View a listing with an expiry date in the past (first visit after expiry)
 - [ ] **Expected:** Status shows "Expired"
 - [ ] **Expected:** Edit, Pause, and Withdraw buttons are not shown
+- [ ] Reload the same detail page
+- [ ] **Expected:** Page loads normally — no error, status still "Expired" (DB flip is idempotent)
 
 ### 10.3 Long content
 
@@ -537,6 +556,7 @@ Use these `[AUTO]` items first when converting manual checks into automated suit
 
 - Account flow: 1.1, 1.2, 1.4, 1.5, 1.6, 1.7
 - Listing creation: 3.1 and 4.1
+- Lazy expiry flip + vector sync: 3.7 and 4.6
 - Discover/search: 5.1 and 5.7
 - Watchlist: 6.1
 - Messaging: 7.1 and 7.7
@@ -558,4 +578,4 @@ When you find a bug, record:
 
 ---
 
-*Last updated: 2026-03-07 — covers Features 1–11 (migration foundation, unified listings, messaging, discover, UI derolification, email verification, listing expiry, profile image upload)*
+*Last updated: 2026-03-08 — covers Features 1–11 + lazy expiry DB flip and vector index sync (supply and demand detail views)*
