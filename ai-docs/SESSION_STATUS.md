@@ -1,12 +1,20 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-07
+**Last updated:** 2026-03-08
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Added new requirements spec draft for internal operator tooling:
+  - `specs/admin-console/requirements.md`
+  - includes admin access model, user/listing moderation, flag queue, constrained messaging oversight, dashboard metrics, global search, and audit logging
+- **Lazy expiry DB flip + vector index sync** (`marketplace/views.py`):
+  - Discovered that `ListingStatus.EXPIRED` was defined but never written by application code — expiry was implicit via `expires_at` field only, leaving status as `ACTIVE` in the DB indefinitely.
+  - Implemented lazy flip in `supply_lot_detail` and `demand_post_detail`: on first visit after expiry, status is written to `EXPIRED` and the listing is removed from the ChromaDB vector index.
+  - Guard condition (`status == ACTIVE`) prevents double-removal on subsequent visits.
+  - Background housekeeping job (§6.5) still needed for listings that expire without ever being visited.
 - Added sales-facing overview document for partner/demo enablement:
   - `specs/SALES_AUDIENCE_OVERVIEW.md`
   - non-technical summary of purpose, target markets, core capabilities, demo talking points, and deliberate scope boundaries

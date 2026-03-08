@@ -604,6 +604,10 @@ def demand_post_edit(request, pk):
 @login_required
 def demand_post_detail(request, pk):
     post = _get_listing_or_404(pk, ListingType.DEMAND)
+    if post.is_expired and post.status == ListingStatus.ACTIVE:
+        post.status = ListingStatus.EXPIRED
+        post.save(update_fields=["status"])
+        _remove_listing_from_vector_index(post)
     is_owner = post.created_by_user == request.user
     post.post_number = _get_post_number(post)
     suggestions = []
@@ -722,6 +726,10 @@ def supply_lot_edit(request, pk):
 @login_required
 def supply_lot_detail(request, pk):
     lot = _get_listing_or_404(pk, ListingType.SUPPLY)
+    if lot.is_expired and lot.status == ListingStatus.ACTIVE:
+        lot.status = ListingStatus.EXPIRED
+        lot.save(update_fields=["status"])
+        _remove_listing_from_vector_index(lot)
     is_owner = lot.created_by_user == request.user
     lot.lot_number = _get_lot_number(lot)
     suggestions = []
