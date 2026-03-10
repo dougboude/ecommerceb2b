@@ -70,11 +70,9 @@ configuration library installed so Django can connect to PostgreSQL.
 
 1. `psycopg2-binary>=2.9` SHALL be added to `requirements.txt`.
 2. `dj-database-url>=2.0` SHALL be added to `requirements.txt`.
-3. Both packages SHALL be installable via `.venv/bin/pip install -r requirements.txt`
+3. `python-dotenv>=1.0` SHALL also be added to `requirements.txt`.
+4. All three packages SHALL be installable via `.venv/bin/pip install -r requirements.txt`
    without errors on the development platform.
-4. SQLite dependencies SHALL NOT be removed — Django's SQLite backend
-   remains available as a fallback for contributors who run tests without
-   a Postgres instance.
 
 ---
 
@@ -88,16 +86,16 @@ dev, CI, and production without code changes.
 
 1. `settings.py` SHALL use `dj-database-url` to parse a `DATABASE_URL`
    environment variable into `DATABASES["default"]`.
-2. If `DATABASE_URL` is not set, `settings.py` SHALL fall back to the
-   existing SQLite configuration (`db.sqlite3`) so the app continues to
-   work for contributors who have not configured Postgres.
-3. The fallback SHALL produce a visible warning in the console at startup
-   so developers are aware they are not running against Postgres.
-4. The `DATABASE_URL` variable SHALL be read via `os.environ.get("DATABASE_URL")`
-   — no additional libraries beyond `dj-database-url` are required.
-5. `CONN_MAX_AGE` SHALL be set to `600` (seconds) when a `DATABASE_URL`
-   is present, to enable persistent connections. It SHALL be `0` for the
-   SQLite fallback.
+2. If `DATABASE_URL` is not set, `settings.py` SHALL raise
+   `django.core.exceptions.ImproperlyConfigured` immediately at startup
+   with a clear message directing the developer to copy `.env.example`
+   to `.env`. There is no SQLite fallback.
+3. The `DATABASE_URL` variable SHALL be loaded via `python-dotenv`'s
+   `load_dotenv()` call at the top of `settings.py`, before any
+   `os.environ` reads.
+4. `CONN_MAX_AGE` SHALL be set to `600` (seconds) to enable persistent
+   connections. `conn_health_checks=True` SHALL also be set to recycle
+   stale connections automatically.
 
 ---
 
@@ -143,8 +141,8 @@ develop and test against the same database.
 ### Requirement 4: Migration Integrity on PostgreSQL
 
 **User Story:** As a developer, I want all existing Django migrations to
-apply cleanly to a fresh Postgres database so the schema is identical to
-what SQLite produces.
+apply cleanly to a fresh Postgres database so the schema is correct and
+complete.
 
 #### Acceptance Criteria
 
@@ -155,8 +153,7 @@ what SQLite produces.
 3. No new migrations SHALL be created as part of this spec. The existing
    migration history is database-agnostic and requires no modification.
 4. The `seed_test_data` management command SHALL execute successfully
-   against Postgres and produce the same seed dataset as it does against
-   SQLite.
+   against Postgres and produce the correct seed dataset.
 
 ---
 
@@ -168,19 +165,17 @@ existing behaviour.
 
 #### Acceptance Criteria
 
-1. All existing tests SHALL pass when run with `DATABASE_URL` pointing at
-   a Postgres instance:
+1. All existing tests SHALL pass against Postgres. With `python-dotenv`
+   loading `.env`, the test command is simply:
    ```bash
-   DATABASE_URL=postgres://postgres:postgres@localhost:5432/ecommerceb2b \
    .venv/bin/python manage.py test
    ```
 2. Tests that use `@override_settings` for storage SHALL continue to work
    unchanged — no test code modifications are expected.
-3. If any test fails only on Postgres (not SQLite), the failure SHALL be
-   treated as a bug to fix before this spec is marked `EXEC` — it is not
-   acceptable to have tests that only pass on one engine.
-4. The CI test run (if configured) SHALL be updated to run against Postgres
-   rather than SQLite.
+3. If any test fails against Postgres, the failure SHALL be treated as a
+   bug to fix before this spec is marked `EXEC`. There is no acceptable
+   state where a test passes against one engine but not the other.
+4. The CI test run (if configured) SHALL be updated to run against Postgres.
 
 ---
 
@@ -196,14 +191,58 @@ so I don't accidentally run against SQLite without realising it.
    database engine for development, including the Docker command and
    `.env` setup.
 2. `ai-docs/AGENT_NOTES.md` SHALL be updated to note that `DATABASE_URL`
-   must be set in the environment and that the SQLite fallback produces a
-   console warning.
-3. `qa/README.md` SHALL be updated to include the Postgres container
-   startup step in the "Quick Start" section, ahead of `bash qa/full_reset.sh`.
+   must be set via `.env` and that a missing value raises
+   `ImproperlyConfigured` at startup.
+3. `qa/README.md` SHALL be updated: `bash start.sh` handles Postgres
+   automatically — no separate Docker step needed. A "Wiping the Database"
+   note SHALL be added explaining `rm -rf data/pgdata/`.
 
 ---
 
-### Requirement 7: Scope Boundaries
+### Requirement 7: Ecosystem Lifecycle — start.sh and stop.sh
+
+**User Story:** As a developer, I want `start.sh` to bring up the entire
+ecosystem including the database, and `stop.sh` to shut everything down
+completely, so there is no ambiguity about what is running.
+
+#### Acceptance Criteria
+
+1. `start.sh` SHALL manage the Postgres container lifecycle:
+   - If the container does not exist, create it with the bind mount to
+     `data/pgdata/` and wait for it to be ready before proceeding.
+   - If the container exists but is stopped, start it and wait for ready.
+   - If the container is already running, proceed without action.
+2. `start.sh` SHALL poll until Postgres accepts connections before starting
+   Django. If Postgres does not become ready within a reasonable timeout,
+   `start.sh` SHALL exit with a clear error message.
+3. `stop.sh` SHALL stop the Postgres container (`docker stop
+   ecommerceb2b-postgres`) as part of its shutdown sequence. When
+   `stop.sh` exits, no part of the ecosystem SHALL remain running.
+4. The Postgres container SHALL use a bind mount to `data/pgdata/` (a
+   developer-owned directory inside the project) for data persistence.
+   Docker-managed named volumes SHALL NOT be used.
+5. `--restart unless-stopped` SHALL NOT be set on the container. `start.sh`
+   owns the lifecycle — Postgres starts and stops only when explicitly told to.
+
+---
+
+### Requirement 8: Seed Script Preflight Checks
+
+**User Story:** As a developer running QA reset scripts, I want a clear
+error if Postgres is not running rather than a cryptic Django crash.
+
+#### Acceptance Criteria
+
+1. `qa/full_reset.sh` SHALL verify the Postgres container is running and
+   accepting connections before executing any Django management commands.
+   If Postgres is not ready, the script SHALL exit with a clear message.
+2. `qa/reset_and_seed.sh` SHALL perform the same preflight check.
+3. The preflight check SHALL use `docker exec ecommerceb2b-postgres
+   pg_isready` or equivalent — not a raw TCP check.
+
+---
+
+### Requirement 9: Scope Boundaries
 
 The following are explicitly **out of scope** for this spec:
 
@@ -216,5 +255,3 @@ The following are explicitly **out of scope** for this spec:
    post-launch infrastructure concern.
 6. Read replicas, backups, or any production database operations policy —
    out of scope for this spec; addressed at deployment time.
-7. Removing the SQLite fallback — retained indefinitely for contributors
-   who run quick checks without Docker.
