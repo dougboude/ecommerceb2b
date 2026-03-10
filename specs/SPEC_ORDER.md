@@ -88,6 +88,12 @@ Rules:
    - Status: `REQ, DES, TASK`
    - Path: `specs/admin-console/`
 
+13. **postgres-database-migration**
+   - Phase: INFRASTRUCTURE
+   - Depends on: Features 1–11 (`EXEC`)
+   - Status: `REQ`
+   - Path: `specs/postgres-database-migration/`
+
 ## Maintenance Workflow
 
 When creating a new spec:
