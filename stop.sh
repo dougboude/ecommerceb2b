@@ -74,11 +74,11 @@ kill_port_owner() {
     return 1
 }
 
-# ── Config (must match start.sh defaults) ────────────────────────────────────
+# ── Config (values come from .env — must match start.sh) ─────────────────────
 
-EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
-SSE_PORT="${SSE_PORT:-8001}"
-DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
+EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+SSE_PORT="$SSE_PORT"
+DJANGO_ADDR="$DJANGO_ADDR"
 DJANGO_PORT="${DJANGO_ADDR##*:}"
 
 PID_FILE="$LOG_DIR/start.pids"

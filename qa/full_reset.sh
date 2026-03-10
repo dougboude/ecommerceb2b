@@ -34,8 +34,8 @@ if [ -f "$REPO_ROOT/.env" ]; then
     set -u
 fi
 
-EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
-DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
+EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+DJANGO_ADDR="$DJANGO_ADDR"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

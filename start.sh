@@ -90,11 +90,11 @@ trap kill_children EXIT
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
-SSE_HOST="${SSE_HOST:-127.0.0.1}"
-SSE_PORT="${SSE_PORT:-8001}"
-DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
-PGDATA_DIR="${PGDATA_DIR:-$HOME/.local/share/ecommerceb2b/pgdata}"
+EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+SSE_HOST="$SSE_HOST"
+SSE_PORT="$SSE_PORT"
+DJANGO_ADDR="$DJANGO_ADDR"
+PGDATA_DIR="$PGDATA_DIR"
 
 PID_FILE="$LOG_DIR/start.pids"
 
