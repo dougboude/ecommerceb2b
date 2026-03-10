@@ -83,6 +83,11 @@ kill_children() {
     for pid in ${EMBEDDING_PID:-} ${SSE_PID:-} ${DJANGO_PID:-}; do
         kill -9 "$pid" 2>/dev/null || true
     done
+    # Stop the Postgres container.
+    if [ "$(docker ps -q -f name=^ecommerceb2b-postgres$)" ]; then
+        log "Stopping Postgres container..."
+        docker stop ecommerceb2b-postgres > /dev/null
+    fi
     log "All processes stopped."
 }
 trap kill_children INT TERM
