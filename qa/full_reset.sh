@@ -21,6 +21,15 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="$REPO_ROOT/.venv/bin/python"
+
+# Load .env so all variables come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
 EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
 DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
 
@@ -31,6 +40,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 cd "$REPO_ROOT"
+
+# ── Step 0: Verify Docker is available ────────────────────────────────────
+
+if ! docker info > /dev/null 2>&1; then
+    echo "ERROR: Docker is not running. Start Docker and try again."
+    exit 1
+fi
 
 # ── Step 1: Start the ecosystem in the background ─────────────────────────
 
@@ -84,7 +100,15 @@ echo ""
 
 # ── Step 3: Seed the database ─────────────────────────────────────────────
 
-echo "Step 3 — Applying migrations and seeding database..."
+echo "Step 3 — Checking Postgres is ready..."
+if ! docker exec ecommerceb2b-postgres pg_isready -U postgres -q 2>/dev/null; then
+    echo "ERROR: Postgres container is not responding. Check Docker logs."
+    kill $START_SH_PID 2>/dev/null
+    exit 1
+fi
+echo "  Postgres ready."
+echo ""
+echo "  Applying migrations and seeding database..."
 "$PYTHON" manage.py migrate --run-syncdb
 "$PYTHON" manage.py seed_test_data
 echo ""

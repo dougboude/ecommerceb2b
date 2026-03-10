@@ -1,0 +1,19 @@
+The secret history of the world by mark booth and the wisdom of all ages by manly p hall and any game of thrones books 
+
+Justin Trevino John B connally Unit
+899 FM632, Kenedy, TX 78119 
+1.1 sign-up - should have to specify my timezone, first name, last name during signup. if not, i arrive at an active account with those pieces of information not present and no indicator that i need to complete my profile. it's just a few additional pieces of info, i don't believe it's too much to add to a signup. or is it? open to discussion. Otherwise, we do need to provide an indicator near the profile link calling my attention to the fact that i need to complete it.
+
+Profile - I want to see my profile as my profile image at the top right of my screen like so many other softwares do it, and when i hover my profile picture i see options for profile and logout. replace the logout button with a logout link under my profile image hover.
+
+Edit profile - i do not want to see my listings when viewing my profile...unrelated information.
+
+green message bars that appear after some actions...should have an x to close, and should fade out after 10 seconds.
+
+Login - we have no "forgot my password" or "reset my password" functionality
+
+2.5 - chose a PDF file. The 'crop your photo' modal popped up wanting me to edit my photo, no error at all. clicking 'use this photo' gave me a message 'uploading...'. i should not have been able to select the pdf in the first place, and the modal should not load for any invalid file. clicking cancel stopped the process, closed the modal. Selecting a gif did load the image and allowed me to crop it.
+
+2.6 - selected file that was 200x200, it allowed me to select it and use it.
+
+at 2.7

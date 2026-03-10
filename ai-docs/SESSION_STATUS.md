@@ -1,12 +1,21 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-08
+**Last updated:** 2026-03-10
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- **Feature 13: PostgreSQL database migration** (`specs/postgres-database-migration/`):
+  - Removed SQLite fallback from `settings.py`; missing `DATABASE_URL` now raises `ImproperlyConfigured`
+  - `start.sh` manages full Postgres container lifecycle (create/start/health check); sources `.env` for all variables
+  - `stop.sh` stops Postgres container as part of full shutdown; sources `.env`
+  - `qa/full_reset.sh` and `qa/reset_and_seed.sh` source `.env` and include Postgres preflight checks
+  - `PGDATA_DIR` added to `.env` / `.env.example` — single source of truth for all scripts
+  - Postgres data stored at `~/.local/share/ecommerceb2b/pgdata` (WSL2 native FS required — `/mnt/c/` lacks chmod support)
+  - All 33 migrations applied cleanly to Postgres; seed data verified; 64 tests pass, 0 failures
+  - `CLAUDE.md`, `AGENT_NOTES.md`, `qa/README.md`, design doc updated with WSL2 bind mount caveat
 - Completed Admin Console spec set through tasks planning:
   - `specs/admin-console/tasks.md` added (execution-ready implementation checklist)
   - `specs/SPEC_ORDER.md` updated with `admin-console` as item 12, status `REQ, DES, TASK` (ready, not executed)

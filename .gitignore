@@ -44,6 +44,9 @@ htmlcov/
 # ChromaDB vector store
 data/chroma/
 
+# PostgreSQL data directory lives on the WSL2 native filesystem, not here.
+# Default: ~/.local/share/ecommerceb2b/pgdata (overridable via PGDATA_DIR)
+
 # Compiled translations
 *.mo
 

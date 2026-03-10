@@ -33,12 +33,42 @@ If any planned work conflicts with a higher-authority document, **stop and ask t
 
 ## Tech Stack
 
-- Python 3.12 / Django / PostgreSQL (SQLite for local dev)
+- Python 3.12 / Django / PostgreSQL
 - Server-rendered templates, no SPA
 - Django ORM, Django built-in auth
 - Virtual environment: `.venv/bin/python`
 - Run Django commands with: `.venv/bin/python manage.py <command>`
 - Embedding sidecar service (FastAPI/uvicorn) for vector search — see below
+
+## Local Database Setup
+
+PostgreSQL 16 is required. `start.sh` manages the Docker container automatically —
+you do not need to run `docker run` manually.
+
+**First-time setup:**
+```bash
+cp .env.example .env   # DATABASE_URL is pre-configured for local dev
+.venv/bin/pip install -r requirements.txt
+bash start.sh          # creates container, migrates, starts all services
+```
+
+**Daily workflow:** `bash start.sh` / `bash stop.sh` — unchanged.
+
+**Wiping all data (full clean slate):**
+```bash
+bash stop.sh
+rm -rf ~/.local/share/ecommerceb2b/pgdata
+bash qa/full_reset.sh
+```
+
+**Data persistence:** Postgres data lives in `~/.local/share/ecommerceb2b/pgdata`
+on the WSL2 native Linux filesystem (not inside the project directory). This path
+is required — the Windows filesystem (`/mnt/c/`) does not support the permissions
+Postgres needs. Override with the `PGDATA_DIR` environment variable if needed.
+Data survives stop/start cycles. Deleting that directory is the only way to lose data.
+
+**`DATABASE_URL` is required.** A missing value raises `ImproperlyConfigured` at
+Django startup — there is no SQLite fallback. Configure it via `.env`.
 
 # Embedding Service (Sidecar)
 

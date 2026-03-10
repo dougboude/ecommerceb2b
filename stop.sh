@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # stop.sh — Stop the ecommerceb2b application ecosystem.
 #
+# Stops all components: Django, SSE relay, embedding sidecar, and the
+# Postgres Docker container. When this script exits, nothing is running.
+#
 # Works regardless of how the ecosystem was started:
 #   - If started via start.sh: uses the PID file for precise targeting.
 #   - Fallback: finds and kills anything holding the known socket/ports.
@@ -9,6 +12,14 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$REPO_ROOT/logs"
+
+# Load .env so variables like PGDATA_DIR come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
 
 log() { echo "[stop.sh] $*"; }
 
@@ -89,6 +100,16 @@ kill_port_owner   "$DJANGO_PORT"      "Django"             && KILLED=$(( KILLED 
 # ── Clean up ─────────────────────────────────────────────────────────────────
 
 rm -f "$EMBEDDING_SOCKET"
+
+# ── Postgres container ────────────────────────────────────────────────────────
+
+if [ "$(docker ps -q -f name=^ecommerceb2b-postgres$)" ]; then
+    log "Stopping Postgres container..."
+    docker stop ecommerceb2b-postgres > /dev/null
+    KILLED=$(( KILLED + 1 ))
+else
+    log "Postgres container is not running."
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 

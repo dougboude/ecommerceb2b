@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
 # start.sh — Start the full ecommerceb2b application ecosystem.
 #
-# Launches three processes:
-#   1. Embedding sidecar  (FastAPI / Unix socket)
-#   2. SSE relay sidecar  (FastAPI / TCP :8001)
-#   3. Django dev server  (manage.py runserver)
+# Manages the complete lifecycle:
+#   0. PostgreSQL container  (Docker / localhost:5432)
+#   1. Embedding sidecar     (FastAPI / Unix socket)
+#   2. SSE relay sidecar     (FastAPI / TCP :8001)
+#   3. Django dev server     (manage.py runserver)
 #
 # Each process writes to its own log file under logs/.
-# Press Ctrl-C once to stop everything.
+# Press Ctrl-C once to stop everything (including Postgres).
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$REPO_ROOT/logs"
 VENV_BIN="$REPO_ROOT/.venv/bin"
+
+# Load .env so all variables (including PGDATA_DIR) come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
 
 mkdir -p "$LOG_DIR"
 
@@ -81,6 +90,7 @@ EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
 SSE_HOST="${SSE_HOST:-127.0.0.1}"
 SSE_PORT="${SSE_PORT:-8001}"
 DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
+PGDATA_DIR="${PGDATA_DIR:-$HOME/.local/share/ecommerceb2b/pgdata}"
 
 PID_FILE="$LOG_DIR/start.pids"
 
@@ -140,6 +150,48 @@ kill_port_owner   "$DJANGO_PORT"      "Django"              && NEEDS_SLEEP=1 || 
 
 # Clean up stale socket file.
 rm -f "$EMBEDDING_SOCKET"
+
+# ── 0. PostgreSQL container ───────────────────────────────────────────────────
+
+start_postgres() {
+    if ! docker info > /dev/null 2>&1; then
+        log "ERROR: Docker is not running. Start Docker and try again."
+        exit 1
+    fi
+
+    if [ ! "$(docker ps -aq -f name=^ecommerceb2b-postgres$)" ]; then
+        log "Creating Postgres container (first time)..."
+        docker run -d \
+            --name ecommerceb2b-postgres \
+            -e POSTGRES_DB=ecommerceb2b \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            -v "$PGDATA_DIR:/var/lib/postgresql/data" \
+            postgres:16 > /dev/null
+    elif [ ! "$(docker ps -q -f name=^ecommerceb2b-postgres$)" ]; then
+        log "Starting existing Postgres container..."
+        docker start ecommerceb2b-postgres > /dev/null
+    else
+        log "Postgres already running."
+    fi
+
+    printf '[start.sh] Waiting for Postgres (up to 30s) '
+    local attempts=0
+    until docker exec ecommerceb2b-postgres pg_isready -U postgres -q 2>/dev/null; do
+        attempts=$(( attempts + 1 ))
+        if [ "$attempts" -ge 30 ]; then
+            echo " TIMEOUT"
+            log "ERROR: Postgres did not become ready — check Docker logs."
+            exit 1
+        fi
+        printf '.'
+        sleep 1
+    done
+    echo " OK"
+}
+
+start_postgres
 
 # ── 1. Embedding sidecar ─────────────────────────────────────────────────────
 
