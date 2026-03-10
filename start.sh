@@ -17,11 +17,15 @@ LOG_DIR="$REPO_ROOT/logs"
 VENV_BIN="$REPO_ROOT/.venv/bin"
 
 # Load .env so all variables (including PGDATA_DIR) come from one place.
+# set +u temporarily: SECRET_KEY and other values may contain $ characters
+# that bash would try to expand as variables under -u (nounset).
 if [ -f "$REPO_ROOT/.env" ]; then
+    set +u
     set -a
     # shellcheck disable=SC1091
     source "$REPO_ROOT/.env"
     set +a
+    set -u
 fi
 
 mkdir -p "$LOG_DIR"
