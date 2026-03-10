@@ -89,8 +89,8 @@ KILLED=0
 
 if [ -f "$PID_FILE" ]; then
     log "Found PID file — stopping managed processes..."
-    while read -r pid; do
-        kill_pid "$pid" "managed process" && KILLED=$(( KILLED + 1 )) || true
+    while IFS=: read -r label pid; do
+        kill_pid "$pid" "$label" && KILLED=$(( KILLED + 1 )) || true
     done < "$PID_FILE"
     rm -f "$PID_FILE"
 fi
