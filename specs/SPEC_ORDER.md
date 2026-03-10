@@ -90,7 +90,7 @@ Rules:
 
 13. **postgres-database-migration**
    - Phase: INFRASTRUCTURE
-   - Depends on: Features 1–11 (`EXEC`)
+   - Depends on: Features 1–10 (`EXEC`) — does not require `admin-console`
    - Status: `REQ`
    - Path: `specs/postgres-database-migration/`
 

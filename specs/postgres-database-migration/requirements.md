@@ -25,7 +25,7 @@ storage migration. Those are separate specs.
 
 | Assumption | Required State | Fail Condition |
 |---|---|---|
-| All foundation specs complete | Features 1–11 `EXEC` | Block if any prior spec is not `EXEC` |
+| All foundation specs complete | Features 1–10 `EXEC` | Block if any of specs 1–10 are not `EXEC` |
 | Docker available locally | `docker --version` succeeds | Warn; operator may use a native Postgres install instead |
 | No pending migrations | `manage.py migrate --check` passes | Block if unapplied migrations exist before switching engines |
 
