@@ -44,6 +44,9 @@ htmlcov/
 # ChromaDB vector store
 data/chroma/
 
+# PostgreSQL data directory (bind mount for local Docker container)
+data/pgdata/
+
 # Compiled translations
 *.mo
 

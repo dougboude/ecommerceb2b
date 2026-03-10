@@ -32,6 +32,13 @@ echo ""
 
 cd "$REPO_ROOT"
 
+# ── Step 0: Verify Docker is available ────────────────────────────────────
+
+if ! docker info > /dev/null 2>&1; then
+    echo "ERROR: Docker is not running. Start Docker and try again."
+    exit 1
+fi
+
 # ── Step 1: Start the ecosystem in the background ─────────────────────────
 
 echo "Step 1 — Starting ecosystem (start.sh)..."
@@ -84,7 +91,15 @@ echo ""
 
 # ── Step 3: Seed the database ─────────────────────────────────────────────
 
-echo "Step 3 — Applying migrations and seeding database..."
+echo "Step 3 — Checking Postgres is ready..."
+if ! docker exec ecommerceb2b-postgres pg_isready -U postgres -q 2>/dev/null; then
+    echo "ERROR: Postgres container is not responding. Check Docker logs."
+    kill $START_SH_PID 2>/dev/null
+    exit 1
+fi
+echo "  Postgres ready."
+echo ""
+echo "  Applying migrations and seeding database..."
 "$PYTHON" manage.py migrate --run-syncdb
 "$PYTHON" manage.py seed_test_data
 echo ""

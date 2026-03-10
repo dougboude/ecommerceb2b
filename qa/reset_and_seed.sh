@@ -11,12 +11,11 @@
 #   - The ecosystem is already running and you want to re-seed without restarting
 #   - You want a fast DB-only reset during development
 #
+# Requires: Postgres container must be running (start.sh manages this).
+#
 # Usage:
 #   bash qa/reset_and_seed.sh
 #   .venv/bin/python manage.py rebuild_vector_index   # if semantic search is needed
-#
-# The application does NOT need to be stopped. Django management commands are
-# safe to run against a live SQLite dev database.
 
 set -euo pipefail
 
@@ -30,6 +29,14 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 cd "$REPO_ROOT"
+
+echo "Checking Postgres..."
+if ! docker exec ecommerceb2b-postgres pg_isready -U postgres -q 2>/dev/null; then
+    echo "ERROR: Postgres is not running. Run 'bash start.sh' first."
+    exit 1
+fi
+echo "Postgres ready."
+echo ""
 
 echo "Step 1/3 — Applying migrations..."
 "$PYTHON" manage.py migrate --run-syncdb

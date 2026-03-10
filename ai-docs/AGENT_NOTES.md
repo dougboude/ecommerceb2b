@@ -101,11 +101,34 @@ via `Model.objects.filter(pk=obj.pk).update(created_at=desired_time)`.
 
 ---
 
+## Database — PostgreSQL
+
+### DATABASE_URL is required — no SQLite fallback
+`config/settings.py` raises `django.core.exceptions.ImproperlyConfigured` at startup
+if `DATABASE_URL` is not set. There is no SQLite fallback. Configure it via `.env`
+(copy `.env.example` to `.env`). `python-dotenv` loads `.env` automatically — no
+manual shell exports needed.
+
+### data/pgdata/ is the Postgres data directory
+The Docker container stores its data in `data/pgdata/` (a bind mount). Do not delete
+this directory unless you intend to wipe all data. To do a clean wipe:
+```bash
+bash stop.sh && rm -rf data/pgdata/ && bash qa/full_reset.sh
+```
+
+### start.sh manages the full Postgres lifecycle
+`start.sh` creates the container on first run, starts it if stopped, and waits for
+it to be ready before starting Django. `stop.sh` stops the container. You never need
+to run `docker run` or `docker stop` manually.
+
+---
+
 ## QA Infrastructure — Quick Reference
 
 | Command | Purpose |
 |---------|---------|
-| `bash start.sh` | Start full ecosystem (all 3 services) |
+| `bash start.sh` | Start full ecosystem (Postgres + all 3 services) |
+| `bash stop.sh` | Stop full ecosystem (including Postgres) |
 | `bash qa/full_reset.sh` | Complete reset: start + seed + vector index rebuild |
 | `bash qa/reset_and_seed.sh` | DB-only reset when ecosystem is already running |
 | `.venv/bin/python manage.py seed_test_data` | Seed the database |
@@ -118,8 +141,6 @@ See `qa/README.md` for the full personas table and pre-wired relationships.
 
 ## Feature Status Summary
 
-Features 1–11 complete. See `specs/SPEC_ORDER.md` for the full list and
-`ai-docs/SESSION_STATUS.md` for detailed implementation notes.
-
-Next up: per `ai-docs/PRODUCT_ROADMAP.md`, candidates are §5.4 Radius Filtering
-and §5.6 Operator Tools (admin UI enhancements).
+Features 1–11 complete; Feature 13 (Postgres migration) in progress.
+See `specs/SPEC_ORDER.md` for the full list and `ai-docs/SESSION_STATUS.md`
+for detailed implementation notes.

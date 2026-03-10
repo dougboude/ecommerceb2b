@@ -5,16 +5,36 @@ for the Niche Supply / Professional Demand platform.
 
 ---
 
+## Prerequisites
+
+Docker must be running. That's the only external requirement — `start.sh`
+manages the Postgres container automatically on first run.
+
+If this is your first time setting up the project:
+```bash
+cp .env.example .env
+.venv/bin/pip install -r requirements.txt
+```
+
 ## Quick Start
 
 ```bash
 bash qa/full_reset.sh
 ```
 
-That's it. One command starts the full ecosystem, seeds the database with
-representative test data, and rebuilds the vector search index. Open
+One command starts the full ecosystem (including Postgres), seeds the database
+with representative test data, and rebuilds the vector search index. Open
 `http://127.0.0.1:8000` when it reports all services healthy.
 Press **Ctrl-C** to stop everything when you're done.
+
+## Wiping All Data
+
+To start from a completely clean database:
+```bash
+bash stop.sh
+rm -rf data/pgdata/
+bash qa/full_reset.sh
+```
 
 ---
 
