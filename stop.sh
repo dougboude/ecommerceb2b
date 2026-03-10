@@ -13,6 +13,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$REPO_ROOT/logs"
 
+# Load .env so variables like PGDATA_DIR come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
 log() { echo "[stop.sh] $*"; }
 
 kill_pid() {

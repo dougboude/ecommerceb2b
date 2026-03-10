@@ -57,12 +57,15 @@ bash start.sh          # creates container, migrates, starts all services
 **Wiping all data (full clean slate):**
 ```bash
 bash stop.sh
-rm -rf data/pgdata/
+rm -rf ~/.local/share/ecommerceb2b/pgdata
 bash qa/full_reset.sh
 ```
 
-**Data persistence:** Postgres data lives in `data/pgdata/` (a bind mount you own).
-It survives stop/start cycles. Deleting that directory is the only way to lose data.
+**Data persistence:** Postgres data lives in `~/.local/share/ecommerceb2b/pgdata`
+on the WSL2 native Linux filesystem (not inside the project directory). This path
+is required — the Windows filesystem (`/mnt/c/`) does not support the permissions
+Postgres needs. Override with the `PGDATA_DIR` environment variable if needed.
+Data survives stop/start cycles. Deleting that directory is the only way to lose data.
 
 **`DATABASE_URL` is required.** A missing value raises `ImproperlyConfigured` at
 Django startup — there is no SQLite fallback. Configure it via `.env`.

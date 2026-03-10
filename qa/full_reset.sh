@@ -21,6 +21,15 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="$REPO_ROOT/.venv/bin/python"
+
+# Load .env so all variables come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
 EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
 DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
 

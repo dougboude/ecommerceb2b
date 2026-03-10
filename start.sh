@@ -16,6 +16,14 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$REPO_ROOT/logs"
 VENV_BIN="$REPO_ROOT/.venv/bin"
 
+# Load .env so all variables (including PGDATA_DIR) come from one place.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
 mkdir -p "$LOG_DIR"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,6 +90,7 @@ EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
 SSE_HOST="${SSE_HOST:-127.0.0.1}"
 SSE_PORT="${SSE_PORT:-8001}"
 DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
+PGDATA_DIR="${PGDATA_DIR:-$HOME/.local/share/ecommerceb2b/pgdata}"
 
 PID_FILE="$LOG_DIR/start.pids"
 
@@ -158,7 +167,7 @@ start_postgres() {
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -p 5432:5432 \
-            -v "$REPO_ROOT/data/pgdata:/var/lib/postgresql/data" \
+            -v "$PGDATA_DIR:/var/lib/postgresql/data" \
             postgres:16 > /dev/null
     elif [ ! "$(docker ps -q -f name=^ecommerceb2b-postgres$)" ]; then
         log "Starting existing Postgres container..."

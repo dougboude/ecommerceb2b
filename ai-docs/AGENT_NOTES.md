@@ -109,11 +109,13 @@ if `DATABASE_URL` is not set. There is no SQLite fallback. Configure it via `.en
 (copy `.env.example` to `.env`). `python-dotenv` loads `.env` automatically — no
 manual shell exports needed.
 
-### data/pgdata/ is the Postgres data directory
-The Docker container stores its data in `data/pgdata/` (a bind mount). Do not delete
-this directory unless you intend to wipe all data. To do a clean wipe:
+### Postgres data lives on the WSL2 native filesystem, not in the project directory
+The Docker container stores its data in `~/.local/share/ecommerceb2b/pgdata` by
+default (overridable via `PGDATA_DIR`). It must be on the Linux-native filesystem —
+the Windows mount (`/mnt/c/`) does not support the `chmod` Postgres requires at init.
+To do a clean wipe:
 ```bash
-bash stop.sh && rm -rf data/pgdata/ && bash qa/full_reset.sh
+bash stop.sh && rm -rf ~/.local/share/ecommerceb2b/pgdata && bash qa/full_reset.sh
 ```
 
 ### start.sh manages the full Postgres lifecycle

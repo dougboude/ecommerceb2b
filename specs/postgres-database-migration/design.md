@@ -106,29 +106,31 @@ secrets are introduced.
 
 ## 4. Data Persistence — Bind Mount
 
-The Postgres container stores its data in `data/pgdata/` — a real directory
-inside the project folder, owned and managed by the developer. Docker mounts
-this directory into the container at `/var/lib/postgresql/data`.
+The Postgres container stores its data via a bind mount — a real directory
+on the developer's filesystem, owned and managed by the developer. Docker
+mounts this directory into the container at `/var/lib/postgresql/data`.
 
-This is a **bind mount** (not a Docker-managed named volume). The difference:
-- A named volume is managed by Docker — you can't see or back it up without
-  Docker commands.
-- A bind mount is a plain directory on your filesystem — you can see it,
-  back it up, or delete it like any other folder.
+**WSL2 constraint:** The bind mount path must be on the WSL2 native Linux
+filesystem. The Windows filesystem (`/mnt/c/`) does not support the `chmod`
+Postgres requires during initialisation. Placing pgdata under the project
+directory (`/mnt/c/projects/...`) will cause Postgres to crash on first start.
 
-`data/pgdata/` sits alongside the existing `data/chroma/` directory. Both
-are gitignored.
+**Default path:** `~/.local/share/ecommerceb2b/pgdata`
+This lives on the Linux-native filesystem, outside the project directory.
+It is not gitignored (it's not in the repo) and does not need to be.
+Override with the `PGDATA_DIR` environment variable if needed.
 
-Add to `.gitignore`:
-```
-data/pgdata/
-```
-
-To wipe the database completely and start fresh, delete the directory:
+`start.sh` reads `PGDATA_DIR` and passes it as the bind mount target:
 ```bash
-rm -rf data/pgdata/
+PGDATA_DIR="${PGDATA_DIR:-$HOME/.local/share/ecommerceb2b/pgdata}"
 ```
-The next `start.sh` run will re-initialise it from scratch.
+
+To wipe the database completely and start fresh:
+```bash
+bash stop.sh
+rm -rf ~/.local/share/ecommerceb2b/pgdata
+bash qa/full_reset.sh
+```
 
 ---
 

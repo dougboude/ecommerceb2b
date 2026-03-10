@@ -32,7 +32,7 @@ Press **Ctrl-C** to stop everything when you're done.
 To start from a completely clean database:
 ```bash
 bash stop.sh
-rm -rf data/pgdata/
+rm -rf ~/.local/share/ecommerceb2b/pgdata
 bash qa/full_reset.sh
 ```
 
