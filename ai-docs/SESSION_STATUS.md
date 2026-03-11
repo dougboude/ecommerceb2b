@@ -435,11 +435,10 @@ Do not create new per-version status files.
   - `specs/SPEC_ORDER.md` Feature 11 status updated to `REQ, DES, TASK, EXEC`
 
 ## Current State
-- Branch: `feat/11-profile-image-upload`
-- Features 1–11 complete; Feature 11 on branch pending merge to `main`
+- Branch: `main`
+- Features 1–11 and 13 complete and merged to `main`
 - Current suite: `64` passing, `6` skipped, `0` failures
-- Per-version status files removed; this is the only status tracker
+- Postgres is the database backend; SQLite is gone
 
 ## What's Next (if continuing)
-- Merge `feat/11-profile-image-upload` → `main`
-- Remaining launch requirements: §5.4 Radius Filtering, §5.6 Operator Tools (admin UI enhancements roadmap)
+- Remaining launch requirements: §5.4 Radius Filtering, §5.6 Operator Tools (`admin-console` spec, status `REQ, DES, TASK`)
