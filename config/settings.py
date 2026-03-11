@@ -206,11 +206,9 @@ else:
     SECURE_HSTS_PRELOAD = True
 
 # ---------------------------------------------------------------------------
-# Embedding service (sidecar over Unix Domain Socket)
+# Embedding service (sidecar over TCP)
 # ---------------------------------------------------------------------------
-EMBEDDING_SOCKET_PATH = os.environ.get(
-    "EMBEDDING_SOCKET_PATH", "/tmp/ecommerceb2b-embedding.sock"
-)
+EMBEDDING_SERVICE_URL = os.environ.get("EMBEDDING_SERVICE_URL", "http://127.0.0.1:8002")
 EMBEDDING_SERVICE_TOKEN = os.environ.get(
     "EMBEDDING_SERVICE_TOKEN", "dev-token-change-me"
 )

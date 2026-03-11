@@ -1,6 +1,5 @@
 """
-Vector search client — talks to the embedding sidecar service over a
-Unix Domain Socket.
+Vector search client — talks to the embedding sidecar service over TCP (HTTP).
 """
 import logging
 
@@ -19,19 +18,10 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        socket_path = getattr(
-            settings, "EMBEDDING_SOCKET_PATH", "/tmp/ecommerceb2b-embedding.sock"
-        )
-        transport = httpx.HTTPTransport(uds=socket_path)
         _client = httpx.Client(
-            transport=transport,
-            base_url="http://embedding-service",
+            base_url=settings.EMBEDDING_SERVICE_URL,
             timeout=30.0,
-            headers={
-                "x-service-token": getattr(
-                    settings, "EMBEDDING_SERVICE_TOKEN", "dev-token-change-me"
-                ),
-            },
+            headers={"x-service-token": settings.EMBEDDING_SERVICE_TOKEN},
         )
     return _client
 

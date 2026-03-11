@@ -76,7 +76,7 @@ kill_port_owner() {
 
 # ── Config (values come from .env — must match start.sh) ─────────────────────
 
-EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+EMBEDDING_PORT="${EMBEDDING_SERVICE_URL##*:}"
 SSE_PORT="$SSE_PORT"
 DJANGO_ADDR="$DJANGO_ADDR"
 DJANGO_PORT="${DJANGO_ADDR##*:}"
@@ -95,15 +95,11 @@ if [ -f "$PID_FILE" ]; then
     rm -f "$PID_FILE"
 fi
 
-# ── Pass 2: socket/port fallback ─────────────────────────────────────────────
+# ── Pass 2: port fallback ────────────────────────────────────────────────────
 
-kill_socket_owner "$EMBEDDING_SOCKET" "embedding sidecar" && KILLED=$(( KILLED + 1 )) || true
+kill_port_owner   "$EMBEDDING_PORT"   "embedding sidecar"  && KILLED=$(( KILLED + 1 )) || true
 kill_port_owner   "$SSE_PORT"         "SSE relay"          && KILLED=$(( KILLED + 1 )) || true
 kill_port_owner   "$DJANGO_PORT"      "Django"             && KILLED=$(( KILLED + 1 )) || true
-
-# ── Clean up ─────────────────────────────────────────────────────────────────
-
-rm -f "$EMBEDDING_SOCKET"
 
 # ── Postgres container ────────────────────────────────────────────────────────
 

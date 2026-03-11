@@ -434,11 +434,21 @@ Do not create new per-version status files.
   - Full suite: `64` passing, `6` skipped, `0` failures
   - `specs/SPEC_ORDER.md` Feature 11 status updated to `REQ, DES, TASK, EXEC`
 
+- **Feature 14: embedding sidecar TCP transport** (`feat/14-embedding-sidecar-tcp-transport`):
+  - Swapped Unix Domain Socket for TCP HTTP transport on the embedding sidecar — matches SSE sidecar pattern and is production-compatible (works across containers/networks).
+  - `EMBEDDING_SOCKET_PATH` replaced by `EMBEDDING_SERVICE_URL=http://127.0.0.1:8002` in `.env`, `.env.example`, `config/settings.py`.
+  - `marketplace/vector_search.py` client: removed UDS `HTTPTransport`, now plain `httpx.Client` with `base_url`.
+  - `start.sh`: embedding sidecar started with `--host`/`--port`; health check uses URL; socket cleanup removed.
+  - `stop.sh`: `kill_socket_owner` replaced with `kill_port_owner` for embedding sidecar.
+  - `services/embedding/run.sh` and `app.py` docstring updated.
+  - `CLAUDE.md` architecture diagram and config table updated.
+  - Branch pending merge — **do not merge without user approval**.
+
 ## Current State
-- Branch: `main`
-- Features 1–11 and 13 complete and merged to `main`
+- Branch: `feat/14-embedding-sidecar-tcp-transport`
+- Features 1–11, 13–14 complete; Feature 14 on branch pending merge to `main`
 - Current suite: `64` passing, `6` skipped, `0` failures
-- Postgres is the database backend; SQLite is gone
 
 ## What's Next (if continuing)
+- Merge `feat/14-embedding-sidecar-tcp-transport` → `main` (awaiting user approval)
 - Remaining launch requirements: §5.4 Radius Filtering, §5.6 Operator Tools (`admin-console` spec, status `REQ, DES, TASK`)

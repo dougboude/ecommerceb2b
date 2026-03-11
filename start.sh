@@ -98,7 +98,9 @@ trap kill_children EXIT
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+EMBEDDING_HOST="${EMBEDDING_SERVICE_URL##*://}"
+EMBEDDING_HOST="${EMBEDDING_HOST%%:*}"
+EMBEDDING_PORT="${EMBEDDING_SERVICE_URL##*:}"
 SSE_HOST="$SSE_HOST"
 SSE_PORT="$SSE_PORT"
 DJANGO_ADDR="$DJANGO_ADDR"
@@ -152,16 +154,13 @@ if [ -f "$PID_FILE" ]; then
     NEEDS_SLEEP=1
 fi
 
-# Pass 2 — fallback: check socket/ports regardless, catches manual starts.
-kill_socket_owner "$EMBEDDING_SOCKET" "embedding sidecar"  && NEEDS_SLEEP=1 || true
-kill_port_owner   "$SSE_PORT"         "SSE relay"           && NEEDS_SLEEP=1 || true
-kill_port_owner   "$DJANGO_PORT"      "Django"              && NEEDS_SLEEP=1 || true
+# Pass 2 — fallback: check ports regardless, catches manual starts.
+kill_port_owner   "$EMBEDDING_PORT"   "embedding sidecar"  && NEEDS_SLEEP=1 || true
+kill_port_owner   "$SSE_PORT"         "SSE relay"          && NEEDS_SLEEP=1 || true
+kill_port_owner   "$DJANGO_PORT"      "Django"             && NEEDS_SLEEP=1 || true
 
-# Give processes a moment to release their resources before we rebind.
+# Give processes a moment to release their ports before we rebind.
 [ "$NEEDS_SLEEP" -eq 1 ] && sleep 1
-
-# Clean up stale socket file.
-rm -f "$EMBEDDING_SOCKET"
 
 # ── 0. PostgreSQL container ───────────────────────────────────────────────────
 
@@ -212,10 +211,10 @@ EMBEDDING_DIR="$REPO_ROOT/services/embedding"
 log "Starting embedding sidecar  →  $LOG_DIR/embedding.log"
 (
     cd "$EMBEDDING_DIR"
-    "$VENV_BIN/uvicorn" app:app --uds "$EMBEDDING_SOCKET"
+    "$VENV_BIN/uvicorn" app:app --host "$EMBEDDING_HOST" --port "$EMBEDDING_PORT"
 ) >> "$LOG_DIR/embedding.log" 2>&1 &
 EMBEDDING_PID=$!
-wait_for_health "embedding sidecar" 150 "http://localhost/health" --unix-socket "$EMBEDDING_SOCKET"
+wait_for_health "embedding sidecar" 150 "$EMBEDDING_SERVICE_URL/health"
 
 # ── 2. SSE relay sidecar ─────────────────────────────────────────────────────
 

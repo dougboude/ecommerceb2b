@@ -73,12 +73,12 @@ Django startup — there is no SQLite fallback. Configure it via `.env`.
 # Embedding Service (Sidecar)
 
 ## Architecture
-The SentenceTransformer model and ChromaDB run in a standalone FastAPI sidecar process, **not** inside Django. Django communicates with it over a Unix Domain Socket using `httpx`.
+The SentenceTransformer model and ChromaDB run in a standalone FastAPI sidecar process, **not** inside Django. Django communicates with it over TCP (HTTP) using `httpx` — the same transport pattern as the SSE sidecar.
 
 ```
-Django  ──(Unix socket)──>  Embedding Service (FastAPI/uvicorn)
-                              ├── SentenceTransformer model (loaded at startup)
-                              └── ChromaDB (persistent, data/chroma/)
+Django  ──(HTTP TCP :8002)──>  Embedding Service (FastAPI/uvicorn)
+                                 ├── SentenceTransformer model (loaded at startup)
+                                 └── ChromaDB (persistent, data/chroma/)
 ```
 
 ## Key Files
@@ -86,8 +86,8 @@ Django  ──(Unix socket)──>  Embedding Service (FastAPI/uvicorn)
 |------|---------|
 | `services/embedding/app.py` | FastAPI app — all embedding + ChromaDB logic |
 | `services/embedding/requirements.txt` | Service-specific deps (fastapi, uvicorn, chromadb, sentence-transformers) |
-| `services/embedding/run.sh` | Startup script (cleans stale socket, runs uvicorn) |
-| `marketplace/vector_search.py` | Django-side HTTP client — same public API, talks to sidecar via socket |
+| `services/embedding/run.sh` | Startup script (runs uvicorn on TCP) |
+| `marketplace/vector_search.py` | Django-side HTTP client — same public API, talks to sidecar via TCP |
 
 ## How to Run
 ```bash
@@ -102,7 +102,7 @@ bash run.sh
 ## Configuration (env vars / settings.py)
 | Variable | Default | Used by |
 |----------|---------|---------|
-| `EMBEDDING_SOCKET_PATH` | `/tmp/ecommerceb2b-embedding.sock` | Django + service |
+| `EMBEDDING_SERVICE_URL` | `http://127.0.0.1:8002` | Django + service |
 | `EMBEDDING_SERVICE_TOKEN` | `dev-token-change-me` | Django + service (shared secret) |
 | `CHROMA_PERSIST_DIR` | `../../data/chroma` (relative to service dir) | Service only |
 

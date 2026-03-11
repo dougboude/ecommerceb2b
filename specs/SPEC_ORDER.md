@@ -94,6 +94,12 @@ Rules:
    - Status: `REQ, DES, TASK, EXEC`
    - Path: `specs/postgres-database-migration/`
 
+14. **embedding-sidecar-tcp-transport**
+   - Phase: INFRASTRUCTURE
+   - Depends on: Feature 13 (`EXEC`)
+   - Status: `EXEC`
+   - Path: n/a (no spec docs — transport swap only, no behavior change)
+
 ## Maintenance Workflow
 
 When creating a new spec:

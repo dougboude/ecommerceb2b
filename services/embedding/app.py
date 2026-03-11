@@ -2,9 +2,9 @@
 Embedding sidecar service.
 
 Loads SentenceTransformer model + ChromaDB at startup and exposes
-search/index/remove/rebuild over HTTP (Unix Domain Socket).
+search/index/remove/rebuild over HTTP (TCP).
 
-Start with:  uvicorn app:app --uds /tmp/ecommerceb2b-embedding.sock
+Start with:  uvicorn app:app --host 127.0.0.1 --port 8002
 """
 
 import os
