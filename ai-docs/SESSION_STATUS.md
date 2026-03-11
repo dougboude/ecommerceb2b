@@ -445,10 +445,9 @@ Do not create new per-version status files.
   - Branch pending merge — **do not merge without user approval**.
 
 ## Current State
-- Branch: `feat/14-embedding-sidecar-tcp-transport`
-- Features 1–11, 13–14 complete; Feature 14 on branch pending merge to `main`
+- Branch: `main`
+- Features 1–11, 13–14 complete and merged to `main`
 - Current suite: `64` passing, `6` skipped, `0` failures
 
 ## What's Next (if continuing)
-- Merge `feat/14-embedding-sidecar-tcp-transport` → `main` (awaiting user approval)
 - Remaining launch requirements: §5.4 Radius Filtering, §5.6 Operator Tools (`admin-console` spec, status `REQ, DES, TASK`)
