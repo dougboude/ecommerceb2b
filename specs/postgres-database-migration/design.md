@@ -211,7 +211,7 @@ with a clear message — no silent hang.
 ## 8. Test Suite
 
 No test code changes are expected. Django's test runner creates and
-destroys a test database automatically, identically for Postgres and SQLite.
+destroys a test database automatically against the configured Postgres instance.
 
 With `python-dotenv` loading `.env`, running the test suite is simply:
 
@@ -256,7 +256,7 @@ Daily workflow after initial setup is unchanged: `bash start.sh` /
 - Update the QA scripts table to note the Postgres prerequisite.
 
 ### `ai-docs/AGENT_NOTES.md`
-- Note that `DATABASE_URL` must be set; SQLite fallback warns at startup.
+- Note that `DATABASE_URL` must be set; missing value raises `ImproperlyConfigured` at startup — no fallback.
 - Note that `python-dotenv` loads `.env` automatically.
 - Note that `data/pgdata/` is the Postgres data directory — do not delete
   it unintentionally.
@@ -264,7 +264,7 @@ Daily workflow after initial setup is unchanged: `bash start.sh` /
 ### `qa/README.md`
 - Update Quick Start: `bash start.sh` already handles Postgres — no
   separate Docker step needed.
-- Add a "Wiping the Database" note: `rm -rf data/pgdata/` then
+- Add a "Wiping the Database" note: `rm -rf ~/.local/share/ecommerceb2b/pgdata` then
   `bash qa/full_reset.sh`.
 
 ---
@@ -274,9 +274,9 @@ Daily workflow after initial setup is unchanged: `bash start.sh` /
 | File | Change |
 |------|--------|
 | `requirements.txt` | Add `psycopg2-binary`, `dj-database-url`, `python-dotenv` |
-| `config/settings.py` | `load_dotenv()` + `dj-database-url` parse + SQLite fallback |
-| `.env.example` | New file — all env vars with local dev defaults |
-| `.gitignore` | Add `data/pgdata/` |
+| `config/settings.py` | `load_dotenv()` + `dj-database-url` parse; raises `ImproperlyConfigured` if `DATABASE_URL` missing |
+| `.env.example` | New file — all env vars with local dev defaults including `PGDATA_DIR` |
+| `.gitignore` | Comment noting pgdata lives on Linux FS, not in project dir |
 | `start.sh` | Add Postgres container lifecycle management + health check |
 | `stop.sh` | Add `docker stop ecommerceb2b-postgres` |
 | `qa/full_reset.sh` | Add Postgres preflight check |
@@ -291,8 +291,7 @@ Total: 11 files. No model, view, migration, template, or test changes.
 
 ## 12. Rollback Plan
 
-If Postgres causes an unexpected issue, revert is a single settings change:
-restore the original hardcoded SQLite `DATABASES` dict and remove the
-`dj-database-url` block. The SQLite `db.sqlite3` file is untouched by this
-spec. `start.sh` and `stop.sh` changes can be reverted independently — the
-Postgres container can be stopped manually with `docker stop ecommerceb2b-postgres`.
+If Postgres causes an unexpected issue, revert `config/settings.py` to a
+hardcoded SQLite `DATABASES` dict and remove the `dj-database-url` block.
+`start.sh` and `stop.sh` changes can be reverted independently — the Postgres
+container can be stopped manually with `docker stop ecommerceb2b-postgres`.

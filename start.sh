@@ -17,11 +17,15 @@ LOG_DIR="$REPO_ROOT/logs"
 VENV_BIN="$REPO_ROOT/.venv/bin"
 
 # Load .env so all variables (including PGDATA_DIR) come from one place.
+# set +u temporarily: SECRET_KEY and other values may contain $ characters
+# that bash would try to expand as variables under -u (nounset).
 if [ -f "$REPO_ROOT/.env" ]; then
+    set +u
     set -a
     # shellcheck disable=SC1091
     source "$REPO_ROOT/.env"
     set +a
+    set -u
 fi
 
 mkdir -p "$LOG_DIR"
@@ -62,8 +66,9 @@ kill_children() {
     sleep 0.2
     # SIGTERM each service individually (not the process group, so this script
     # stays alive long enough to wait and confirm they're gone).
-    for pid in ${EMBEDDING_PID:-} ${SSE_PID:-} ${DJANGO_PID:-}; do
-        kill "$pid" 2>/dev/null || true
+    for entry in "embedding:${EMBEDDING_PID:-}" "SSE relay:${SSE_PID:-}" "Django:${DJANGO_PID:-}"; do
+        local label="${entry%%:*}" pid="${entry##*:}"
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null && log "  Stopping $label (PID $pid)" || true
     done
     # Wait up to 8s for graceful exit.
     local deadline=$(( $(date +%s) + 8 ))
@@ -76,9 +81,16 @@ kill_children() {
         sleep 0.5
     done
     # SIGKILL anything still standing.
-    for pid in ${EMBEDDING_PID:-} ${SSE_PID:-} ${DJANGO_PID:-}; do
-        kill -9 "$pid" 2>/dev/null || true
+    for entry in "embedding:${EMBEDDING_PID:-}" "SSE relay:${SSE_PID:-}" "Django:${DJANGO_PID:-}"; do
+        local label="${entry%%:*}" pid="${entry##*:}"
+        [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null && log "  Force-killed $label (PID $pid)" || true
     done
+    # Stop the Postgres container.
+    if [ "$(docker ps -q -f name=^ecommerceb2b-postgres$)" ]; then
+        log "  Stopping Postgres container..."
+        docker stop ecommerceb2b-postgres > /dev/null
+        log "  Postgres stopped."
+    fi
     log "All processes stopped."
 }
 trap kill_children INT TERM
@@ -86,11 +98,11 @@ trap kill_children EXIT
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
-SSE_HOST="${SSE_HOST:-127.0.0.1}"
-SSE_PORT="${SSE_PORT:-8001}"
-DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
-PGDATA_DIR="${PGDATA_DIR:-$HOME/.local/share/ecommerceb2b/pgdata}"
+EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+SSE_HOST="$SSE_HOST"
+SSE_PORT="$SSE_PORT"
+DJANGO_ADDR="$DJANGO_ADDR"
+PGDATA_DIR="$PGDATA_DIR"
 
 PID_FILE="$LOG_DIR/start.pids"
 
@@ -133,8 +145,8 @@ NEEDS_SLEEP=0
 # Pass 1 — precise: use PID file if we started the ecosystem ourselves.
 if [ -f "$PID_FILE" ]; then
     log "Found PID file — stopping previously managed processes..."
-    while read -r pid; do
-        kill_pid "$pid" "managed process"
+    while IFS=: read -r label pid; do
+        kill_pid "$pid" "$label"
     done < "$PID_FILE"
     rm -f "$PID_FILE"
     NEEDS_SLEEP=1
@@ -229,7 +241,7 @@ wait_for_health "Django" 30 "http://${DJANGO_ADDR}/"
 
 # ── Record PIDs for clean restart ────────────────────────────────────────────
 
-printf '%s\n' "$EMBEDDING_PID" "$SSE_PID" "$DJANGO_PID" > "$PID_FILE"
+printf '%s\n' "embedding:$EMBEDDING_PID" "SSE relay:$SSE_PID" "Django:$DJANGO_PID" > "$PID_FILE"
 
 # ── Status ────────────────────────────────────────────────────────────────────
 

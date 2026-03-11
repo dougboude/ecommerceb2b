@@ -14,11 +14,15 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$REPO_ROOT/logs"
 
 # Load .env so variables like PGDATA_DIR come from one place.
+# set +u temporarily: SECRET_KEY and other values may contain $ characters
+# that bash would try to expand as variables under -u (nounset).
 if [ -f "$REPO_ROOT/.env" ]; then
+    set +u
     set -a
     # shellcheck disable=SC1091
     source "$REPO_ROOT/.env"
     set +a
+    set -u
 fi
 
 log() { echo "[stop.sh] $*"; }
@@ -70,11 +74,11 @@ kill_port_owner() {
     return 1
 }
 
-# ── Config (must match start.sh defaults) ────────────────────────────────────
+# ── Config (values come from .env — must match start.sh) ─────────────────────
 
-EMBEDDING_SOCKET="${EMBEDDING_SOCKET_PATH:-/tmp/ecommerceb2b-embedding.sock}"
-SSE_PORT="${SSE_PORT:-8001}"
-DJANGO_ADDR="${DJANGO_ADDR:-127.0.0.1:8000}"
+EMBEDDING_SOCKET="$EMBEDDING_SOCKET_PATH"
+SSE_PORT="$SSE_PORT"
+DJANGO_ADDR="$DJANGO_ADDR"
 DJANGO_PORT="${DJANGO_ADDR##*:}"
 
 PID_FILE="$LOG_DIR/start.pids"
@@ -85,8 +89,8 @@ KILLED=0
 
 if [ -f "$PID_FILE" ]; then
     log "Found PID file — stopping managed processes..."
-    while read -r pid; do
-        kill_pid "$pid" "managed process" && KILLED=$(( KILLED + 1 )) || true
+    while IFS=: read -r label pid; do
+        kill_pid "$pid" "$label" && KILLED=$(( KILLED + 1 )) || true
     done < "$PID_FILE"
     rm -f "$PID_FILE"
 fi

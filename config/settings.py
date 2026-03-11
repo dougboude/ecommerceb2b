@@ -12,7 +12,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly resolve .env relative to this file (config/../.env = repo root).
+# Avoids CWD-dependent search — works regardless of how Django is invoked.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import dj_database_url
 
