@@ -7,6 +7,16 @@ If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+- Created UX-to-spec planning artifacts:
+  - `docs/FEATURE_BACKLOG.md` (prioritized feature list for specsmd generation with journeys, component mappings, and dependencies)
+  - `docs/SPEC_ORDER.md` (recommended spec creation/implementation sequence, dependency-safe with practical flow notes)
+- Normalized new `ui-ux` architecture docs for implementation alignment:
+  - `ui-ux/UX_ARCHITECTURE.md`: role-agnostic terminology updates (`supply`/`demand`, `listing owner`), nav terminology aligned to `Watchlist` + `Supply` + `Demand`, removed non-current assumptions (e.g., duplicate listing as standard action)
+  - `ui-ux/UI_DESIGN_PRINCIPLES.md`: stack-aligned component-system language (Django includes + CSS tokens), navigation terminology alignment, skin/theme policy corrected to support existing managed themes
+  - `ui-ux/UI_COMPONENT_LIBRARY.md`: replaced `Saved/My Listings` terms with canonical product terms, renamed `seller-panel` to `listing-owner-panel`, marked listing gallery and duplicate-listing controls as future-ready component slots, added explicit scope/terminology alignment note
+- Added UX reverse-engineering artifact for journey redesign prep:
+  - `docs/UX_SYSTEM_MAP.md`
+  - documents application purpose, domain entities, route map, page inventory, navigation, action map, transitions, user loops, dead ends, and UX friction observations (structure-only; no redesign proposals)
 - **Feature 13: PostgreSQL database migration** (`specs/postgres-database-migration/`):
   - Removed SQLite fallback from `settings.py`; missing `DATABASE_URL` now raises `ImproperlyConfigured`
   - `start.sh` manages full Postgres container lifecycle (create/start/health check); sources `.env` for all variables

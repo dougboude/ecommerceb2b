@@ -2,6 +2,10 @@ The secret history of the world by mark booth and the wisdom of all ages by manl
 
 Justin Trevino John B connally Unit
 899 FM632, Kenedy, TX 78119 
+
+TO DO: need to change how we're communiating with the sidecar to accommodate our production environment.
+
+
 1.1 sign-up - should have to specify my timezone, first name, last name during signup. if not, i arrive at an active account with those pieces of information not present and no indicator that i need to complete my profile. it's just a few additional pieces of info, i don't believe it's too much to add to a signup. or is it? open to discussion. Otherwise, we do need to provide an indicator near the profile link calling my attention to the fact that i need to complete it.
 
 Profile - I want to see my profile as my profile image at the top right of my screen like so many other softwares do it, and when i hover my profile picture i see options for profile and logout. replace the logout button with a logout link under my profile image hover.
@@ -16,4 +20,18 @@ Login - we have no "forgot my password" or "reset my password" functionality
 
 2.6 - selected file that was 200x200, it allowed me to select it and use it.
 
-at 2.7
+at 2.
+
+when looking at my demand listings page, and another user sends me a message on a listing of mine that is active, the messages notification DOES give me an indicator, but i would think that the listing i'm looking at on the page of listings would also show an indicator that it has a message thread. I don't think we currently have the feature of indicating that a listing has a message thread.
+
+I am looking at my listings page. I click on one of my active listings that has a message thread. i see a 'conversations' section listing the various individuals with whom I have conversation threads going. I click one of those conversations, I am taken to that conversation details page. But, the only navigation option i have on that page is to go back to Messages. if i arrived from a certain view, I should be able to return to that view, not another view. In this case, my nav button should say 'back to listing', not 'back to messages'.
+
+I do a semantic search for supply, keyword 'tomates', and find a listing. the listing shows me 'unsave', and 'message' as options. i click on the listing, expecting that since it apparently in my saved list that i would be taken to that listing and seeing it rendered as i would within my Watchlist view (in that view, this listing has an 'in conversation' banner, an archive button, remove button, and 'open conversation' button). But instead I am taken to a detailed view of the listing with no navigation options at all, no indicators at all, no option to do anything except use one of my top bar nav items...no back to my search results or anything. 
+
+In my watchlist view, i have some listings saved. each listing has an archive button, remove button, and either an open conversation or message button. Additionally, there might be an 'in conversation' banner if there is an existing conversation. If i click on that listing, i am taken to a view of that listing that shows me just the listing details, but without any kind of navigation options, no indicator that there is a conversation or the ability to start one. when i am looking at a specific listing, i should see everything relevant to that listing...in conversation indicator, saved if it is in my watchlist, the conversation if one exists and the abiity to engage in it (just like the 'conversation' view within the messages section).
+
+we need a single unified view of a listing regardless of how i drilled into that listing, and we need a means of navigating back to the view/page from which i navigated to get to this view of the listing. eventually this unified view will also include photos and other details as well. 
+
+Discover...I search for a demand i know exists, but i don't find it. i think i'm not finding it in my results because i already have a conversation going with this listing. However, i also do not have this listing in my watchlist, so the only way i can find it is if i go to my messages section and happen to see it there. I'm almost thinking that our searh results SHOULD include listings with which i have an existing conversation, only the search result tile annotates this fact. We do already have a discover option that lets me hide items i'm watching, we should add a similar option to exclude items i'm already in conversation with. At this point in time, having a conversation and watching the item are two completely unrelated states for an item to be in. For now let's keep it that way.
+
+
