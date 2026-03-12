@@ -9,6 +9,9 @@
     <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
 </div>
 {% if page_obj %}
+<p class="listing-summary">
+    {% blocktrans with total=total_count active=active_count %}{{ total }} listing{{ total|pluralize }} — {{ active }} active{% endblocktrans %}
+</p>
 {% include "includes/_listing_filter.html" %}
 <div class="card-grid">
     {% for post in page_obj %}
@@ -29,6 +32,9 @@
 </div>
 {% include "includes/_pagination.html" %}
 {% else %}
-<p class="empty-state">{% trans "No demand listings yet." %}</p>
+<div class="empty-state">
+    <p>{% trans "No demand listings yet." %}</p>
+    <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create your first demand listing" %}</a>
+</div>
 {% endif %}
 {% endblock %}

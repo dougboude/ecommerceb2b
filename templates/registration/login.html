@@ -12,5 +12,6 @@
         <button type="submit">{% trans "Log in" %}</button>
     </form>
     <p class="auth-link"><a href="{% url 'marketplace:signup' %}">{% trans "Don't have an account? Sign up" %}</a></p>
+    <p class="auth-link"><a href="{% url 'marketplace:resend_verification' %}">{% trans "Need a new verification email?" %}</a></p>
 </div>
 {% endblock %}

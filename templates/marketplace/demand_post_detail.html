@@ -25,6 +25,50 @@
     {% if post.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ post.notes }}</dd>{% endif %}
 </dl>
 
+{% if not is_owner %}
+<section class="card">
+    <h2>{% trans "Take action" %}</h2>
+    <div class="actions">
+        {% if can_convert %}
+            {% if is_watchlisted %}
+            <form method="post" action="{% url 'marketplace:discover_unsave' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="demand_post">
+                <input type="hidden" name="listing_pk" value="{{ post.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:demand_post_detail' post.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Unsave" %}</button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'marketplace:discover_save' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="demand_post">
+                <input type="hidden" name="listing_pk" value="{{ post.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:demand_post_detail' post.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Save" %}</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'marketplace:discover_message' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="demand_post">
+                <input type="hidden" name="listing_pk" value="{{ post.pk }}">
+                <button type="submit" class="btn btn-primary">{% trans "Message" %}</button>
+            </form>
+        {% else %}
+            <p class="empty-state">{{ message_unavailable_reason }}</p>
+            {% if is_watchlisted %}
+            <form method="post" action="{% url 'marketplace:discover_unsave' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="demand_post">
+                <input type="hidden" name="listing_pk" value="{{ post.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:demand_post_detail' post.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Unsave" %}</button>
+            </form>
+            {% endif %}
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
 {% if is_owner and suggestions %}
 <section>
     <h2>{% trans "Suggested Supply Listings" %}</h2>

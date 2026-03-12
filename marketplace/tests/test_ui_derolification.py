@@ -46,7 +46,7 @@ class UiDerolificationTests(TestCase):
         html = response.content.decode("utf-8")
         self.assertIn(reverse("marketplace:supply_lot_list"), html)
         self.assertIn(reverse("marketplace:demand_post_list"), html)
-        self.assertIn("Your Listings", html)
+        self.assertIn("Watchlist", html)
 
     def test_dashboard_heading_is_not_role_labeled(self):
         self.client.login(email=self.user.email, password=self.password)

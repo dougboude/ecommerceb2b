@@ -6,11 +6,25 @@
 {% block content %}
 <h1>{% if editing %}{% trans "Edit Demand Listing" %}{% else %}{% trans "New Demand Listing" %}{% endif %}</h1>
 <div class="card">
-    <form method="post">
+    <form method="post" novalidate>
         {% csrf_token %}
+        {% if form.errors %}
+        <div class="messages">
+            <div class="message error">
+                {% trans "Please correct the errors below." %}
+            </div>
+        </div>
+        {% endif %}
+        {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
         {{ form.as_p }}
         <div class="actions">
-            <button type="submit">{% trans "Submit" %}</button>
+            <button type="submit" class="btn btn-primary">{% if editing %}{% trans "Save changes" %}{% else %}{% trans "Create listing" %}{% endif %}</button>
             {% if editing %}
                 <a href="{% url 'marketplace:demand_post_detail' form.instance.pk %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             {% else %}

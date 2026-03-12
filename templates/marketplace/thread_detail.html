@@ -5,7 +5,24 @@
 
 {% block content %}
 <h1>{% trans "Conversation" %}</h1>
-<p class="helptext">{% trans "With:" %} <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong></p>
+<div class="listing-owner">
+    <img src="{{ counterparty.profile_image_url }}"
+         alt="{{ counterparty.display_name|default:counterparty.email }}"
+         class="avatar avatar-sm"
+         width="48" height="48">
+    <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong>
+</div>
+{% if listing %}
+<p class="helptext">
+    {% trans "About:" %}
+    {% if listing_deleted %}
+        <strong>{{ listing.item_text }}</strong>
+    {% else %}
+        <a href="{{ listing_detail_url }}"><strong>{{ listing.item_text }}</strong></a>
+    {% endif %}
+    <span class="tile-meta">({{ listing_kind_label }})</span>
+</p>
+{% endif %}
 
 <section>
     <h2>{% trans "Item details" %}</h2>
@@ -49,12 +66,15 @@
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">{% trans "Send" %}</button>
+        <button type="submit" class="btn btn-primary">{% trans "Send" %}</button>
     </form>
 </div>
 {% endif %}
 
 <div class="actions">
+    {% if listing and not listing_deleted and listing_detail_url %}
+    <a href="{{ listing_detail_url }}" class="btn btn-secondary">{% trans "Back to listing" %}</a>
+    {% endif %}
     <a href="{% url 'marketplace:inbox' %}" class="btn btn-secondary">{% trans "Back to messages" %}</a>
 </div>
 {% endblock %}

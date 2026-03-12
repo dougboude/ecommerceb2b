@@ -53,7 +53,7 @@
             </form>
             {% endif %}
             {% if show_remove %}
-            <form method="post" action="{% url 'marketplace:watchlist_delete' item.pk %}" style="display:inline;">
+            <form method="post" action="{% url 'marketplace:watchlist_delete' item.pk %}" style="display:inline;" onsubmit="return confirm('{% trans "Remove this item from your watchlist?" %}')">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-secondary btn-small" title="{% trans 'Remove' %}">{% trans "Remove" %}</button>
             </form>

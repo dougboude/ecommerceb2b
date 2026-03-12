@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from urllib.parse import urlencode
 
 import uuid as _uuid
 
@@ -278,7 +279,10 @@ class MarketplaceLoginView(LoginView):
     def form_valid(self, form):
         user = form.get_user()
         if not user.email_verified:
-            resend_url = reverse("marketplace:resend_verification")
+            resend_url = "{}?{}".format(
+                reverse("marketplace:resend_verification"),
+                urlencode({"email": user.email}),
+            )
             form.add_error(
                 None,
                 mark_safe(
@@ -361,6 +365,13 @@ def resend_verification(request):
             _send_verification_email(request, user)
         except Exception:
             pass  # neutral — do not leak account existence or already-verified status
+        django_messages.info(
+            request,
+            _(
+                "If an unverified account exists for that email, a new verification "
+                "link has been sent."
+            ),
+        )
         return redirect("marketplace:verify_email")
 
     initial_email = request.GET.get("email", "")
@@ -559,6 +570,8 @@ def demand_post_list(request):
         created_by_user=request.user,
         type=ListingType.DEMAND,
     ).exclude(status=ListingStatus.DELETED).order_by("-created_at")
+    total_count = qs.count()
+    active_count = qs.filter(status=ListingStatus.ACTIVE).count()
     post_numbers = _build_post_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -566,7 +579,11 @@ def demand_post_list(request):
     for post in page_obj:
         post.post_number = post_numbers.get(post.pk, 1)
         post.unsaved_count, post.saved_count = counts.get(post.pk, (0, 0))
-    return render(request, "marketplace/demand_post_list.html", {"page_obj": page_obj})
+    return render(request, "marketplace/demand_post_list.html", {
+        "page_obj": page_obj,
+        "total_count": total_count,
+        "active_count": active_count,
+    })
 
 
 @login_required
@@ -576,6 +593,7 @@ def demand_post_create(request):
         if form.is_valid():
             post = form.save(commit=False)
             post.created_by_user = request.user
+            post.created_at = timezone_now()
             post.save()
             _sync_listing_to_vector_index(post)
             django_messages.success(request, _("Demand listing created."))
@@ -609,6 +627,19 @@ def demand_post_detail(request, pk):
         post.save(update_fields=["status"])
         _remove_listing_from_vector_index(post)
     is_owner = post.created_by_user == request.user
+    is_watchlisted = False
+    can_convert = False
+    message_unavailable_reason = ""
+    if not is_owner:
+        is_watchlisted = WatchlistItem.objects.filter(
+            user=request.user,
+            listing=post,
+        ).exists()
+        can_convert = post.status == ListingStatus.ACTIVE and not post.is_expired
+        if not can_convert:
+            message_unavailable_reason = _(
+                "Messaging is unavailable because this listing is not active."
+            )
     post.post_number = _get_post_number(post)
     suggestions = []
     if is_owner and post.status == ListingStatus.ACTIVE:
@@ -634,6 +665,9 @@ def demand_post_detail(request, pk):
         "post": post,
         "suggestions": suggestions,
         "is_owner": is_owner,
+        "is_watchlisted": is_watchlisted,
+        "can_convert": can_convert,
+        "message_unavailable_reason": message_unavailable_reason,
         "watchlisted_pks": watchlisted_pks,
         "listing_threads": listing_threads,
     })
@@ -652,8 +686,10 @@ def demand_post_toggle(request, pk):
     _sync_listing_to_vector_index(post)
     if post.status == ListingStatus.ACTIVE:
         _restore_watchlist_items_for_listing(post)
+        django_messages.success(request, _("Demand listing resumed."))
     else:
         _archive_watchlist_items_for_listing(post)
+        django_messages.success(request, _("Demand listing paused."))
     return redirect("marketplace:demand_post_detail", pk=post.pk)
 
 
@@ -681,6 +717,8 @@ def supply_lot_list(request):
         created_by_user=request.user,
         type=ListingType.SUPPLY,
     ).exclude(status=ListingStatus.DELETED).order_by("-created_at")
+    total_count = qs.count()
+    active_count = qs.filter(status=ListingStatus.ACTIVE).count()
     lot_numbers = _build_lot_number_map(request.user)
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -688,7 +726,11 @@ def supply_lot_list(request):
     for lot in page_obj:
         lot.lot_number = lot_numbers.get(lot.pk, 1)
         lot.unsaved_count, lot.saved_count = counts.get(lot.pk, (0, 0))
-    return render(request, "marketplace/supply_lot_list.html", {"page_obj": page_obj})
+    return render(request, "marketplace/supply_lot_list.html", {
+        "page_obj": page_obj,
+        "total_count": total_count,
+        "active_count": active_count,
+    })
 
 
 @login_required
@@ -698,6 +740,7 @@ def supply_lot_create(request):
         if form.is_valid():
             lot = form.save(commit=False)
             lot.created_by_user = request.user
+            lot.created_at = timezone_now()
             lot.save()
             _sync_listing_to_vector_index(lot)
             django_messages.success(request, _("Supply listing created."))
@@ -731,6 +774,19 @@ def supply_lot_detail(request, pk):
         lot.save(update_fields=["status"])
         _remove_listing_from_vector_index(lot)
     is_owner = lot.created_by_user == request.user
+    is_watchlisted = False
+    can_convert = False
+    message_unavailable_reason = ""
+    if not is_owner:
+        is_watchlisted = WatchlistItem.objects.filter(
+            user=request.user,
+            listing=lot,
+        ).exists()
+        can_convert = lot.status == ListingStatus.ACTIVE and not lot.is_expired
+        if not can_convert:
+            message_unavailable_reason = _(
+                "Messaging is unavailable because this listing is not active."
+            )
     lot.lot_number = _get_lot_number(lot)
     suggestions = []
     if is_owner and lot.status == ListingStatus.ACTIVE:
@@ -756,6 +812,9 @@ def supply_lot_detail(request, pk):
         "lot": lot,
         "suggestions": suggestions,
         "is_owner": is_owner,
+        "is_watchlisted": is_watchlisted,
+        "can_convert": can_convert,
+        "message_unavailable_reason": message_unavailable_reason,
         "watchlisted_pks": watchlisted_pks,
         "listing_threads": listing_threads,
     })
@@ -774,8 +833,10 @@ def supply_lot_toggle(request, pk):
     _sync_listing_to_vector_index(lot)
     if lot.status == ListingStatus.ACTIVE:
         _restore_watchlist_items_for_listing(lot)
+        django_messages.success(request, _("Supply listing reactivated."))
     else:
         _archive_watchlist_items_for_listing(lot)
+        django_messages.success(request, _("Supply listing withdrawn."))
     return redirect("marketplace:supply_lot_detail", pk=lot.pk)
 
 
@@ -815,6 +876,13 @@ def _discover_listing_types_for_direction(direction):
     if normalized == DiscoverForm.DIRECTION_FIND_DEMAND:
         return ListingType.DEMAND, ListingType.DEMAND
     return ListingType.SUPPLY, ListingType.SUPPLY
+
+
+def _discover_direction_label(direction):
+    normalized = _normalize_discover_direction(direction)
+    if normalized == DiscoverForm.DIRECTION_FIND_DEMAND:
+        return _("Find Demand")
+    return _("Find Supply")
 
 
 def _discover_listing_payload(listing, default_listing_type):
@@ -920,12 +988,16 @@ def discover_view(request):
     searched = False
     watchlisted_pks = set()
     short_query_hint = False
+    active_direction = _normalize_discover_direction(
+        request.session.get("discover_last_direction")
+    )
 
     if request.method == "POST":
         form = DiscoverForm(request.POST, user=user)
         if form.is_valid() and form.cleaned_data.get("query"):
             query = form.cleaned_data["query"]
             direction = _normalize_discover_direction(form.cleaned_data.get("direction"))
+            active_direction = direction
             category = form.cleaned_data.get("category") or ""
             country = form.cleaned_data.get("location_country") or ""
             radius = form.cleaned_data.get("radius") or ""
@@ -969,6 +1041,7 @@ def discover_view(request):
                 "sort_by": request.session.get("discover_last_sort_by", DiscoverForm.SORT_BEST_MATCH),
                 "exclude_watched": request.session.get("discover_last_exclude_watched", False),
             }
+            active_direction = initial["direction"]
             form = DiscoverForm(initial=initial, user=user)
             results = _run_discover_search(
                 user, session_query,
@@ -993,6 +1066,7 @@ def discover_view(request):
         "searched": searched,
         "watchlisted_pks": watchlisted_pks,
         "short_query_hint": short_query_hint,
+        "active_direction_label": _discover_direction_label(active_direction),
     })
 
 
@@ -1005,6 +1079,7 @@ def discover_clear(request):
                 "discover_last_direction",
                 "discover_last_exclude_watched", "discover_keep_results"]:
         request.session.pop(key, None)
+    django_messages.success(request, _("Search cleared. Try a new query."))
     return redirect("marketplace:discover")
 
 
@@ -1084,20 +1159,28 @@ def watchlist_view(request):
         "listing__created_by_user",
     )
 
-    watching = list(qs.filter(
-        status__in=[WatchlistStatus.STARRED, WatchlistStatus.WATCHING],
-    ).order_by("-updated_at"))
+    starred = list(qs.filter(status=WatchlistStatus.STARRED).order_by("-updated_at"))
+    watching = list(qs.filter(status=WatchlistStatus.WATCHING).order_by("-updated_at"))
     archived = list(qs.filter(status=WatchlistStatus.ARCHIVED).order_by("-updated_at"))
 
-    for item in watching + archived:
+    for item in starred + watching + archived:
         item.resolved_listing = item.resolve_listing()
 
+    _attach_unread_counts(user, starred)
     _attach_unread_counts(user, watching)
     _attach_unread_counts(user, archived)
+    active_items = starred + watching
+    active_count = len(active_items)
+    conversation_count = sum(1 for item in active_items if item.thread)
+    unread_conversation_count = sum(1 for item in active_items if getattr(item, "unread_count", 0) > 0)
 
     return render(request, "marketplace/watchlist.html", {
+        "starred": starred,
         "watching": watching,
         "archived": archived,
+        "active_count": active_count,
+        "conversation_count": conversation_count,
+        "unread_conversation_count": unread_conversation_count,
     })
 
 
@@ -1125,6 +1208,10 @@ def watchlist_star(request, pk):
             "show_remove": not inactive,
             "inactive": inactive,
         })
+    if item.status == WatchlistStatus.STARRED:
+        django_messages.success(request, _("Added to starred items."))
+    else:
+        django_messages.success(request, _("Moved to watching."))
     return redirect("marketplace:watchlist")
 
 
@@ -1135,6 +1222,7 @@ def watchlist_archive(request, pk):
     permission_service.authorize_watchlist_action(request.user.pk, item, "archive").deny_if_not_allowed()
     item.status = WatchlistStatus.ARCHIVED
     item.save(update_fields=["status"])
+    django_messages.success(request, _("Watchlist item archived."))
     return redirect("marketplace:watchlist")
 
 
@@ -1145,6 +1233,7 @@ def watchlist_unarchive(request, pk):
     permission_service.authorize_watchlist_action(request.user.pk, item, "unarchive").deny_if_not_allowed()
     item.status = WatchlistStatus.WATCHING
     item.save(update_fields=["status"])
+    django_messages.success(request, _("Watchlist item restored to watching."))
     return redirect("marketplace:watchlist")
 
 
@@ -1154,6 +1243,7 @@ def watchlist_delete(request, pk):
     item = get_object_or_404(WatchlistItem, pk=pk)
     permission_service.authorize_watchlist_action(request.user.pk, item, "delete").deny_if_not_allowed()
     item.delete()
+    django_messages.success(request, _("Removed from watchlist."))
     return redirect("marketplace:watchlist")
 
 
@@ -1176,9 +1266,12 @@ def discover_save(request):
     """Save a listing from search results to watchlist."""
     listing_pk = request.POST.get("listing_pk")
     listing_type = request.POST.get("listing_type")
+    next_url = request.POST.get("next")
     listing = _resolve_listing_for_action(listing_pk, listing_type)
     _get_or_create_watchlist_item(request.user, listing=listing, source=WatchlistSource.SEARCH)
     django_messages.success(request, _("Saved to watchlist."))
+    if next_url:
+        return redirect(next_url)
     request.session["discover_keep_results"] = True
     return redirect("marketplace:discover")
 
@@ -1189,12 +1282,15 @@ def discover_unsave(request):
     """Remove a listing from watchlist via discover results."""
     listing_pk = request.POST.get("listing_pk")
     listing_type = request.POST.get("listing_type")
+    next_url = request.POST.get("next")
     listing = _resolve_listing_for_action(listing_pk, listing_type)
     WatchlistItem.objects.filter(
         user=request.user,
         listing=listing,
     ).delete()
     django_messages.success(request, _("Removed from watchlist."))
+    if next_url:
+        return redirect(next_url)
     request.session["discover_keep_results"] = True
     return redirect("marketplace:discover")
 
@@ -1212,6 +1308,7 @@ def discover_message(request):
         listing=listing,
         source=WatchlistSource.DIRECT,
     )
+    django_messages.success(request, _("Conversation ready. Send your message below."))
     return redirect("marketplace:thread_detail", pk=result.thread.pk)
 
 
@@ -1240,6 +1337,7 @@ def suggestion_dismiss(request):
     listing_type = request.POST.get("listing_type")
     listing = _resolve_listing_for_action(listing_pk, listing_type)
     DismissedSuggestion.objects.get_or_create(user=request.user, listing=listing)
+    django_messages.success(request, _("Suggestion dismissed. You can find more matches in Discover."))
     next_url = request.POST.get("next", "marketplace:dashboard")
     return redirect(next_url)
 
@@ -1293,12 +1391,23 @@ def thread_detail(request, pk):
         form = MessageForm()
     msgs = thread.messages.select_related("sender").all()
     counterparty = thread.counterparty_for(request.user)
+    listing_detail_url = ""
+    listing_kind_label = ""
+    if listing is not None:
+        if listing.type == ListingType.SUPPLY:
+            listing_detail_url = reverse("marketplace:supply_lot_detail", kwargs={"pk": listing.pk})
+            listing_kind_label = _("Supply listing")
+        else:
+            listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": listing.pk})
+            listing_kind_label = _("Demand listing")
     return render(request, "marketplace/thread_detail.html", {
         "thread": thread,
         "messages_list": msgs,
         "form": form,
         "counterparty": counterparty,
         "listing": listing,
+        "listing_detail_url": listing_detail_url,
+        "listing_kind_label": listing_kind_label,
         "is_supply": thread.is_supply_thread(),
         "listing_deleted": listing_deleted,
     })
@@ -1351,6 +1460,15 @@ def inbox_view(request):
     for t in threads:
         t.counterparty = t.counterparty_for(user)
         t.listing = t.get_listing()
+        t.listing_detail_url = ""
+        t.listing_kind_label = ""
+        if t.listing is not None:
+            if t.listing.type == ListingType.SUPPLY:
+                t.listing_detail_url = reverse("marketplace:supply_lot_detail", kwargs={"pk": t.listing.pk})
+                t.listing_kind_label = _("Supply")
+            else:
+                t.listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": t.listing.pk})
+                t.listing_kind_label = _("Demand")
         preview = (t.last_message_body or "")[:120]
         if len(t.last_message_body or "") > 120:
             preview += "..."
@@ -1360,9 +1478,11 @@ def inbox_view(request):
             and (t.user_read_at is None or t.last_other_message_at > t.user_read_at)
         )
         thread_list.append(t)
+    unread_threads = sum(1 for t in thread_list if t.is_unread)
 
     return render(request, "marketplace/inbox.html", {
         "threads": thread_list,
+        "unread_threads": unread_threads,
     })
 
 
@@ -1379,6 +1499,7 @@ def suggestion_message(request):
         listing=listing,
         source=WatchlistSource.SUGGESTION,
     )
+    django_messages.success(request, _("Conversation ready. Send your message below."))
     return redirect("marketplace:thread_detail", pk=result.thread.pk)
 
 

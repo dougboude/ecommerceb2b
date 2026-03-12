@@ -159,6 +159,8 @@ class VerifyEmailConfirmTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "registration/email_verify_expired.html")
+        self.assertContains(response, reverse("marketplace:resend_verification"))
+        self.assertContains(response, reverse("marketplace:login"))
         user.refresh_from_db()
         self.assertFalse(user.email_verified)
 
@@ -170,6 +172,7 @@ class VerifyEmailConfirmTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "registration/email_verify_used.html")
+        self.assertContains(response, reverse("marketplace:login"))
 
     def test_nonexistent_token_returns_404(self):
         import uuid
@@ -214,6 +217,7 @@ class LoginGateTests(TestCase):
         )
         html = response.content.decode()
         self.assertIn(reverse("marketplace:resend_verification"), html)
+        self.assertIn("email=unverified2%40example.com", html)
 
     def test_login_allowed_for_verified_user(self):
         user = _make_user(email="verified@example.com", verified=True)
@@ -260,18 +264,28 @@ class ResendVerificationTests(TestCase):
         response = self.client.post(
             reverse("marketplace:resend_verification"),
             {"email": "nobody@example.com"},
+            follow=True,
         )
-        self.assertRedirects(response, reverse("marketplace:verify_email"))
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(
+            response,
+            "If an unverified account exists for that email, a new verification link has been sent.",
+        )
 
     def test_resend_neutral_for_already_verified(self):
         user = _make_user(email="alreadyverified@example.com", verified=True)
         response = self.client.post(
             reverse("marketplace:resend_verification"),
             {"email": user.email},
+            follow=True,
         )
-        self.assertRedirects(response, reverse("marketplace:verify_email"))
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(
+            response,
+            "If an unverified account exists for that email, a new verification link has been sent.",
+        )
 
     def test_resend_get_renders_form(self):
         response = self.client.get(reverse("marketplace:resend_verification"))
@@ -284,3 +298,9 @@ class ResendVerificationTests(TestCase):
         )
         html = response.content.decode()
         self.assertIn("test@example.com", html)
+
+    def test_resend_page_has_back_to_check_email_link(self):
+        response = self.client.get(reverse("marketplace:resend_verification"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("marketplace:verify_email"))
+

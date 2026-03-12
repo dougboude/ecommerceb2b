@@ -28,6 +28,7 @@
 {% if searched %}
     {% if results %}
     <h2>{% trans "Results" %}</h2>
+    <p class="tile-meta">{% blocktrans with direction=active_direction_label %}Showing matches for {{ direction }}.{% endblocktrans %}</p>
     <div id="discover-results-list">
     {% for listing in results %}
     <div
@@ -78,10 +79,13 @@
     {% endfor %}
     </div>
     {% else %}
-    <p class="empty-state">{% trans "No results found. Try broadening your search." %}</p>
+    <p class="empty-state">{% blocktrans with direction=active_direction_label %}No results found for {{ direction }}. Try broadening your search.{% endblocktrans %}</p>
     {% if short_query_hint %}
     <p class="empty-state">{% trans "Tip: try a more descriptive search (3+ words) for better semantic matches." %}</p>
     {% endif %}
+    <div class="actions">
+        <a href="{% url 'marketplace:discover_clear' %}" class="btn btn-primary">{% trans "Start a new search" %}</a>
+    </div>
     {% endif %}
 {% endif %}
 {% endblock %}
