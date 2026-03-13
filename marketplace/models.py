@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import timedelta
 
@@ -166,6 +167,7 @@ class User(AbstractUser):
     )
     skin = models.CharField(_("theme"), max_length=20, choices=Skin.choices)
     email_on_message = models.BooleanField(_("email me when I receive a message"), default=False)
+    enter_to_send = models.BooleanField(_("press Enter to send messages"), default=False)
     organization_name = models.CharField(_("organization name"), max_length=255, blank=True, null=True)
     profile_image = models.ImageField(
         upload_to="profile_images/",
@@ -187,6 +189,35 @@ class User(AbstractUser):
         if self.profile_image:
             return self.profile_image.url
         return static("img/default_avatar.png")
+
+    @property
+    def has_custom_profile_image(self):
+        if not self.profile_image:
+            return False
+        filename = os.path.basename(getattr(self.profile_image, "name", "") or "")
+        normalized = filename.lower()
+        if normalized.startswith("seed_avatar") or normalized.startswith("default_avatar"):
+            return False
+        return True
+
+    @property
+    def avatar_initials(self):
+        first = (self.first_name or "").strip()
+        last = (self.last_name or "").strip()
+        if first or last:
+            return f"{first[:1]}{last[:1]}".upper()
+
+        display = (self.display_name or "").strip()
+        if display:
+            parts = [part for part in display.split() if part]
+            if len(parts) >= 2:
+                return f"{parts[0][:1]}{parts[-1][:1]}".upper()
+            return display[:1].upper()
+
+        email = (self.email or "").strip()
+        if email:
+            return email[:1].upper()
+        return "U"
 
     def clean(self):
         super().clean()
@@ -264,10 +295,6 @@ class Listing(LocationMixin):
     @item_text.setter
     def item_text(self, value):
         self.title = value
-
-    @property
-    def available_until(self):
-        return self.expires_at if self.type == ListingType.SUPPLY else None
 
     @property
     def quantity_value(self):

@@ -34,4 +34,40 @@ we need a single unified view of a listing regardless of how i drilled into that
 
 Discover...I search for a demand i know exists, but i don't find it. i think i'm not finding it in my results because i already have a conversation going with this listing. However, i also do not have this listing in my watchlist, so the only way i can find it is if i go to my messages section and happen to see it there. I'm almost thinking that our searh results SHOULD include listings with which i have an existing conversation, only the search result tile annotates this fact. We do already have a discover option that lets me hide items i'm watching, we should add a similar option to exclude items i'm already in conversation with. At this point in time, having a conversation and watching the item are two completely unrelated states for an item to be in. For now let's keep it that way.
 
+Error encountered: clicked demands, create new. filled in form. submitted. received raw error: IntegrityError at /wanted/new/
+null value in column "created_at" of relation "marketplace_listing" violates not-null constraint
+DETAIL:  Failing row contains (15, US, Nevada, MO, 63772, null, null, demand, Seasonal Morel Mushrooms, , food_fresh, active, null, , 1.00, dz, , , null, seasonal, null, null, 2026-03-12 02:10:09.132157+00, 2).
+Request Method:	POST
+Request URL:	http://127.0.0.1:8000/wanted/new/
+Django Version:	5.2.11
+Exception Type:	IntegrityError
+Exception Value:	
+null value in column "created_at" of relation "marketplace_listing" violates not-null constraint
+DETAIL:  Failing row contains (15, US, Nevada, MO, 63772, null, null, demand, Seasonal Morel Mushrooms, , food_fresh, active, null, , 1.00, dz, , , null, seasonal, null, null, 2026-03-12 02:10:09.132157+00, 2).
+Exception Location:	/mnt/c/projects/ecommerceb2b/.venv/lib/python3.12/site-packages/django/db/backends/utils.py, line 105, in _execute
+Raised during:	marketplace.views.demand_post_create
+Python Executable:	/mnt/c/projects/ecommerceb2b/.venv/bin/python
+Python Version:	3.12.8
+Python Path:	
+['/mnt/c/projects/ecommerceb2b',
+ '/usr/local/lib/python312.zip',
+ '/usr/local/lib/python3.12',
+ '/usr/local/lib/python3.12/lib-dynload',
+ '/mnt/c/projects/ecommerceb2b/.venv/lib/python3.12/site-packages']
+Server time:	Thu, 12 Mar 2026 02:10:09 +0000
+Traceback Switch to copy-and-paste view
+/mnt/c/projects/ecommerceb2b/.venv/lib/python3.12/site-packages/django/db/backends/utils.py, line 105, in _execute
+                return self.cursor.execute(sql, params)
+				
+				
+
+Errors should be pretty errors for end users, not stack traces (unless we're just in some kind of dev mode where that is okay). 
+
+messages: default size for message text field should be much smaller. 
+
+remove item from watchlist gives me a generic javascript confirm dialog. BOO!
+
+starring watched listings...only when i navigate away and come back to the starred items float to the top. It should happen dynamically when i star and unstar, without reloading the page.
+
+in supply or demand area, if no listings present we get a nice button that says 'create your first supply listing'...but we also have the old 'create new' button present. if we're showing the create your first button, we should not show the 'create new' button as well.
 

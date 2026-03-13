@@ -1,0 +1,44 @@
+{% load i18n %}
+<div id="watchlist-content">
+    <p class="tile-meta">{% blocktrans with active=active_count conversations=conversation_count unread=unread_conversation_count %}{{ active }} active items, {{ conversations }} in conversation ({{ unread }} with unread messages).{% endblocktrans %}</p>
+
+    {% if starred %}
+    <section>
+        <h2>{% trans "Starred" %} ({{ starred|length }})</h2>
+        {% for item in starred %}
+            {% include "marketplace/_watchlist_card.html" with item=item show_unstar=True show_archive=True show_remove=True %}
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <section>
+        <h2>{% trans "Watching" %} ({{ watching|length }})</h2>
+        {% if watching %}
+        {% for item in watching %}
+            {% include "marketplace/_watchlist_card.html" with item=item show_star=True show_archive=True show_remove=True %}
+        {% endfor %}
+        {% else %}
+        <p class="empty-state">{% trans "No items being watched." %}</p>
+        {% if not starred %}
+        <div class="actions">
+            <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover listings" %}</a>
+        </div>
+        {% endif %}
+        {% endif %}
+    </section>
+
+    {% if archived %}
+    <details>
+        <summary style="cursor:pointer; font-weight:600; margin-bottom:0.5rem;">{% trans "Archived" %} ({{ archived|length }})</summary>
+        {% for item in archived %}
+        {% include "marketplace/_watchlist_card.html" with item=item show_unarchive=True inactive=True %}
+        {% endfor %}
+    </details>
+    {% endif %}
+
+    {% if starred or watching %}
+    <div class="actions" style="margin-top:1.5rem;">
+        <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover more" %}</a>
+    </div>
+    {% endif %}
+</div>

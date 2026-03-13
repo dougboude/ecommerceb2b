@@ -26,19 +26,18 @@ def skin(request):
 def nav_section(request):
     """Provide the current nav section name based on the URL path."""
     path = request.path
-    if path == "/":
-        return {"nav_section": "dashboard"}
     prefix_map = [
-        ("/messages", "messages"),
+        ("/", "dashboard"),
         ("/discover", "discover"),
+        ("/messages", "messages"),
+        ("/threads", "messages"),
         ("/watchlist", "watchlist"),
         ("/profile", "profile"),
-        ("/demands", "listings"),
-        ("/supply", "listings"),
-        ("/threads", "messages"),
+        ("/available", "supply"),
+        ("/wanted", "demand"),
     ]
     for prefix, section in prefix_map:
-        if path.startswith(prefix):
+        if path == prefix or (prefix != "/" and path.startswith(prefix)):
             return {"nav_section": section}
     return {"nav_section": ""}
 

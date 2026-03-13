@@ -20,18 +20,25 @@ from .skin_config import DEFAULT_SKIN_SLUG
 
 
 class SignupForm(UserCreationForm):
+    first_name = forms.CharField(max_length=150, label=_("First name"))
+    last_name = forms.CharField(max_length=150, label=_("Last name"))
     country = forms.ChoiceField(choices=COUNTRY_CHOICES, label=_("Country"))
+    timezone = forms.ChoiceField(choices=TIMEZONE_CHOICES, label=_("Timezone"), initial="UTC")
     organization_name = forms.CharField(
         max_length=255, required=False, label=_("Organization name"),
     )
+
     class Meta:
         model = User
         fields = (
+            "first_name",
+            "last_name",
             "email",
             "display_name",
             "password1",
             "password2",
             "country",
+            "timezone",
             "organization_name",
         )
 
@@ -43,12 +50,14 @@ class SignupForm(UserCreationForm):
         cleaned = super().clean()
         org_name = (cleaned.get("organization_name") or "").strip()
         cleaned["organization_name"] = org_name or None
-
         return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)
+        user.first_name = self.cleaned_data["first_name"]
+        user.last_name = self.cleaned_data["last_name"]
         user.country = self.cleaned_data["country"]
+        user.timezone = self.cleaned_data["timezone"]
         user.organization_name = self.cleaned_data.get("organization_name")
         if not user.skin:
             user.skin = DEFAULT_SKIN_SLUG
@@ -85,6 +94,7 @@ class DemandPostForm(forms.ModelForm):
         self.fields["title"].label = _("Item description")
         self.fields["description"].label = _("Notes")
         self.fields["description"].required = False
+        self.fields["description"].widget.attrs["rows"] = 5
 
         # Demand listing quantity semantics
         self.fields["quantity"].label = _("Minimum quantity")
@@ -125,10 +135,6 @@ class SupplyLotForm(forms.ModelForm):
     location_country = forms.ChoiceField(
         choices=COUNTRY_CHOICES, label=_("Country"),
     )
-    available_until = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}),
-        label=_("Available until"),
-    )
 
     class Meta:
         model = Listing
@@ -156,6 +162,7 @@ class SupplyLotForm(forms.ModelForm):
         self.fields["price_value"].label = _("Asking price")
         self.fields["description"].label = _("Notes")
         self.fields["description"].required = False
+        self.fields["description"].widget.attrs["rows"] = 5
         # Keep supply scopes aligned to unified listing enum values.
         self.fields["shipping_scope"].choices = ListingShippingScope.choices
         if self.instance and self.instance.pk and self.instance.expires_at:
@@ -247,7 +254,8 @@ class DiscoverForm(forms.Form):
 
 
 class MessageForm(forms.Form):
-    body = forms.CharField(widget=forms.Textarea, label=_("Message"))
+    body = forms.CharField(widget=forms.Textarea(attrs={"rows": 5}), label=_("Message"))
+    enter_to_send = forms.BooleanField(required=False, label=_("Press Enter to send"))
 
 
 class ProfileForm(forms.ModelForm):

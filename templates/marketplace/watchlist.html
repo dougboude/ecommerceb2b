@@ -3,35 +3,157 @@
 
 {% block title %}{% trans "Watchlist" %}{% endblock %}
 
+{% block extra_css %}
+<style>
+#watchlist-remove-modal {
+    border: none;
+    border-radius: 10px;
+    max-width: 420px;
+    padding: 0;
+    width: calc(100% - 2rem);
+    inset: 0;
+    margin: auto;
+    opacity: 0;
+    transform: translateY(8px);
+}
+#watchlist-remove-modal::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+}
+#watchlist-remove-modal.watchlist-modal-open {
+    animation: watchlist-modal-in 140ms ease-out forwards;
+}
+#watchlist-remove-modal.watchlist-modal-closing {
+    animation: watchlist-modal-out 120ms ease-in forwards;
+}
+#watchlist-remove-modal.watchlist-modal-open::backdrop {
+    animation: watchlist-backdrop-in 140ms ease-out forwards;
+}
+#watchlist-remove-modal.watchlist-modal-closing::backdrop {
+    animation: watchlist-backdrop-out 120ms ease-in forwards;
+}
+.watchlist-modal-body {
+    padding: 1rem 1.1rem;
+}
+.watchlist-modal-body h2 {
+    margin: 0 0 0.5rem;
+}
+.watchlist-modal-body p {
+    margin: 0;
+}
+.watchlist-modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+@keyframes watchlist-modal-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes watchlist-modal-out {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(6px); }
+}
+@keyframes watchlist-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes watchlist-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div id="sse-watchlist-page" hidden></div>
 <h1>{% trans "Your Watchlist" %}</h1>
+{% include "marketplace/_watchlist_content.html" %}
 
-<section>
-    <h2>{% trans "Watching" %}</h2>
-    {% if watching %}
-    {% for item in watching %}
-    {% if item.status == "starred" %}
-        {% include "marketplace/_watchlist_card.html" with item=item show_unstar=True show_archive=True show_remove=True %}
-    {% else %}
-        {% include "marketplace/_watchlist_card.html" with item=item show_star=True show_archive=True show_remove=True %}
-    {% endif %}
-    {% endfor %}
-    {% else %}
-    <p class="empty-state">{% trans "No items being watched." %}</p>
-    {% endif %}
-</section>
+<dialog id="watchlist-remove-modal" aria-labelledby="watchlist-remove-title" aria-modal="true">
+    <div class="watchlist-modal-body">
+        <h2 id="watchlist-remove-title">{% trans "Remove watchlist item?" %}</h2>
+        <p>{% trans "This item will be removed from your watchlist." %}</p>
+        <div class="watchlist-modal-actions">
+            <button id="watchlist-remove-cancel" type="button" class="btn btn-secondary">{% trans "Cancel" %}</button>
+            <button id="watchlist-remove-confirm" type="button" class="btn btn-danger">{% trans "Remove" %}</button>
+        </div>
+    </div>
+</dialog>
+{% endblock %}
 
-{% if archived %}
-<details>
-    <summary style="cursor:pointer; font-weight:600; margin-bottom:0.5rem;">{% trans "Archived" %} ({{ archived|length }})</summary>
-    {% for item in archived %}
-    {% include "marketplace/_watchlist_card.html" with item=item show_unarchive=True inactive=True %}
-    {% endfor %}
-</details>
-{% endif %}
+{% block extra_js %}
+<script>
+(function () {
+    var modal = document.getElementById('watchlist-remove-modal');
+    var cancelBtn = document.getElementById('watchlist-remove-cancel');
+    var confirmBtn = document.getElementById('watchlist-remove-confirm');
+    var pendingForm = null;
+    var CLOSE_MS = 120;
+    if (!modal || !cancelBtn || !confirmBtn) return;
 
-<div class="actions" style="margin-top:1.5rem;">
-    <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover more" %}</a>
-</div>
+    function openModal(form) {
+        pendingForm = form;
+        modal.classList.remove('watchlist-modal-closing');
+        modal.showModal();
+        requestAnimationFrame(function () {
+            modal.classList.add('watchlist-modal-open');
+        });
+    }
+
+    function closeModal() {
+        modal.classList.remove('watchlist-modal-open');
+        modal.classList.add('watchlist-modal-closing');
+        setTimeout(function () {
+            modal.classList.remove('watchlist-modal-closing');
+            if (modal.open) modal.close();
+        }, CLOSE_MS);
+    }
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!form.classList || !form.classList.contains('watchlist-remove-form')) return;
+        if (form.dataset.confirmed === 'true') {
+            delete form.dataset.confirmed;
+            return;
+        }
+        event.preventDefault();
+        openModal(form);
+    }, true);
+
+    cancelBtn.addEventListener('click', function () {
+        pendingForm = null;
+        closeModal();
+    });
+
+    confirmBtn.addEventListener('click', function () {
+        if (!pendingForm) {
+            closeModal();
+            return;
+        }
+        pendingForm.dataset.confirmed = 'true';
+        if (pendingForm.requestSubmit) {
+            pendingForm.requestSubmit();
+        } else {
+            pendingForm.submit();
+        }
+        pendingForm = null;
+        closeModal();
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+            pendingForm = null;
+            closeModal();
+        }
+    });
+
+    modal.addEventListener('cancel', function (event) {
+        event.preventDefault();
+        pendingForm = null;
+        closeModal();
+    });
+})();
+</script>
 {% endblock %}

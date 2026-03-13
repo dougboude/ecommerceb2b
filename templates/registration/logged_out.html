@@ -8,5 +8,6 @@
     <h1>{% trans "Logged out" %}</h1>
     <p style="text-align:center;color:var(--color-text-muted);">{% trans "You have been successfully logged out." %}</p>
     <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Log back in" %}</a></p>
+    <p class="auth-link"><a href="{% url 'marketplace:signup' %}">{% trans "Create an account" %}</a></p>
 </div>
 {% endblock %}

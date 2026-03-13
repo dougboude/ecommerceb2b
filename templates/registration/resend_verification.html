@@ -15,5 +15,6 @@
         <p><button type="submit">{% trans "Send verification email" %}</button></p>
     </form>
     <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Back to login" %}</a></p>
+    <p class="auth-link"><a href="{% url 'marketplace:verify_email' %}">{% trans "Back to check email" %}</a></p>
 </div>
 {% endblock %}

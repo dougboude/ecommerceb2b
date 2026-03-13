@@ -7,11 +7,16 @@
 <h1>{{ lot.item_text }} #{{ lot.lot_number }}</h1>
 
 <div class="listing-owner">
+    {% if lot.created_by_user.has_custom_profile_image %}
     <img src="{{ lot.created_by_user.profile_image_url }}"
          alt="{{ lot.created_by_user.display_name|default:lot.created_by_user.email }}"
          class="avatar avatar-sm avatar-clickable"
          data-full-src="{{ lot.created_by_user.profile_image_url }}"
          width="64" height="64">
+    {% else %}
+    <span class="avatar avatar-sm avatar-fallback"
+          aria-label="{{ lot.created_by_user.display_name|default:lot.created_by_user.email }}">{{ lot.created_by_user.avatar_initials }}</span>
+    {% endif %}
     <span>{{ lot.created_by_user.display_name|default:lot.created_by_user.email }}</span>
 </div>
 
@@ -19,12 +24,56 @@
     <dt>{% trans "Status" %}</dt><dd>{% if lot.is_expired %}<span class="status status-expired">{% trans "Expired" %}</span>{% else %}<span class="status status-{{ lot.status }}">{{ lot.get_status_display }}</span>{% endif %}</dd>
     <dt>{% trans "Category" %}</dt><dd>{{ lot.get_category_display|default:"-" }}</dd>
     <dt>{% trans "Quantity" %}</dt><dd>{{ lot.quantity_value|default:"-" }} {{ lot.get_quantity_unit_display }}</dd>
-    <dt>{% trans "Available until" %}</dt><dd>{{ lot.available_until|date:"N j, Y" }}</dd>
+    <dt>{% trans "Available until" %}</dt><dd>{{ lot.expires_at|date:"N j, Y" }}</dd>
     <dt>{% trans "Location" %}</dt><dd>{{ lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}{% if lot.location_region %}, {{ lot.location_region }}{% endif %}</dd>
     {% if lot.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>{{ lot.asking_price }} / {{ lot.get_price_unit_display }}</dd>{% endif %}
     <dt>{% trans "Shipping scope" %}</dt><dd>{{ lot.get_shipping_scope_display }}</dd>
     {% if lot.notes %}<dt>{% trans "Notes" %}</dt><dd>{{ lot.notes }}</dd>{% endif %}
 </dl>
+
+{% if not is_owner %}
+<section class="card">
+    <h2>{% trans "Take action" %}</h2>
+    <div class="actions">
+        {% if can_convert %}
+            {% if is_watchlisted %}
+            <form method="post" action="{% url 'marketplace:discover_unsave' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ lot.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:supply_lot_detail' lot.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Unsave" %}</button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'marketplace:discover_save' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ lot.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:supply_lot_detail' lot.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Save" %}</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'marketplace:discover_message' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ lot.pk }}">
+                <button type="submit" class="btn btn-primary">{% trans "Message" %}</button>
+            </form>
+        {% else %}
+            <p class="empty-state">{{ message_unavailable_reason }}</p>
+            {% if is_watchlisted %}
+            <form method="post" action="{% url 'marketplace:discover_unsave' %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="listing_type" value="supply_lot">
+                <input type="hidden" name="listing_pk" value="{{ lot.pk }}">
+                <input type="hidden" name="next" value="{% url 'marketplace:supply_lot_detail' lot.pk %}">
+                <button type="submit" class="btn btn-secondary">{% trans "Unsave" %}</button>
+            </form>
+            {% endif %}
+        {% endif %}
+    </div>
+</section>
+{% endif %}
 
 {% if is_owner and suggestions %}
 <section>

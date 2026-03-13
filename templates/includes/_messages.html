@@ -1,7 +1,10 @@
 {% if messages %}
-<ul class="messages">
+<ul class="toast-list">
     {% for message in messages %}
-    <li class="message {{ message.tags }}">{{ message }}</li>
+    <li class="toast {{ message.tags }}">
+        <span class="toast-text">{{ message }}</span>
+        <button class="toast-close" aria-label="Dismiss" type="button">&times;</button>
+    </li>
     {% endfor %}
 </ul>
 {% endif %}

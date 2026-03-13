@@ -22,15 +22,31 @@
 <h1>{% trans "Profile" %}</h1>
 
 <div class="profile-avatar-wrap">
+    {% if user.has_custom_profile_image %}
     <img id="avatar-display"
          src="{{ user.profile_image_url }}"
          alt="{% trans 'Your profile photo' %}"
          class="avatar avatar-lg avatar-live"
          width="96" height="96">
+    {% else %}
+    <span id="avatar-display"
+          class="avatar avatar-lg avatar-live avatar-fallback"
+          aria-label="{% trans 'Your initials' %}">{{ user.avatar_initials }}</span>
+    {% endif %}
     <div>
-        <label for="avatar-input" class="btn btn-secondary" style="cursor:pointer;">
+        <strong>{{ identity_profile.display_name|default:user.email }}</strong>
+        {% if identity_profile.organization_name %}<p class="tile-meta">{{ identity_profile.organization_name }}</p>{% endif %}
+        <label for="avatar-input" class="btn btn-secondary" style="cursor:pointer; margin-top: 0.5rem;">
             {% trans "Change photo" %}
         </label>
+        <button id="avatar-remove-button"
+                type="button"
+                class="btn btn-secondary"
+                data-remove-url="{% url 'marketplace:remove_profile_image' %}"
+                {% if not user.has_custom_profile_image %}hidden{% endif %}
+                style="margin-top: 0.5rem;">
+            {% trans "Remove photo" %}
+        </button>
         <input type="file" id="avatar-input"
                accept="image/jpeg,image/png,image/webp"
                data-upload-url="{% url 'marketplace:upload_profile_image' %}"
@@ -42,6 +58,7 @@
 {% csrf_token %}
 
 <dl>
+    <dt>{% trans "Email" %}</dt><dd>{{ user.email }}</dd>
     <dt>{% trans "Display name" %}</dt><dd>{{ identity_profile.display_name|default:"-" }}</dd>
     <dt>{% trans "Organization" %}</dt><dd>{{ identity_profile.organization_name|default:"-" }}</dd>
     <dt>{% trans "Location" %}</dt>
@@ -49,36 +66,10 @@
     <dt>{% trans "Member since" %}</dt><dd>{{ member_since|date:"F j, Y" }}</dd>
 </dl>
 
-<section>
-    <h2>{% trans "Supply Listings" %}</h2>
-    {% if supply_listings %}
-    <div class="item-list">
-        {% for listing in supply_listings %}
-        <a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }}</a>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="empty-state">{% trans "No supply listings yet." %}</p>
-    {% endif %}
-</section>
-
-<section>
-    <h2>{% trans "Demand Listings" %}</h2>
-    {% if demand_listings %}
-    <div class="item-list">
-        {% for listing in demand_listings %}
-        <a href="{% url 'marketplace:demand_post_detail' listing.pk %}">{{ listing.item_text }}</a>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="empty-state">{% trans "No demand listings yet." %}</p>
-    {% endif %}
-</section>
-
 <div class="actions">
     <a href="{% url 'marketplace:profile_edit' %}" class="btn btn-primary">{% trans "Edit profile" %}</a>
-    <a href="{% url 'marketplace:dashboard' %}" class="btn btn-secondary">{% trans "Back to dashboard" %}</a>
 </div>
+
 
 <!-- Crop modal -->
 <dialog id="avatar-crop-modal" aria-labelledby="crop-modal-title">

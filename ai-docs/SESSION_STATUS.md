@@ -1,12 +1,394 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-10
+**Last updated:** 2026-03-13 (`available_until` runtime alias removed; canonical `expires_at` normalized)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Expiry field normalization (`expires_at` only) (branch `feat/ui-ux-rewrite`)**:
+  - Removed `Listing.available_until` compatibility property from `marketplace/models.py`
+  - Updated discover runtime usage in `marketplace/views.py`:
+    - `_decorate_discover_results()` now always derives ending metadata from `expires_at`
+    - `_sort_discover_results()` now uses `expires_at` for supply and demand ending-soon sorting
+  - Updated legacy active queryset helper in `marketplace/managers.py`:
+    - `ActiveSupplyLotQuerySet.active()` now filters on `expires_at__gt=now`
+  - Updated supply detail template to read canonical field:
+    - `templates/marketplace/supply_lot_detail.html` now renders `lot.expires_at`
+  - Updated active tests:
+    - `marketplace/tests/test_discover_sorting.py` now asserts ending-soon supply ordering using `expires_at`
+    - `marketplace/tests/test_listing_authoring_edit_flows.py` removed extra `available_until` POST payload key/comments
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_discover_sorting marketplace.tests.test_listing_authoring_edit_flows` (58 tests)
+
+- **Supply form duplicate date field fix (branch `feat/ui-ux-rewrite`)**:
+  - Removed extra `available_until` field declaration from `SupplyLotForm` in `marketplace/forms.py`
+  - `expires_at` remains the single rendered/processed field labeled “Available until”
+  - Eliminates duplicate “Available until” inputs on new/edit supply listing forms
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_listing_authoring_edit_flows --keepdb -v 1` (54 tests)
+
+- **Watchlist remove confirmation modal (branch `feat/ui-ux-rewrite`)**:
+  - Replaced native `window.confirm(...)` on watchlist tile remove with custom modal dialog
+  - Updated `templates/marketplace/_watchlist_card.html`:
+    - remove forms now use `.watchlist-remove-form`
+    - removed inline `onsubmit` native confirm handler
+  - Updated `templates/marketplace/watchlist.html`:
+    - added custom `<dialog id="watchlist-remove-modal">` with Cancel/Remove actions
+    - added scoped CSS for quick fade/slide in/out animations
+    - added delegated JS submit interception so modal works for dynamically swapped content (HTMX)
+  - Updated test coverage:
+    - `marketplace/tests/test_feedback_recovery.py` now asserts custom modal + remove form hook on watchlist page
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_feedback_recovery marketplace.tests.test_watchlist_workflow --keepdb -v 1` (13 tests)
+
+- **Watchlist star/unstar dynamic reordering fix (branch `feat/ui-ux-rewrite`)**:
+  - HTMX star toggle now re-renders full watchlist content region so items move between sections instantly
+  - Added shared watchlist context builder in `marketplace/views.py`:
+    - `_build_watchlist_context(user)` used by both `watchlist_view` and HTMX `watchlist_star`
+  - `watchlist_star` now returns `marketplace/_watchlist_content.html` for HTMX requests (instead of single-card partial)
+  - Template updates:
+    - `templates/marketplace/watchlist.html` now includes `marketplace/_watchlist_content.html`
+    - added new partial `templates/marketplace/_watchlist_content.html` containing grouped sections + summary
+    - `templates/marketplace/_watchlist_card.html` star/unstar buttons now target `#watchlist-content` with `hx-swap="outerHTML"`
+  - Added regression test in `marketplace/tests/test_watchlist_workflow.py`:
+    - HTMX star toggle returns updated content fragment with section counts and moved listing
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_watchlist_workflow --keepdb -v 1` (6 tests)
+
+- **Thread Enter-to-send preference toggle (branch `feat/ui-ux-rewrite`)**:
+  - Added per-user persisted preference:
+    - `User.enter_to_send` boolean field (default `False`) in `marketplace/models.py`
+    - migration added: `marketplace/migrations/0017_user_enter_to_send.py`
+  - Updated `MessageForm` (`marketplace/forms.py`):
+    - added checkbox field `enter_to_send` (`Press Enter to send`)
+  - Updated `thread_detail` view (`marketplace/views.py`):
+    - on POST, persists `enter_to_send` preference to current user
+    - on GET, initializes form checkbox from `request.user.enter_to_send`
+  - Updated thread template (`templates/marketplace/thread_detail.html`):
+    - added JS handler so Enter submits only when toggle is checked
+    - Shift+Enter still inserts newline
+    - checkbox remains available for click-send mode
+  - Updated tests (`marketplace/tests/test_messaging_workspace.py`):
+    - asserts checkbox renders in thread form
+    - verifies preference persists after POST and renders as checked on return
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_messaging_workspace marketplace.tests.test_profile_trust_surfaces --keepdb -v 1` (26 tests)
+
+- **Thread composer textarea height adjustment (branch `feat/ui-ux-rewrite`)**:
+  - Updated `MessageForm` in `marketplace/forms.py`:
+    - message body textarea now renders with `rows="5"` by default
+  - Added regression assertion in `marketplace/tests/test_messaging_workspace.py`:
+    - `thread_detail` response includes `name="body"` and `rows="5"`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_messaging_workspace --keepdb -v 1` (4 tests)
+
+- **Listing Notes textarea default height reduction (branch `feat/ui-ux-rewrite`)**:
+  - Updated listing forms so `Notes` (`description`) uses half-height default rows:
+    - `marketplace/forms.py`
+    - `DemandPostForm.__init__`: `description` textarea rows set to `5`
+    - `SupplyLotForm.__init__`: `description` textarea rows set to `5`
+  - Added regression checks in `marketplace/tests/test_listing_authoring_edit_flows.py`:
+    - supply create form renders `description` with `rows="5"`
+    - demand create form renders `description` with `rows="5"`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_listing_authoring_edit_flows --keepdb -v 1` (54 tests)
+
+- **Supply/Demand list CTA logic correction (branch `feat/ui-ux-rewrite`)**:
+  - Updated list templates so `Create new` appears only when listings exist:
+    - `templates/marketplace/supply_lot_list.html`
+    - `templates/marketplace/demand_post_list.html`
+  - Empty-state behavior now shows only first-listing CTA:
+    - `Create your first supply listing` / `Create your first demand listing`
+    - `Create new` is hidden in empty states
+  - Updated regression tests in `marketplace/tests/test_listing_management_hub.py`:
+    - header CTA tests now use populated state
+    - empty-state tests assert `Create new` is not present
+    - parity tests updated for both populated and empty-state expectations
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_listing_management_hub --keepdb -v 1` (38 tests)
+
+- **Global affirmation/toast positioning update (branch `feat/ui-ux-rewrite`)**:
+  - Replaced top-gap/flash-slot message layout with fixed toast overlays
+  - `templates/base.html`: removed flash-slot wrapper; global messages now render normally and are positioned entirely by CSS
+  - `static/css/skin-simple-blue.css` + `static/css/skin-warm-editorial.css`:
+    - `.messages` now fixed overlay at bottom-right on desktop
+    - responsive behavior switches to bottom-center on small viewports
+    - toasts do not participate in layout flow, preventing content shifts on show/hide
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia marketplace.tests.test_profile_trust_surfaces --keepdb -v 1` (31 tests)
+
+- **Global message bar layout stabilization (branch `feat/ui-ux-rewrite`)**:
+  - Moved global messages include into `<main>` in `templates/base.html` so messages can be anchored relative to content container
+  - Updated both skins to anchor `.messages` absolutely in the top gap above content:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+  - Added `position: relative` on `main` in both skins; `.messages` now uses absolute positioning (`top: -1.5rem`) and no longer affects flow layout
+  - Result: message fade/remove no longer shifts page content upward
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia marketplace.tests.test_profile_trust_surfaces --keepdb -v 1` (31 tests)
+
+- **Profile photo remove action + live avatar sync (branch `feat/ui-ux-rewrite`)**:
+  - Added remove endpoint: `POST /profile/remove-avatar/` (`marketplace:remove_profile_image`)
+  - Endpoint behavior (`marketplace/views.py`):
+    - clears `profile_image`
+    - updates `profile_image_updated_at`
+    - attempts file deletion safely
+    - returns JSON with `avatar_initials`
+  - Added clean profile UI action in `templates/marketplace/profile.html`:
+    - `Remove photo` button next to `Change photo`
+    - button appears only when a custom photo exists
+  - Updated live client behavior in `static/js/avatar-upload.js`:
+    - uploading a photo updates both profile avatar and top-right navbar avatar instantly
+    - removing a photo reverts both profile and top-right avatar to initials instantly
+    - remove button visibility toggles appropriately after upload/remove
+  - Added/updated tests in `marketplace/tests/test_profile_image.py`:
+    - unauthenticated remove redirects
+    - remove clears existing image and returns initials
+    - remove without image is idempotent
+    - profile page includes remove control
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_profile_image marketplace.tests.test_navigation_ia --keepdb -v 1` (30 tests)
+
+- **Avatar fallback standardization + seed-avatar removal (branch `feat/ui-ux-rewrite`)**:
+  - Added `User.has_custom_profile_image` and `User.avatar_initials` in `marketplace/models.py`
+  - Removed generated seed avatar image creation from `marketplace/management/commands/seed_test_data.py` (no `_attach_avatar` writes)
+  - Switched avatar rendering to photo-or-initials across:
+    - `templates/includes/_navbar.html`
+    - `templates/marketplace/profile.html`
+    - `templates/marketplace/inbox.html`
+    - `templates/marketplace/thread_detail.html`
+    - `templates/marketplace/supply_lot_detail.html`
+    - `templates/marketplace/demand_post_detail.html`
+  - Added shared initials circle styles (`.avatar-fallback`) to both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+  - Updated `static/js/avatar-upload.js` so a fallback initials element is replaced with a real `<img>` after successful upload
+  - Updated tests:
+    - `marketplace/tests/test_navigation_ia.py`
+    - `marketplace/tests/test_profile_trust_surfaces.py`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia marketplace.tests.test_profile_trust_surfaces marketplace.tests.test_profile_image marketplace.tests.test_messaging_workspace --keepdb -v 1` (52 tests)
+
+- **Global message bar improvements (post-QA, branch `feat/ui-ux-rewrite`)**:
+  - Removed duplicate messages block from `templates/marketplace/profile.html` — base template already renders messages globally via `includes/_messages.html`
+  - Updated `templates/includes/_messages.html`: added `<button class="message-close">` with `&times;` icon per message
+  - Updated `templates/base.html`: added inline JS — close button dismisses with fade, all messages auto-fade after 10 seconds
+  - Updated both skin CSS files (`skin-simple-blue.css`, `skin-warm-editorial.css`): `.messages .message` now flex row, `.message-close` styled consistently
+  - This behavior is global — applies to all pages that emit Django messages
+
+- **Profile page cleanup (post-QA, branch `feat/ui-ux-rewrite`)**:
+  - Removed Supply Listings and Demand Listings sections from `templates/marketplace/profile.html` — these don't belong on the profile view
+  - Removed "Back to dashboard" button from profile page actions
+  - Updated `marketplace/tests/test_profile_trust_surfaces.py`: tests F10-2, F10-4, F10-6 inverted to assert sections are absent; all 21 tests pass
+- **Navbar profile avatar + hover account menu update executed on branch `feat/ui-ux-rewrite`**:
+  - Updated `templates/includes/_navbar.html`:
+    - replaced top-nav standalone `Profile` link + logout button form with top-right avatar trigger
+    - added hover/focus account dropdown with `Profile` and `Log out` links
+    - avatar now renders uploaded profile image when present
+    - when no profile image exists, avatar circle shows initials (`first_name` + `last_name`), with fallback to first character of display name/email
+  - Updated `marketplace/views.py` (`MarketplaceLogoutView`):
+    - enabled logout by GET for link-based logout UX (`http_method_names = ["get", "post", "options"]`)
+    - `get()` now delegates to `post()` so logout link performs an actual logout and redirect
+  - Updated both skins for consistent navbar dropdown UX:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+    - added `.nav-user-menu`, `.nav-avatar-link`, `.nav-avatar-fallback`, and `.nav-user-dropdown` styling with hover/focus visibility behavior
+  - Extended `marketplace/tests/test_navigation_ia.py`:
+    - asserts authenticated navbar includes avatar-menu container
+    - verifies initials fallback render behavior
+    - verifies logout link via GET logs out and redirects to login
+  - Validation status:
+    - PASS: `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia -v 2` (8 tests)
+
+- **UI/UX Rewrite — Feature 10 executed on branch `feat/ui-ux-rewrite`** (`profile-trust-surfaces`):
+  - Audited identity presentation across profile, listing detail, thread detail, and inbox templates.
+  - Updated `templates/marketplace/profile.html`:
+    - Added Django messages display block at top of content (shows post-edit success feedback)
+    - Moved "Edit profile" button to appear directly after the identity DL (near identity, not buried at bottom)
+    - Added display name + organization inline in the avatar wrap for immediate identity context
+    - Added user email to the identity DL
+    - Added status badge (`.status status-{{ listing.status }}`) to supply and demand listing items
+  - Updated `templates/marketplace/profile_edit.html`:
+    - Changed submit button to `btn btn-primary` and label to "Save changes"
+    - Added Cancel link back to profile page
+    - Wrapped actions in `.actions` div for consistent layout
+  - Updated `templates/marketplace/thread_detail.html`:
+    - Replaced `<p class="helptext">{% trans "With:" %} ...` with a `.listing-owner` div containing counterparty avatar + name
+    - Added `class="btn btn-primary"` to Send button
+  - Updated `templates/marketplace/inbox.html`:
+    - Added counterparty avatar (`avatar-xs`) inside each thread card's `.match-card-details` using `.listing-owner` wrapper
+  - Updated `marketplace/tests/test_messaging_workspace.py`:
+    - Replaced two `assertContains(response, "With:")` assertions with `assertContains(response, "listing-owner")` to match new counterparty identity presentation
+  - Added Feature 10 test suite: `marketplace/tests/test_profile_trust_surfaces.py`
+    - 21 tests across 5 test classes: `ProfileSurfaceClarityTests`, `ProfileEditContinuityTests`, `AvatarFallbackTests`, `TrustContextTests`, `SafetyBoundaryTests`
+    - covers: email display, listing sections, Edit button, back link, success message display, status badges, Save changes button, Cancel link, redirect on save, data persistence, avatar fallback URL, avatar on profile/supply_detail/demand_detail/thread_detail/inbox, listing-owner block presence, send button class, unauthenticated access gating
+  - Full regression: 209 tests pass, 6 skipped (pre-existing).
+  - Updated `docs/SPEC_ORDER.md` Feature 10 status to `REQ, DES, TASK, EXEC`.
+
+- **UI/UX Rewrite — Feature 9 executed on branch `feat/ui-ux-rewrite`** (`listing-authoring-edit-flows`):
+  - Audited create/edit/cancel/delete-confirm paths for supply and demand listing forms.
+  - Cancel paths and submit destinations were already correct; validation feedback clarity was the main gap.
+  - Updated `templates/marketplace/supply_lot_form.html`:
+    - Added `novalidate` to `<form>` for consistent browser-level validation handling
+    - Added error banner (`<div class="messages"><div class="message error">`) when `form.errors` is non-empty
+    - Added `{% if form.non_field_errors %}` block to surface non-field validation errors
+    - Changed submit button label: create mode = "Create listing", edit mode = "Save changes" (was "Submit" in both)
+    - Added `class="btn btn-primary"` to submit button for visual consistency
+  - Updated `templates/marketplace/demand_post_form.html` with identical improvements.
+  - Fixed pre-existing bug in `marketplace/views.py`: `supply_lot_create` and `demand_post_create` did not set `created_at` on new listings (would have caused IntegrityError at DB level). Both now set `created_at = timezone_now()` before `save()`.
+  - Added Feature 9 test suite: `marketplace/tests/test_listing_authoring_edit_flows.py`
+    - 52 tests across 6 test classes: `SupplyCreateFlowTests`, `SupplyEditFlowTests`, `DemandCreateFlowTests`, `DemandEditFlowTests`, `SupplyDeleteConfirmTests`, `DemandDeleteConfirmTests`
+    - covers: form rendering, title/mode display, button labels, cancel links (create→list, edit→detail), valid-POST redirect paths, validation error banner visibility, input preservation on failure, delete confirm page (title, danger button, cancel link, consequences text), delete commit path, delete status transition, non-owner permission boundaries, auth gating
+  - Full regression: 188 tests pass, 6 skipped (pre-existing).
+  - Updated `docs/SPEC_ORDER.md` Feature 9 status to `REQ, DES, TASK, EXEC`.
+
+- **UI/UX Rewrite — Feature 8 executed on branch `feat/ui-ux-rewrite`** (`supply-demand-listing-management-hub`):
+  - Audited supply and demand list templates — found structural parity already in place; identified gaps in empty-state recovery and management summary context.
+  - Updated `supply_lot_list` and `demand_post_list` views (`marketplace/views.py`) to pass `total_count` and `active_count` context variables.
+  - Updated both list templates to:
+    - show a listing summary line (`N listings — M active`) above the filter bar when listings exist
+    - improve empty-state recovery: replaced bare `<p>` text with a `<div class="empty-state">` block including a direct create CTA link (`"Create your first supply/demand listing"`)
+  - Added Feature 8 test suite: `marketplace/tests/test_listing_management_hub.py`
+    - 38 tests across 4 test classes: `SupplyListPageTests`, `DemandListPageTests`, `ListDetailActionTransitionTests`, `ListSupplyDemandParityTests`
+    - covers: page load, auth gating, create CTA presence (header + empty state), listing visibility, status badges, count summary, owner isolation, deleted exclusion, filter bar presence, detail links, toggle transitions, edit/action state rules, non-owner permission boundaries, supply/demand structural parity
+  - Full regression: 136 tests pass, 6 skipped (pre-existing).
+  - Updated `docs/SPEC_ORDER.md` Feature 8 status to `REQ, DES, TASK, EXEC`.
+
+- **UI/UX Rewrite — Feature 7 executed on branch `feat/ui-ux-rewrite`** (`watchlist-follow-up-workflow`):
+  - Refined watchlist page into explicit follow-up state groups:
+    - `Starred`, `Watching`, and `Archived` sections with counts
+    - active-item workspace summary (`active items`, `in conversation`, unread conversation count)
+  - Updated watchlist data shaping in `marketplace/views.py`:
+    - split active records into separate `starred` and `watching` collections
+    - added summary metrics (`active_count`, `conversation_count`, `unread_conversation_count`)
+  - Improved empty-state recovery clarity:
+    - when no active tracked items exist, watchlist shows direct `Discover listings` CTA
+  - Added watchlist workflow regression coverage:
+    - `marketplace/tests/test_watchlist_workflow.py`
+    - covers state-group separation, empty-state CTA, conversation-start continuity from watchlist, archive/restore transitions, and unread summary presence
+  - Updated `docs/SPEC_ORDER.md` Feature 7 status to `REQ, DES, TASK, EXEC`.
+- **UI/UX Rewrite — Feature 6 executed on branch `feat/ui-ux-rewrite`** (`messaging-workspace-conversation-context`):
+  - Improved messages workspace coherence in inbox/thread surfaces:
+    - `inbox_view` now annotates per-thread listing context (`listing_kind_label`, `listing_detail_url`) and aggregate unread count for workspace summary
+    - inbox template now shows conversation summary (`X conversations, Y unread`) and listing context links per thread
+  - Strengthened thread context preservation in `thread_detail`:
+    - added explicit listing context metadata (`listing_kind_label`, `listing_detail_url`)
+    - thread template now shows persistent `About` line with listing link (when available)
+    - added secondary `Back to listing` path while preserving consistent `Back to messages`
+  - Added messaging workspace regression coverage:
+    - `marketplace/tests/test_messaging_workspace.py`
+    - covers inbox recency ordering, unread cue rendering, thread context visibility, read-state update on open, and send-message context continuity
+  - Updated `docs/SPEC_ORDER.md` Feature 6 status to `REQ, DES, TASK, EXEC`.
+- **UI/UX Rewrite — Feature 5 executed on branch `feat/ui-ux-rewrite`** (`listing-detail-conversion-surface`):
+  - Added non-owner conversion action surfaces to listing detail templates:
+    - `templates/marketplace/supply_lot_detail.html`
+    - `templates/marketplace/demand_post_detail.html`
+    - new `Take action` block includes primary `Message` and secondary `Save/Unsave` actions when listing is actionable
+  - Added status-aware conversion gating in detail views (`marketplace/views.py`):
+    - `demand_post_detail` and `supply_lot_detail` now compute:
+      - `is_watchlisted`
+      - `can_convert`
+      - `message_unavailable_reason` for inactive states
+  - Improved detail-page action continuity by extending discover save/unsave endpoints:
+    - `discover_save` / `discover_unsave` now honor optional `next` redirect target
+    - enables save/unsave from detail pages while preserving listing context
+  - Added listing-detail conversion regression coverage:
+    - `marketplace/tests/test_listing_detail_conversion.py`
+    - covers non-owner action visibility, owner/non-owner surface separation, save/unsave continuity on detail pages, detail->message thread transition, and inactive-status messaging explanation
+  - Updated `docs/SPEC_ORDER.md` Feature 5 status to `REQ, DES, TASK, EXEC`.
+- **UI/UX Rewrite — Feature 4 executed on branch `feat/ui-ux-rewrite`** (`discover-search-experience`):
+  - Strengthened Discover direction clarity in `marketplace/views.py` + template:
+    - added explicit direction label contract via `_discover_direction_label()`
+    - results state now surfaces direction context (`Showing matches for Find Supply/Find Demand`)
+    - empty-state copy now includes active direction (`No results found for Find ...`)
+  - Preserved existing direction/state continuity behavior for save/unsave keep-results flow and clear/reset contract.
+  - Added new discover regression test suite:
+    - `marketplace/tests/test_discover_experience.py`
+    - covers direction isolation, direction labeling, save/unsave context persistence, discover->message thread creation, clear-state reset, and short-query hint + recovery CTA behavior
+  - Updated `docs/SPEC_ORDER.md` Feature 4 status to `REQ, DES, TASK, EXEC`.
+- **UI/UX Rewrite — Feature 3 executed on branch `feat/ui-ux-rewrite`** (`account-access-verification-journey`):
+  - Refined unverified-login recovery path in `MarketplaceLoginView` (`marketplace/views.py`):
+    - resend-verification link now includes prefilled email query (`/resend-verification/?email=...`)
+  - Added neutral resend outcome feedback in `resend_verification` view:
+    - `If an unverified account exists for that email, a new verification link has been sent.`
+  - Normalized auth CTA copy and progression links across templates:
+    - `templates/registration/login.html`: added direct `Need a new verification email?` link
+    - `templates/registration/email_verify.html`: standardized login CTA label (`Log in`)
+    - `templates/registration/email_verify_expired.html`: added `Back to login` path in addition to resend
+    - `templates/registration/email_verify_used.html`: standardized login CTA label (`Log in`)
+    - `templates/registration/resend_verification.html`: added `Back to check email` path
+    - `templates/registration/logged_out.html`: added signup progression link (`Create an account`)
+  - Extended auth/verification regression tests in `marketplace/tests/test_email_verification.py`:
+    - verifies expired/used token pages include correct recovery/login links
+    - verifies unverified-login resend link includes prefilled email query
+    - verifies resend flow displays neutral outcome feedback
+    - verifies resend page includes check-email return path
+  - Updated `docs/SPEC_ORDER.md` Feature 3 status to `REQ, DES, TASK, EXEC`.
+  - Validation status:
+    - PASS: `.venv/bin/python manage.py test marketplace.tests.test_email_verification marketplace.tests.test_feedback_recovery marketplace.tests.test_navigation_ia marketplace.tests.test_ui_derolification` (44 tests, DB-backed)
+- **UI/UX Rewrite — Feature 2 executed on branch `feat/ui-ux-rewrite`** (`cross-page-feedback-recovery-empty-state-system`):
+  - Added cross-page success/recovery feedback messages for key mutating actions in `marketplace/views.py`:
+    - listing toggles (`demand_post_toggle`, `supply_lot_toggle`)
+    - discover clear (`discover_clear`)
+    - watchlist actions (`watchlist_star` non-HTMX path, `watchlist_archive`, `watchlist_unarchive`, `watchlist_delete`)
+    - suggestion dismiss (`suggestion_dismiss`)
+    - message-entry flows (`discover_message`, `suggestion_message`)
+  - Normalized empty-state recovery CTAs:
+    - Discover no-results state now includes primary CTA `Start a new search` (`templates/marketplace/discover.html`)
+    - Profile empty supply/demand sections now include create-listing CTAs (`templates/marketplace/profile.html`)
+  - Added confirmation affordance for watchlist remove action:
+    - browser confirm prompt on remove submit (`templates/marketplace/_watchlist_card.html`)
+  - Added feedback/recovery contract artifact:
+    - `docs/FEEDBACK_CONTRACT_MATRIX.md`
+  - Added regression coverage:
+    - `marketplace/tests/test_feedback_recovery.py`
+    - covers feedback message presence, empty-state CTA presence/targets, and watchlist remove confirmation prompt
+  - Updated `docs/SPEC_ORDER.md` Feature 2 status to `REQ, DES, TASK, EXEC`.
+- **UI/UX Rewrite — Feature 1 execution started on branch `feat/ui-ux-rewrite`** (`navigation-ia-unification`):
+  - Updated `nav_section()` in `marketplace/context_processors.py` to canonical route families:
+    - `/discover` -> `discover`
+    - `/messages` and `/threads` -> `messages`
+    - `/watchlist` -> `watchlist`
+    - `/profile` -> `profile`
+    - `/available` -> `supply`
+    - `/wanted` -> `demand`
+    - `/` -> `dashboard`
+  - Removed obsolete active-nav dependencies on legacy prefixes (`/demands`, `/supply`).
+  - Normalized authenticated navbar in `templates/includes/_navbar.html` to canonical labels:
+    - `Discover`, `Messages`, `Watchlist`, `Supply`, `Demand`, `Profile`, `Log out`
+    - removed `Dashboard` top-nav entry and `Your Listings:` grouping label
+    - split active-state highlighting so Supply and Demand activate independently
+    - added `aria-current="page"` on active nav links
+  - Added primary empty-state next actions on inbox page (`templates/marketplace/inbox.html`):
+    - `Discover listings` (primary)
+    - `Open watchlist` (secondary)
+  - Added navigation IA regression tests:
+    - `marketplace/tests/test_navigation_ia.py`
+    - covers canonical route-family mapping, unknown-path fallback, canonical nav labels, supply/demand active-state correctness, and inbox empty-state CTA presence
+  - Updated existing UI derolification assertion (`marketplace/tests/test_ui_derolification.py`) for the normalized navbar contract.
+  - Validation status:
+    - PASS: `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia.NavSectionMappingTests` (2 tests)
+    - PASS: `.venv/bin/python manage.py test marketplace.tests.test_navigation_ia marketplace.tests.test_ui_derolification` (13 tests, DB-backed)
+- Completed UX/UI spec drafting for the full planned feature sequence (items 1-10 in `docs/SPEC_ORDER.md`):
+  - `specs/navigation-ia-unification/{requirements.md,design.md,tasks.md}`
+  - `specs/cross-page-feedback-recovery-empty-state-system/{requirements.md,design.md,tasks.md}`
+  - `specs/account-access-verification-journey/{requirements.md,design.md,tasks.md}`
+  - `specs/discover-search-experience/{requirements.md,design.md,tasks.md}`
+  - `specs/listing-detail-conversion-surface/{requirements.md,design.md,tasks.md}`
+  - `specs/messaging-workspace-conversation-context/{requirements.md,design.md,tasks.md}`
+  - `specs/watchlist-follow-up-workflow/{requirements.md,design.md,tasks.md}`
+  - `specs/supply-demand-listing-management-hub/{requirements.md,design.md,tasks.md}`
+  - `specs/listing-authoring-edit-flows/{requirements.md,design.md,tasks.md}`
+  - `specs/profile-trust-surfaces/{requirements.md,design.md,tasks.md}`
+- Updated `docs/SPEC_ORDER.md` statuses for all ten UX/UI features to `REQ, DES, TASK` (spec-complete, implementation not yet executed).
+- Generated specsmd documents for Feature 1 (`navigation-ia-unification`):
+  - `specs/navigation-ia-unification/requirements.md`
+  - `specs/navigation-ia-unification/design.md`
+  - `specs/navigation-ia-unification/tasks.md`
+  - focus is behavioral IA/navigation unification (canonical nav labels, active-state correctness, route mapping coherence, contextual navigation, dead-end CTA coverage) with no framework-specific requirements
 - Created UX-to-spec planning artifacts:
   - `docs/FEATURE_BACKLOG.md` (prioritized feature list for specsmd generation with journeys, component mappings, and dependencies)
   - `docs/SPEC_ORDER.md` (recommended spec creation/implementation sequence, dependency-safe with practical flow notes)

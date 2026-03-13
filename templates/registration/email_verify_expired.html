@@ -8,5 +8,6 @@
     <h1>{% trans "Verification link expired" %}</h1>
     <p style="text-align:center;color:var(--color-text-muted);">{% trans "Verification links are valid for 24 hours. Yours has expired." %}</p>
     <p class="auth-link"><a href="{% url 'marketplace:resend_verification' %}">{% trans "Request a new verification email" %}</a></p>
+    <p class="auth-link"><a href="{% url 'marketplace:login' %}">{% trans "Back to login" %}</a></p>
 </div>
 {% endblock %}

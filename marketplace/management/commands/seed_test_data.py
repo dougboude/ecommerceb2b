@@ -13,11 +13,9 @@ Maintenance note:
     The goal is that every new spec leaves a representative data row here.
 """
 
-import io
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils.timezone import now as timezone_now
@@ -55,7 +53,6 @@ PERSONAS = [
         "organization_name": "Thornton Farms",
         "country": "US",
         "email_verified": True,
-        "avatar_color": (72, 149, 239),    # blue
     },
     {
         "handle": "bob",
@@ -64,7 +61,6 @@ PERSONAS = [
         "organization_name": "Mercado Provisions",
         "country": "US",
         "email_verified": True,
-        "avatar_color": (56, 176, 0),      # green
     },
     {
         "handle": "carol",
@@ -73,7 +69,6 @@ PERSONAS = [
         "organization_name": None,
         "country": "CA",
         "email_verified": True,
-        "avatar_color": None,              # no profile image
     },
     {
         "handle": "dave",
@@ -82,7 +77,6 @@ PERSONAS = [
         "organization_name": "Okonkwo & Sons",
         "country": "GB",
         "email_verified": True,
-        "avatar_color": (230, 126, 34),    # orange
     },
     {
         "handle": "eve",
@@ -91,7 +85,6 @@ PERSONAS = [
         "organization_name": None,
         "country": "JP",
         "email_verified": False,           # unverified — tests login blocking
-        "avatar_color": None,
     },
 ]
 
@@ -127,8 +120,6 @@ class Command(BaseCommand):
                 country=p["country"],
                 email_verified=p["email_verified"],
             )
-            if p["avatar_color"]:
-                _attach_avatar(user, p["avatar_color"])
             if not p["email_verified"]:
                 # Create a pending (unused) verification token so the resend
                 # flow has something to revoke.
@@ -496,32 +487,3 @@ def _message(thread, sender, body, created_at=None):
         # Override auto_now_add after the fact
         Message.objects.filter(pk=msg.pk).update(created_at=created_at)
     return msg
-
-
-def _attach_avatar(user, rgb_color):
-    """
-    Generate a simple solid-color circle PNG and attach it as the user's
-    profile image. This gives every seeded user a distinct, visually
-    identifiable avatar without requiring real photos.
-    """
-    try:
-        from PIL import Image, ImageDraw
-    except ImportError:
-        return  # Pillow not available — skip silently
-
-    size = 512
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    # Filled circle
-    draw.ellipse([0, 0, size - 1, size - 1], fill=(*rgb_color, 255))
-    # Subtle inner highlight ring
-    draw.ellipse([20, 20, size - 21, size - 21], outline=(255, 255, 255, 60), width=6)
-
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    filename = f"profile_images/{user.pk}/seed_avatar.png"
-    user.profile_image.save(filename, ContentFile(buf.read(), name=filename), save=False)
-    user.profile_image_updated_at = timezone_now()
-    user.save(update_fields=["profile_image", "profile_image_updated_at"])
