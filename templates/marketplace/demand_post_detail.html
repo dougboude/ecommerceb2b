@@ -7,11 +7,16 @@
 <h1>{% trans "Looking for:" %} {{ post.item_text }} #{{ post.post_number }}</h1>
 
 <div class="listing-owner">
+    {% if post.created_by_user.has_custom_profile_image %}
     <img src="{{ post.created_by_user.profile_image_url }}"
          alt="{{ post.created_by_user.display_name|default:post.created_by_user.email }}"
          class="avatar avatar-sm avatar-clickable"
          data-full-src="{{ post.created_by_user.profile_image_url }}"
          width="64" height="64">
+    {% else %}
+    <span class="avatar avatar-sm avatar-fallback"
+          aria-label="{{ post.created_by_user.display_name|default:post.created_by_user.email }}">{{ post.created_by_user.avatar_initials }}</span>
+    {% endif %}
     <span>{{ post.created_by_user.display_name|default:post.created_by_user.email }}</span>
 </div>
 

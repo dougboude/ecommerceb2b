@@ -17,5 +17,5 @@ class ActiveSupplyLotQuerySet(models.QuerySet):
         now = timezone.now()
         return self.filter(
             status="active",
-            available_until__gt=now,
+            expires_at__gt=now,
         )

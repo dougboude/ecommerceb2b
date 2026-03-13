@@ -94,6 +94,11 @@ class SupplyCreateFlowTests(TestCase):
         response = self.client.get(self.url)
         self.assertContains(response, "Create listing")
 
+    def test_create_form_notes_field_uses_compact_height(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, 'name="description"')
+        self.assertContains(response, 'rows="5"')
+
     def test_create_cancel_links_to_supply_list(self):
         response = self.client.get(self.url)
         list_url = reverse("marketplace:supply_lot_list")
@@ -107,7 +112,6 @@ class SupplyCreateFlowTests(TestCase):
             "quantity": "100",
             "unit": "kg",
             "expires_at": future.isoformat(),
-            "available_until": future.isoformat(),
             "location_country": "US",
             "location_locality": "",
             "location_region": "",
@@ -130,15 +134,14 @@ class SupplyCreateFlowTests(TestCase):
 
     def test_invalid_post_shows_error_banner(self):
         future = (timezone.now() + timedelta(days=30)).date()
-        # Provide expires_at/available_until to avoid unhandled None in clean_expires_at;
-        # leave other required fields blank to trigger validation errors.
+        # Provide expires_at to avoid unhandled None in clean_expires_at; leave
+        # other required fields blank to trigger validation errors.
         data = {
             "title": "",
             "category": "",
             "quantity": "",
             "unit": "",
             "expires_at": future.isoformat(),
-            "available_until": future.isoformat(),
             "location_country": "US",
             "location_locality": "",
             "location_region": "",
@@ -160,7 +163,6 @@ class SupplyCreateFlowTests(TestCase):
             "quantity": "",
             "unit": "",
             "expires_at": "not-a-date",
-            "available_until": "not-a-date",
             "location_country": "US",
             "location_locality": "",
             "location_region": "",
@@ -226,7 +228,6 @@ class SupplyEditFlowTests(TestCase):
             "quantity": "50",
             "unit": "kg",
             "expires_at": future.isoformat(),
-            "available_until": future.isoformat(),
             "location_country": "US",
             "location_locality": "",
             "location_region": "",
@@ -245,14 +246,13 @@ class SupplyEditFlowTests(TestCase):
     def test_invalid_edit_post_shows_error_banner(self):
         future = (timezone.now() + timedelta(days=30)).date()
         # Leave required fields blank (title, unit) to trigger validation errors;
-        # include expires_at/available_until to avoid an unhandled None in clean_expires_at.
+        # include expires_at to avoid an unhandled None in clean_expires_at.
         data = {
             "title": "",
             "category": "",
             "quantity": "",
             "unit": "",
             "expires_at": future.isoformat(),
-            "available_until": future.isoformat(),
             "location_country": "US",
             "location_locality": "",
             "location_region": "",
@@ -303,6 +303,11 @@ class DemandCreateFlowTests(TestCase):
     def test_create_form_has_submit_button(self):
         response = self.client.get(self.url)
         self.assertContains(response, "Create listing")
+
+    def test_create_form_notes_field_uses_compact_height(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, 'name="description"')
+        self.assertContains(response, 'rows="5"')
 
     def test_create_cancel_links_to_demand_list(self):
         response = self.client.get(self.url)

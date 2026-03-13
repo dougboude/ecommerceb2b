@@ -98,7 +98,7 @@ class SignupFlowTests(TestCase):
     def test_signup_does_not_autologin(self):
         response = self.client.post(
             reverse("marketplace:signup"),
-            {"email": "new@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User"},
+            {"email": "new@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User", "first_name": "Test", "last_name": "User", "timezone": "UTC"},
         )
         # Should redirect to verify_email, not dashboard
         self.assertRedirects(response, reverse("marketplace:verify_email"))
@@ -108,7 +108,7 @@ class SignupFlowTests(TestCase):
     def test_signup_creates_token(self):
         self.client.post(
             reverse("marketplace:signup"),
-            {"email": "new2@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User"},
+            {"email": "new2@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User", "first_name": "Test", "last_name": "User", "timezone": "UTC"},
         )
         user = User.objects.get(email="new2@example.com")
         self.assertEqual(EmailVerificationToken.objects.filter(user=user).count(), 1)
@@ -116,7 +116,7 @@ class SignupFlowTests(TestCase):
     def test_signup_sends_verification_email(self):
         self.client.post(
             reverse("marketplace:signup"),
-            {"email": "new3@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User"},
+            {"email": "new3@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User", "first_name": "Test", "last_name": "User", "timezone": "UTC"},
         )
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Confirm", mail.outbox[0].subject)
@@ -128,7 +128,7 @@ class SignupFlowTests(TestCase):
         with patch("marketplace.views.send_mail", side_effect=Exception("smtp error")):
             response = self.client.post(
                 reverse("marketplace:signup"),
-                {"email": "fail@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User"},
+                {"email": "fail@example.com", "password1": "strongpass99!", "password2": "strongpass99!", "country": "US", "display_name": "Test User", "first_name": "Test", "last_name": "User", "timezone": "UTC"},
             )
         # User should still be created
         self.assertTrue(User.objects.filter(email="fail@example.com").exists())
@@ -139,17 +139,17 @@ class SignupFlowTests(TestCase):
 @override_settings(STORAGES=_STATIC_TEST_SETTINGS, EMAIL_BACKEND=_LOCMEM_EMAIL)
 @tag("email_verification")
 class VerifyEmailConfirmTests(TestCase):
-    def test_valid_token_activates_and_logs_in(self):
+    def test_valid_token_activates_and_redirects_to_login(self):
         user = _make_user()
         token = _make_token(user)
         url = reverse("marketplace:verify_email_confirm", args=[token.token])
         response = self.client.get(url)
-        self.assertRedirects(response, reverse("marketplace:dashboard"))
+        self.assertRedirects(response, reverse("marketplace:login"))
         user.refresh_from_db()
         self.assertTrue(user.email_verified)
         token.refresh_from_db()
         self.assertIsNotNone(token.used_at)
-        self.assertIn("_auth_user_id", self.client.session)
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_expired_token_shows_expired_page(self):
         user = _make_user()

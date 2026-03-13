@@ -6,13 +6,20 @@
         <a href="{% url 'marketplace:watchlist' %}"{% if nav_section == "watchlist" %} class="nav-active" aria-current="page"{% endif %}>{% trans "Watchlist" %}</a>
         <a href="{% url 'marketplace:supply_lot_list' %}"{% if nav_section == "supply" %} class="nav-active" aria-current="page"{% endif %}>{% trans "Supply" %}</a>
         <a href="{% url 'marketplace:demand_post_list' %}"{% if nav_section == "demand" %} class="nav-active" aria-current="page"{% endif %}>{% trans "Demand" %}</a>
-        <a href="{% url 'marketplace:profile' %}"{% if nav_section == "profile" %} class="nav-active" aria-current="page"{% endif %}>{% trans "Profile" %}</a>
-        <form method="post" action="{% url 'marketplace:logout' %}" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit">{% trans "Log out" %}</button>
-        </form>
-    {% else %}
-        <a href="{% url 'marketplace:login' %}">{% trans "Log in" %}</a>
-        <a href="{% url 'marketplace:signup' %}">{% trans "Sign up" %}</a>
+        <div class="nav-user-menu">
+            <a href="{% url 'marketplace:profile' %}" class="nav-avatar-link" aria-label="{% trans 'Account menu' %}">
+                {% if user.has_custom_profile_image %}
+                    <img id="nav-avatar-display" src="{{ user.profile_image_url }}" alt="{{ user.display_name|default:user.email }}" class="avatar avatar-xs avatar-live">
+                {% else %}
+                    <span id="nav-avatar-display"
+                          class="avatar avatar-xs avatar-live avatar-fallback nav-avatar-fallback"
+                          aria-label="{{ user.display_name|default:user.email }}">{{ user.avatar_initials }}</span>
+                {% endif %}
+            </a>
+            <div class="nav-user-dropdown" role="menu" aria-label="{% trans 'Account menu' %}">
+                <a href="{% url 'marketplace:profile' %}" role="menuitem"{% if nav_section == "profile" %} class="nav-active" aria-current="page"{% endif %}>{% trans "Profile" %}</a>
+                <a href="{% url 'marketplace:logout' %}" role="menuitem">{% trans "Log out" %}</a>
+            </div>
+        </div>
     {% endif %}
 </nav>

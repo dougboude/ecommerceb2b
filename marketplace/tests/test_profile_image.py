@@ -19,6 +19,9 @@ Test plan:
   10.15 upload view: missing old file swallowed (no 500)
   10.16 profile page: shows avatar img tag
   10.17 profile page: contains upload form elements
+  10.18 remove view: unauthenticated → 302
+  10.19 remove view: clears existing image and returns initials
+  10.20 remove view: no-image remove returns initials (idempotent)
 """
 
 import io
@@ -188,6 +191,7 @@ class UploadViewTest(TestCase):
     def setUp(self):
         self.user = _create_user(email="uploader@example.com")
         self.url = reverse("marketplace:upload_profile_image")
+        self.remove_url = reverse("marketplace:remove_profile_image")
 
     def _post_image(self, image_file=None, content_type="image/jpeg"):
         if image_file is None:
@@ -281,6 +285,39 @@ class UploadViewTest(TestCase):
         resp = self.client.post(self.url, {"avatar": f2})
         self.assertEqual(resp.status_code, 200)
 
+    def test_10_18_remove_unauthenticated_redirects(self):
+        """10.18: unauthenticated remove request → 302 to login"""
+        resp = self.client.post(self.remove_url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/login/", resp["Location"])
+
+    def test_10_19_remove_clears_existing_image_and_returns_initials(self):
+        """10.19: remove clears profile image and returns avatar initials."""
+        self.client.force_login(self.user)
+
+        f1 = _make_image_file()
+        f1.content_type = "image/jpeg"
+        self.client.post(self.url, {"avatar": f1})
+        self.user.refresh_from_db()
+        old_path = os.path.join(settings.MEDIA_ROOT, self.user.profile_image.name)
+
+        resp = self.client.post(self.remove_url)
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertFalse(bool(self.user.profile_image))
+        self.assertEqual(resp.json().get("avatar_initials"), self.user.avatar_initials)
+        self.assertFalse(os.path.exists(old_path))
+
+    def test_10_20_remove_without_image_is_idempotent(self):
+        """10.20: remove succeeds even when no profile image exists."""
+        self.client.force_login(self.user)
+        self.user.profile_image = None
+        self.user.save(update_fields=["profile_image"])
+
+        resp = self.client.post(self.remove_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("avatar_initials"), self.user.avatar_initials)
+
 
 # ---------------------------------------------------------------------------
 # Group 10.16–10.17: profile page template tests
@@ -309,5 +346,6 @@ class ProfilePageAvatarTest(TestCase):
         resp = self.client.get(reverse("marketplace:profile"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'id="avatar-input"')
+        self.assertContains(resp, 'id="avatar-remove-button"')
         self.assertContains(resp, 'id="avatar-crop-modal"')
         self.assertContains(resp, "/upload-avatar/")

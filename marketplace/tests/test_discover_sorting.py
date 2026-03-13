@@ -28,10 +28,10 @@ class DiscoverSortingTests(SimpleTestCase):
         )
         self.assertEqual([r.pk for r in results], [3, 2, 1])
 
-    def test_ending_soon_for_buyers_uses_available_until(self):
-        a = SimpleNamespace(pk=1, created_at=datetime(2026, 1, 1), available_until=datetime(2026, 2, 10))
-        b = SimpleNamespace(pk=2, created_at=datetime(2026, 1, 2), available_until=datetime(2026, 2, 5))
-        c = SimpleNamespace(pk=3, created_at=datetime(2026, 1, 3), available_until=None)
+    def test_ending_soon_for_buyers_uses_expires_at(self):
+        a = SimpleNamespace(pk=1, created_at=datetime(2026, 1, 1), expires_at=datetime(2026, 2, 10))
+        b = SimpleNamespace(pk=2, created_at=datetime(2026, 1, 2), expires_at=datetime(2026, 2, 5))
+        c = SimpleNamespace(pk=3, created_at=datetime(2026, 1, 3), expires_at=None)
 
         results = _sort_discover_results(
             [a, c, b], DiscoverForm.SORT_ENDING_SOON, DiscoverForm.DIRECTION_FIND_SUPPLY,

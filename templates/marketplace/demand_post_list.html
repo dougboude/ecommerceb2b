@@ -6,7 +6,9 @@
 {% block content %}
 <div class="page-header">
     <h1>{% trans "Demand Listings" %}</h1>
+    {% if page_obj %}
     <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
+    {% endif %}
 </div>
 {% if page_obj %}
 <p class="listing-summary">

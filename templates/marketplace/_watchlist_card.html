@@ -35,13 +35,13 @@
             {% if show_star %}
             <button type="button" class="star-toggle" title="{% trans 'Star' %}"
                     hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
-                    hx-target="#watchlist-card-{{ item.pk }}"
+                    hx-target="#watchlist-content"
                     hx-swap="outerHTML">&#9734;</button>
             {% endif %}
             {% if show_unstar %}
             <button type="button" class="star-toggle star-toggle--active" title="{% trans 'Unstar' %}"
                     hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
-                    hx-target="#watchlist-card-{{ item.pk }}"
+                    hx-target="#watchlist-content"
                     hx-swap="outerHTML">&#9733;</button>
             {% endif %}
         </div>
@@ -53,7 +53,10 @@
             </form>
             {% endif %}
             {% if show_remove %}
-            <form method="post" action="{% url 'marketplace:watchlist_delete' item.pk %}" style="display:inline;" onsubmit="return confirm('{% trans "Remove this item from your watchlist?" %}')">
+            <form method="post"
+                  action="{% url 'marketplace:watchlist_delete' item.pk %}"
+                  class="watchlist-remove-form"
+                  style="display:inline;">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-secondary btn-small" title="{% trans 'Remove' %}">{% trans "Remove" %}</button>
             </form>

@@ -57,32 +57,13 @@ class UiDerolificationTests(TestCase):
         self.assertNotIn("Buyer Dashboard", html)
         self.assertNotIn("Supplier Dashboard", html)
 
-    def test_profile_shows_both_listing_sections(self):
-        Listing.objects.create(
-            type=ListingType.SUPPLY,
-            created_by_user=self.user,
-            title="Fresh mushrooms",
-            status=ListingStatus.ACTIVE,
-            location_country="US",
-            shipping_scope="domestic",
-            created_at=timezone.now(),
-        )
-        Listing.objects.create(
-            type=ListingType.DEMAND,
-            created_by_user=self.user,
-            title="Need wild garlic",
-            status=ListingStatus.ACTIVE,
-            location_country="US",
-            created_at=timezone.now(),
-        )
+    def test_profile_does_not_show_listing_sections(self):
         self.client.login(email=self.user.email, password=self.password)
         response = self.client.get(reverse("marketplace:profile"))
         self.assertEqual(response.status_code, 200)
         html = response.content.decode("utf-8")
-        self.assertIn("Supply Listings", html)
-        self.assertIn("Demand Listings", html)
-        self.assertIn("Fresh mushrooms", html)
-        self.assertIn("Need wild garlic", html)
+        self.assertNotIn("Supply Listings", html)
+        self.assertNotIn("Demand Listings", html)
 
     def test_no_page_contains_buyer_supplier_role_label(self):
         self.client.login(email=self.user.email, password=self.password)

@@ -6,10 +6,15 @@
 {% block content %}
 <h1>{% trans "Conversation" %}</h1>
 <div class="listing-owner">
+    {% if counterparty.has_custom_profile_image %}
     <img src="{{ counterparty.profile_image_url }}"
          alt="{{ counterparty.display_name|default:counterparty.email }}"
          class="avatar avatar-sm"
          width="48" height="48">
+    {% else %}
+    <span class="avatar avatar-sm avatar-fallback"
+          aria-label="{{ counterparty.display_name|default:counterparty.email }}">{{ counterparty.avatar_initials }}</span>
+    {% endif %}
     <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong>
 </div>
 {% if listing %}
@@ -44,10 +49,15 @@
 <div class="messages-list" id="sse-messages-list" data-thread-id="{{ thread.pk }}">
     {% for msg in messages_list %}
     <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}" data-message-ts="{{ msg.created_at|date:'U' }}">
+        {% if msg.sender.has_custom_profile_image %}
         <img src="{{ msg.sender.profile_image_url }}"
              alt="{{ msg.sender.display_name }}"
              class="avatar avatar-xs"
              width="40" height="40">
+        {% else %}
+        <span class="avatar avatar-xs avatar-fallback"
+              aria-label="{{ msg.sender.display_name|default:msg.sender.email }}">{{ msg.sender.avatar_initials }}</span>
+        {% endif %}
         <strong>{{ msg.sender.display_name }}</strong>
         <span>{{ msg.created_at|date:"SHORT_DATETIME_FORMAT" }}</span>
         <p>{{ msg.body }}</p>
@@ -77,4 +87,29 @@
     {% endif %}
     <a href="{% url 'marketplace:inbox' %}" class="btn btn-secondary">{% trans "Back to messages" %}</a>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.querySelector('form[method="post"]');
+    if (!form) return;
+    var textarea = form.querySelector('textarea[name="body"]');
+    var enterToggle = form.querySelector('input[name="enter_to_send"]');
+    if (!textarea || !enterToggle) return;
+
+    textarea.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter') return;
+        if (event.shiftKey) return;
+        if (!enterToggle.checked) return;
+        if (event.isComposing) return;
+        event.preventDefault();
+        if (form.requestSubmit) {
+            form.requestSubmit();
+            return;
+        }
+        form.submit();
+    });
+})();
+</script>
 {% endblock %}

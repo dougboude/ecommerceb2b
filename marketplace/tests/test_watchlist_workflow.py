@@ -149,3 +149,29 @@ class WatchlistWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "in conversation")
         self.assertContains(response, "with unread messages")
+
+    def test_htmx_star_toggle_returns_reordered_watchlist_content_fragment(self):
+        starred_listing = _make_supply(self.owner, "Already starred")
+        watching_listing = _make_supply(self.owner, "To be starred")
+        WatchlistItem.objects.create(
+            user=self.user,
+            listing=starred_listing,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.STARRED,
+        )
+        to_toggle = WatchlistItem.objects.create(
+            user=self.user,
+            listing=watching_listing,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.WATCHING,
+        )
+
+        response = self.client.post(
+            reverse("marketplace:watchlist_star", kwargs={"pk": to_toggle.pk}),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="watchlist-content"')
+        self.assertContains(response, "Starred (2)")
+        self.assertContains(response, "Watching (0)")
+        self.assertContains(response, "To be starred")

@@ -18,11 +18,11 @@ Profile edit continuity (Req 4):
   F10-10 profile_edit shows updated data after save
 
 Avatar and identity fallback (Req 2):
-  F10-11 user with no avatar has a non-empty profile_image_url (no broken state)
-  F10-12 profile page avatar img has correct src (default or uploaded)
-  F10-13 listing detail owner block renders avatar img with profile_image_url
-  F10-14 thread detail counterparty block renders avatar img
-  F10-15 inbox thread list renders counterparty avatar img
+  F10-11 user with no avatar has non-empty initials fallback
+  F10-12 profile page renders initials fallback avatar when no image uploaded
+  F10-13 listing detail owner block renders avatar fallback when no image uploaded
+  F10-14 thread detail counterparty block renders avatar fallback when no image uploaded
+  F10-15 inbox thread list renders counterparty avatar fallback when no image uploaded
 
 Trust context on listing/thread surfaces (Req 3):
   F10-16 supply_lot_detail shows listing-owner div with avatar
@@ -114,11 +114,11 @@ class ProfileSurfaceClarityTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "profile@example.com")
 
-    def test_f10_2_profile_shows_listing_sections(self):
-        """F10-2: profile page renders supply and demand listing sections."""
+    def test_f10_2_profile_does_not_show_listing_sections(self):
+        """F10-2: profile page does not render supply/demand listing sections."""
         resp = self.client.get(reverse("marketplace:profile"))
-        self.assertContains(resp, "Supply Listings")
-        self.assertContains(resp, "Demand Listings")
+        self.assertNotContains(resp, "Supply Listings")
+        self.assertNotContains(resp, "Demand Listings")
 
     def test_f10_3_profile_shows_edit_button(self):
         """F10-3: profile page shows Edit profile button."""
@@ -126,11 +126,10 @@ class ProfileSurfaceClarityTests(TestCase):
         self.assertContains(resp, reverse("marketplace:profile_edit"))
         self.assertContains(resp, "Edit profile")
 
-    def test_f10_4_profile_shows_dashboard_link(self):
-        """F10-4: profile page shows Back to dashboard link."""
+    def test_f10_4_profile_does_not_show_dashboard_link(self):
+        """F10-4: profile page does not show a Back to dashboard button."""
         resp = self.client.get(reverse("marketplace:profile"))
-        self.assertContains(resp, reverse("marketplace:dashboard"))
-        self.assertContains(resp, "Back to dashboard")
+        self.assertNotContains(resp, "Back to dashboard")
 
     def test_f10_5_profile_shows_django_messages(self):
         """F10-5: profile page renders Django success messages."""
@@ -145,14 +144,13 @@ class ProfileSurfaceClarityTests(TestCase):
         )
         self.assertContains(resp, "Profile updated")
 
-    def test_f10_6_profile_listing_shows_status_badge(self):
-        """F10-6: supply and demand listings on profile show status badge."""
-        supply = _make_supply(self.user, title="Widget Supply")
-        demand = _make_demand(self.user, title="Gadget Demand")
+    def test_f10_6_profile_does_not_show_listing_items(self):
+        """F10-6: profile page does not render individual listing titles or status badges."""
+        _make_supply(self.user, title="Widget Supply")
+        _make_demand(self.user, title="Gadget Demand")
         resp = self.client.get(reverse("marketplace:profile"))
-        self.assertContains(resp, "status-active")
-        self.assertContains(resp, "Widget Supply")
-        self.assertContains(resp, "Gadget Demand")
+        self.assertNotContains(resp, "Widget Supply")
+        self.assertNotContains(resp, "Gadget Demand")
 
 
 @override_settings(STORAGES=_STATIC_TEST_SETTINGS)
@@ -203,29 +201,29 @@ class AvatarFallbackTests(TestCase):
         self.client.force_login(self.user)
 
     def test_f10_11_no_avatar_has_valid_profile_image_url(self):
-        """F10-11: user with no avatar still has a non-empty profile_image_url."""
-        url = self.user.profile_image_url
-        self.assertTrue(url)
-        self.assertNotEqual(url, "")
+        """F10-11: user with no avatar has non-empty initials."""
+        self.assertEqual(self.user.avatar_initials, "AU")
 
     def test_f10_12_profile_page_avatar_img_present(self):
-        """F10-12: profile page renders avatar img tag with valid src."""
+        """F10-12: profile page renders fallback avatar element when no image."""
         resp = self.client.get(reverse("marketplace:profile"))
         self.assertContains(resp, 'id="avatar-display"')
-        self.assertContains(resp, self.user.profile_image_url)
+        self.assertContains(resp, "avatar-fallback")
+        self.assertContains(resp, self.user.avatar_initials)
 
     def test_f10_13_supply_detail_owner_avatar(self):
-        """F10-13: supply_lot_detail shows listing-owner div with avatar img."""
+        """F10-13: supply_lot_detail shows listing-owner div with avatar fallback."""
         viewer = _make_user("viewer13@example.com")
         supply = _make_supply(self.user, title="Owner Avatar Supply")
         self.client.force_login(viewer)
         resp = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": supply.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "listing-owner")
-        self.assertContains(resp, self.user.profile_image_url)
+        self.assertContains(resp, "avatar-fallback")
+        self.assertContains(resp, self.user.avatar_initials)
 
     def test_f10_14_thread_detail_counterparty_avatar(self):
-        """F10-14: thread_detail renders counterparty avatar in the header."""
+        """F10-14: thread_detail renders counterparty fallback avatar in the header."""
         other = _make_user("counter14@example.com", display_name="Counter Party")
         supply = _make_supply(self.user, title="Thread Supply")
         thread = _make_thread(self.user, other, supply)
@@ -233,10 +231,11 @@ class AvatarFallbackTests(TestCase):
         resp = self.client.get(reverse("marketplace:thread_detail", kwargs={"pk": thread.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "listing-owner")
-        self.assertContains(resp, other.profile_image_url)
+        self.assertContains(resp, "avatar-fallback")
+        self.assertContains(resp, other.avatar_initials)
 
     def test_f10_15_inbox_counterparty_avatar(self):
-        """F10-15: inbox thread list renders counterparty avatar img."""
+        """F10-15: inbox thread list renders counterparty avatar fallback."""
         other = _make_user("counter15@example.com", display_name="Inbox Counter")
         supply = _make_supply(self.user, title="Inbox Supply")
         thread = _make_thread(self.user, other, supply)
@@ -245,7 +244,8 @@ class AvatarFallbackTests(TestCase):
         self.client.force_login(self.user)
         resp = self.client.get(reverse("marketplace:inbox"))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, other.profile_image_url)
+        self.assertContains(resp, "avatar-fallback")
+        self.assertContains(resp, other.avatar_initials)
 
 
 @override_settings(STORAGES=_STATIC_TEST_SETTINGS)

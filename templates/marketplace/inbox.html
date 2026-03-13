@@ -13,10 +13,15 @@
 <a href="{% url 'marketplace:thread_detail' thread.pk %}" data-thread-id="{{ thread.pk }}" class="match-card{% if thread.is_unread %} thread-unread{% endif %}" style="text-decoration:none; color:inherit;">
     <div class="match-card-details">
         <div class="listing-owner" style="margin-bottom:0.25rem;">
+            {% if thread.counterparty.has_custom_profile_image %}
             <img src="{{ thread.counterparty.profile_image_url }}"
                  alt="{{ thread.counterparty.display_name|default:thread.counterparty.email }}"
                  class="avatar avatar-xs"
                  width="32" height="32">
+            {% else %}
+            <span class="avatar avatar-xs avatar-fallback"
+                  aria-label="{{ thread.counterparty.display_name|default:thread.counterparty.email }}">{{ thread.counterparty.avatar_initials }}</span>
+            {% endif %}
             <strong>{{ thread.counterparty.display_name|default:thread.counterparty.email }}</strong>
         </div>
         {% if thread.listing %}

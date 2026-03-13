@@ -84,6 +84,7 @@ class SupplyListPageTests(TestCase):
         self.assertNotEqual(response.status_code, 200)
 
     def test_supply_list_shows_create_cta_in_header(self):
+        _make_supply(self.user, "Header CTA lot")
         response = self.client.get(reverse("marketplace:supply_lot_list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("marketplace:supply_lot_create"))
@@ -118,6 +119,7 @@ class SupplyListPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No supply listings yet.")
         self.assertContains(response, "Create your first supply listing")
+        self.assertNotContains(response, "Create new")
         self.assertContains(response, reverse("marketplace:supply_lot_create"))
 
     def test_supply_list_only_shows_own_listings(self):
@@ -168,6 +170,7 @@ class DemandListPageTests(TestCase):
         self.assertNotEqual(response.status_code, 200)
 
     def test_demand_list_shows_create_cta_in_header(self):
+        _make_demand(self.user, "Header CTA demand")
         response = self.client.get(reverse("marketplace:demand_post_list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("marketplace:demand_post_create"))
@@ -201,6 +204,7 @@ class DemandListPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No demand listings yet.")
         self.assertContains(response, "Create your first demand listing")
+        self.assertNotContains(response, "Create new")
         self.assertContains(response, reverse("marketplace:demand_post_create"))
 
     def test_demand_list_only_shows_own_listings(self):
@@ -332,6 +336,8 @@ class ListSupplyDemandParityTests(TestCase):
         self.client.force_login(self.user)
 
     def test_both_list_pages_have_page_header_with_create_cta(self):
+        _make_supply(self.user, "Supply CTA")
+        _make_demand(self.user, "Demand CTA")
         supply_response = self.client.get(reverse("marketplace:supply_lot_list"))
         demand_response = self.client.get(reverse("marketplace:demand_post_list"))
         for response in (supply_response, demand_response):
@@ -360,6 +366,8 @@ class ListSupplyDemandParityTests(TestCase):
         demand_response = self.client.get(reverse("marketplace:demand_post_list"))
         self.assertContains(supply_response, "Create your first supply listing")
         self.assertContains(demand_response, "Create your first demand listing")
+        self.assertNotContains(supply_response, "Create new")
+        self.assertNotContains(demand_response, "Create new")
 
     def test_both_list_pages_pass_context_counts(self):
         _make_supply(self.user, "Active supply")

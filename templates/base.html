@@ -31,6 +31,21 @@
     <script src="{% static 'js/sse-client.js' %}"></script>
     <script>initSSE("{{ sse_stream_url|escapejs }}");</script>
     {% endif %}
+    <script>
+    (function () {
+        var FADE_MS = 5000;
+        function dismissMessage(el) {
+            el.style.transition = 'opacity 0.4s';
+            el.style.opacity = '0';
+            setTimeout(function () { el.remove(); }, 400);
+        }
+        document.querySelectorAll('.toast-list > .toast').forEach(function (msg) {
+            var btn = msg.querySelector('.toast-close');
+            if (btn) btn.addEventListener('click', function () { dismissMessage(msg); });
+            setTimeout(function () { dismissMessage(msg); }, FADE_MS);
+        });
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
     {% include "includes/_avatar_lightbox.html" %}
 </body>

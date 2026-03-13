@@ -17,13 +17,14 @@
   const cropImg = document.getElementById("avatar-crop-image");
   const confirmBtn = document.getElementById("avatar-crop-confirm");
   const cancelBtn = document.getElementById("avatar-crop-cancel");
+  const removeBtn = document.getElementById("avatar-remove-button");
   const errorMsg = document.getElementById("avatar-upload-error");
-  const avatarDisplay = document.getElementById("avatar-display");
 
   if (!input || !modal) return;
 
   let cropper = null;
   const uploadUrl = input.dataset.uploadUrl;
+  const removeUrl = removeBtn ? removeBtn.dataset.removeUrl : "";
   const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
 
   function showError(msg) {
@@ -38,6 +39,36 @@
       errorMsg.textContent = "";
       errorMsg.hidden = true;
     }
+  }
+
+  function replaceWithAvatarImage(node, sizeClass, altText, src) {
+    if (!node) return;
+    if (node.tagName === "IMG") {
+      node.src = src;
+      return;
+    }
+    const img = document.createElement("img");
+    if (node.id) img.id = node.id;
+    img.src = src;
+    img.alt = altText;
+    img.className = "avatar " + sizeClass + " avatar-live";
+    node.replaceWith(img);
+  }
+
+  function replaceWithAvatarFallback(node, sizeClass, ariaLabel, initials, extraClasses) {
+    if (!node) return;
+    if (node.tagName !== "IMG") {
+      node.textContent = initials;
+      node.className = extraClasses;
+      node.setAttribute("aria-label", ariaLabel);
+      return;
+    }
+    const span = document.createElement("span");
+    if (node.id) span.id = node.id;
+    span.textContent = initials;
+    span.className = extraClasses;
+    span.setAttribute("aria-label", ariaLabel);
+    node.replaceWith(span);
   }
 
   input.addEventListener("change", function (e) {
@@ -121,13 +152,28 @@
           })
           .then(function ({ ok, data }) {
             if (ok && data.avatar_url) {
+              const cacheBustedUrl = data.avatar_url + "?t=" + Date.now();
               // Update avatar image(s) on the page
-              if (avatarDisplay) {
-                avatarDisplay.src = data.avatar_url + "?t=" + Date.now();
-              }
+              replaceWithAvatarImage(
+                document.getElementById("avatar-display"),
+                "avatar-lg",
+                "Your profile photo",
+                cacheBustedUrl
+              );
+              replaceWithAvatarImage(
+                document.getElementById("nav-avatar-display"),
+                "avatar-xs",
+                "Account menu",
+                cacheBustedUrl
+              );
               document.querySelectorAll(".avatar-live").forEach(function (img) {
-                img.src = data.avatar_url + "?t=" + Date.now();
+                if (img.tagName === "IMG") {
+                  img.src = cacheBustedUrl;
+                }
               });
+              if (removeBtn) {
+                removeBtn.hidden = false;
+              }
               modal.close();
               if (cropper) {
                 cropper.destroy();
@@ -149,4 +195,49 @@
       0.92
     );
   });
+
+  if (removeBtn && removeUrl) {
+    removeBtn.addEventListener("click", function () {
+      clearError();
+      removeBtn.disabled = true;
+
+      fetch(removeUrl, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken },
+      })
+        .then(function (resp) {
+          return resp.json().then(function (data) {
+            return { ok: resp.ok, data };
+          });
+        })
+        .then(function ({ ok, data }) {
+          if (!ok) {
+            showError(data.error || "Could not remove photo. Please try again.");
+            return;
+          }
+          const initials = data.avatar_initials || "";
+          replaceWithAvatarFallback(
+            document.getElementById("avatar-display"),
+            "avatar-lg",
+            "Your initials",
+            initials,
+            "avatar avatar-lg avatar-live avatar-fallback"
+          );
+          replaceWithAvatarFallback(
+            document.getElementById("nav-avatar-display"),
+            "avatar-xs",
+            "Account menu",
+            initials,
+            "avatar avatar-xs avatar-live avatar-fallback nav-avatar-fallback"
+          );
+          removeBtn.hidden = true;
+        })
+        .catch(function () {
+          showError("Network error. Please try again.");
+        })
+        .finally(function () {
+          removeBtn.disabled = false;
+        });
+    });
+  }
 })();

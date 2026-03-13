@@ -299,6 +299,10 @@ class MarketplaceLoginView(LoginView):
 
 class MarketplaceLogoutView(LogoutView):
     next_page = "marketplace:login"
+    http_method_names = ["get", "post", "options"]
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -350,10 +354,8 @@ def verify_email_confirm(request, token):
         obj.used_at = timezone_now()
         obj.save(update_fields=["used_at"])
 
-    login(request, obj.user, backend="django.contrib.auth.backends.ModelBackend")
-    django_messages.success(request, _("Email verified. Welcome to NicheMarket!"))
-    response = redirect("marketplace:dashboard")
-    return _set_skin_cookie(response, obj.user.skin)
+    django_messages.success(request, _("Email verified. You can now log in."))
+    return redirect("marketplace:login")
 
 
 def resend_verification(request):
@@ -557,6 +559,29 @@ def upload_profile_image(request):
             )
 
     return JsonResponse({"avatar_url": avatar_url})
+
+
+@login_required
+@require_POST
+def remove_profile_image(request):
+    old_name = request.user.profile_image.name if request.user.profile_image else None
+
+    request.user.profile_image = None
+    request.user.profile_image_updated_at = timezone_now()
+    request.user.save(update_fields=["profile_image", "profile_image_updated_at"])
+
+    if old_name:
+        try:
+            from django.core.files.storage import default_storage
+            default_storage.delete(old_name)
+        except Exception:
+            logger.warning(
+                "Could not delete profile image during removal for user_id=%s: %s",
+                request.user.pk,
+                old_name,
+            )
+
+    return JsonResponse({"avatar_initials": request.user.avatar_initials})
 
 
 # ---------------------------------------------------------------------------
@@ -903,10 +928,7 @@ def _decorate_discover_results(results, direction):
         listing.discover_listing_type, listing.discover_listing_pk, listing.discover_detail_url_name = (
             _discover_listing_payload(listing, default_listing_type)
         )
-        if listing.discover_listing_type == "supply_lot":
-            listing.discover_ending_at = getattr(listing, "available_until", None)
-        else:
-            listing.discover_ending_at = getattr(listing, "expires_at", None)
+        listing.discover_ending_at = getattr(listing, "expires_at", None)
 
 
 def _run_discover_search(user, query, category, country, direction, search_mode="similar"):
@@ -945,8 +967,8 @@ def _sort_discover_results(results, sort_by, direction):
             return sorted(
                 results,
                 key=lambda listing: (
-                    listing.available_until is None,
-                    listing.available_until or listing.created_at,
+                    listing.expires_at is None,
+                    listing.expires_at or listing.created_at,
                 ),
             )
         return sorted(
@@ -1153,7 +1175,14 @@ def _attach_unread_counts(user, items):
 
 @login_required
 def watchlist_view(request):
-    user = request.user
+    return render(
+        request,
+        "marketplace/watchlist.html",
+        _build_watchlist_context(request.user),
+    )
+
+
+def _build_watchlist_context(user):
     qs = WatchlistItem.objects.filter(user=user).select_related(
         "listing",
         "listing__created_by_user",
@@ -1174,14 +1203,14 @@ def watchlist_view(request):
     conversation_count = sum(1 for item in active_items if item.thread)
     unread_conversation_count = sum(1 for item in active_items if getattr(item, "unread_count", 0) > 0)
 
-    return render(request, "marketplace/watchlist.html", {
+    return {
         "starred": starred,
         "watching": watching,
         "archived": archived,
         "active_count": active_count,
         "conversation_count": conversation_count,
         "unread_conversation_count": unread_conversation_count,
-    })
+    }
 
 
 @login_required
@@ -1195,19 +1224,11 @@ def watchlist_star(request, pk):
     item.save(update_fields=["status"])
 
     if request.headers.get("HX-Request"):
-        is_starred = item.status == WatchlistStatus.STARRED
-        inactive = item.status == WatchlistStatus.ARCHIVED
-        item.resolved_listing = item.resolve_listing()
-        _attach_unread_counts(request.user, [item])
-        return render(request, "marketplace/_watchlist_card.html", {
-            "item": item,
-            "show_star": not is_starred and not inactive,
-            "show_unstar": is_starred,
-            "show_archive": not inactive,
-            "show_unarchive": inactive,
-            "show_remove": not inactive,
-            "inactive": inactive,
-        })
+        return render(
+            request,
+            "marketplace/_watchlist_content.html",
+            _build_watchlist_context(request.user),
+        )
     if item.status == WatchlistStatus.STARRED:
         django_messages.success(request, _("Added to starred items."))
     else:
@@ -1371,6 +1392,10 @@ def thread_detail(request, pk):
     if request.method == "POST":
         if listing_deleted:
             raise PermissionDenied
+        enter_pref = bool(request.POST.get("enter_to_send"))
+        if request.user.enter_to_send != enter_pref:
+            request.user.enter_to_send = enter_pref
+            request.user.save(update_fields=["enter_to_send"])
         form = MessageForm(request.POST)
         if form.is_valid():
             msg = Message.objects.create(
@@ -1388,7 +1413,7 @@ def thread_detail(request, pk):
             )
             return redirect("marketplace:thread_detail", pk=thread.pk)
     else:
-        form = MessageForm()
+        form = MessageForm(initial={"enter_to_send": request.user.enter_to_send})
     msgs = thread.messages.select_related("sender").all()
     counterparty = thread.counterparty_for(request.user)
     listing_detail_url = ""

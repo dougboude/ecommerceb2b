@@ -59,8 +59,53 @@ class NavigationTemplateBehaviorTests(TestCase):
         self.assertIn(">Demand<", html)
         self.assertIn(">Profile<", html)
         self.assertIn(">Log out<", html)
+        self.assertIn("nav-user-menu", html)
         self.assertNotIn(">Dashboard<", html)
         self.assertNotIn("Your Listings:", html)
+
+    def test_nav_avatar_fallback_renders_initials(self):
+        self.user.first_name = "Jamie"
+        self.user.last_name = "Smith"
+        self.user.save(update_fields=["first_name", "last_name"])
+
+        response = self.client.get(reverse("marketplace:discover"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("nav-avatar-fallback", html)
+        self.assertIn("JS", html)
+
+    def test_nav_avatar_fallback_uses_display_name_when_names_missing(self):
+        self.user.first_name = ""
+        self.user.last_name = ""
+        self.user.display_name = "Alex Morgan"
+        self.user.save(update_fields=["first_name", "last_name", "display_name"])
+
+        response = self.client.get(reverse("marketplace:discover"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("nav-avatar-fallback", html)
+        self.assertIn("AM", html)
+
+    def test_nav_avatar_fallback_is_used_for_seed_avatar_filename(self):
+        self.user.first_name = "Bob"
+        self.user.last_name = "Mercado"
+        self.user.profile_image = "profile_images/1/seed_avatar_T5npYjV.png"
+        self.user.save(update_fields=["first_name", "last_name", "profile_image"])
+
+        response = self.client.get(reverse("marketplace:discover"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("nav-avatar-fallback", html)
+        self.assertIn("BM", html)
+
+    def test_logout_link_supports_get_and_redirects_to_login(self):
+        response = self.client.get(reverse("marketplace:logout"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("marketplace:login"))
+
+        discover_response = self.client.get(reverse("marketplace:discover"))
+        self.assertEqual(discover_response.status_code, 302)
+        self.assertIn(reverse("marketplace:login"), discover_response.url)
 
     def test_supply_nav_active_does_not_activate_demand(self):
         response = self.client.get(reverse("marketplace:supply_lot_list"))

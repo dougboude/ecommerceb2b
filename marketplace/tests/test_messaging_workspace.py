@@ -104,6 +104,28 @@ class MessagingWorkspaceTests(TestCase):
         self.assertContains(response, reverse("marketplace:supply_lot_detail", kwargs={"pk": listing.pk}))
         self.assertContains(response, "Back to messages")
         self.assertContains(response, "Back to listing")
+        self.assertContains(response, 'name="body"')
+        self.assertContains(response, 'rows="5"')
+        self.assertContains(response, 'name="enter_to_send"')
+
+    def test_enter_to_send_preference_persists_on_post(self):
+        listing = _make_supply(self.owner, "Preference listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "pref seed",
+            timezone.now() - timedelta(minutes=5),
+        )
+
+        response = self.client.post(
+            reverse("marketplace:thread_detail", kwargs={"pk": thread.pk}),
+            {"body": "toggle pref", "enter_to_send": "on"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.viewer.refresh_from_db()
+        self.assertTrue(self.viewer.enter_to_send)
+        self.assertContains(response, 'name="enter_to_send"')
+        self.assertContains(response, "checked")
 
     def test_opening_thread_updates_read_state(self):
         listing = _make_supply(self.owner, "Read-state listing")

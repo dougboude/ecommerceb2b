@@ -129,15 +129,13 @@ class FeedbackRecoveryTests(TestCase):
         self.assertContains(response, "Start a new search")
         self.assertContains(response, reverse("marketplace:discover_clear"))
 
-    def test_profile_empty_states_have_create_listing_ctas(self):
+    def test_profile_does_not_show_listing_sections(self):
         response = self.client.get(reverse("marketplace:profile"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Create supply listing")
-        self.assertContains(response, "Create demand listing")
-        self.assertContains(response, reverse("marketplace:supply_lot_create"))
-        self.assertContains(response, reverse("marketplace:demand_post_create"))
+        self.assertNotContains(response, "Create supply listing")
+        self.assertNotContains(response, "Create demand listing")
 
-    def test_watchlist_remove_uses_confirmation_prompt(self):
+    def test_watchlist_remove_uses_custom_confirmation_modal(self):
         listing = _make_supply_listing(self.user, title="Prompt me")
         item = WatchlistItem.objects.create(
             user=self.user,
@@ -149,9 +147,10 @@ class FeedbackRecoveryTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Remove this item from your watchlist?",
+            'id="watchlist-remove-modal"',
         )
         self.assertContains(
             response,
             reverse("marketplace:watchlist_delete", kwargs={"pk": item.pk}),
         )
+        self.assertContains(response, "watchlist-remove-form")

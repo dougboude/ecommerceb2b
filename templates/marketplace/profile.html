@@ -21,26 +21,32 @@
 {% block content %}
 <h1>{% trans "Profile" %}</h1>
 
-{% if messages %}
-<div class="messages">
-    {% for message in messages %}
-    <div class="message {{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-
 <div class="profile-avatar-wrap">
+    {% if user.has_custom_profile_image %}
     <img id="avatar-display"
          src="{{ user.profile_image_url }}"
          alt="{% trans 'Your profile photo' %}"
          class="avatar avatar-lg avatar-live"
          width="96" height="96">
+    {% else %}
+    <span id="avatar-display"
+          class="avatar avatar-lg avatar-live avatar-fallback"
+          aria-label="{% trans 'Your initials' %}">{{ user.avatar_initials }}</span>
+    {% endif %}
     <div>
         <strong>{{ identity_profile.display_name|default:user.email }}</strong>
         {% if identity_profile.organization_name %}<p class="tile-meta">{{ identity_profile.organization_name }}</p>{% endif %}
         <label for="avatar-input" class="btn btn-secondary" style="cursor:pointer; margin-top: 0.5rem;">
             {% trans "Change photo" %}
         </label>
+        <button id="avatar-remove-button"
+                type="button"
+                class="btn btn-secondary"
+                data-remove-url="{% url 'marketplace:remove_profile_image' %}"
+                {% if not user.has_custom_profile_image %}hidden{% endif %}
+                style="margin-top: 0.5rem;">
+            {% trans "Remove photo" %}
+        </button>
         <input type="file" id="avatar-input"
                accept="image/jpeg,image/png,image/webp"
                data-upload-url="{% url 'marketplace:upload_profile_image' %}"
@@ -62,40 +68,8 @@
 
 <div class="actions">
     <a href="{% url 'marketplace:profile_edit' %}" class="btn btn-primary">{% trans "Edit profile" %}</a>
-    <a href="{% url 'marketplace:dashboard' %}" class="btn btn-secondary">{% trans "Back to dashboard" %}</a>
 </div>
 
-<section>
-    <h2>{% trans "Supply Listings" %}</h2>
-    {% if supply_listings %}
-    <div class="item-list">
-        {% for listing in supply_listings %}
-        <a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }} <span class="status status-{{ listing.status }}">{{ listing.get_status_display }}</span></a>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="empty-state">{% trans "No supply listings yet." %}</p>
-    <div class="actions">
-        <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create supply listing" %}</a>
-    </div>
-    {% endif %}
-</section>
-
-<section>
-    <h2>{% trans "Demand Listings" %}</h2>
-    {% if demand_listings %}
-    <div class="item-list">
-        {% for listing in demand_listings %}
-        <a href="{% url 'marketplace:demand_post_detail' listing.pk %}">{{ listing.item_text }} <span class="status status-{{ listing.status }}">{{ listing.get_status_display }}</span></a>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="empty-state">{% trans "No demand listings yet." %}</p>
-    <div class="actions">
-        <a href="{% url 'marketplace:demand_post_create' %}" class="btn btn-primary">{% trans "Create demand listing" %}</a>
-    </div>
-    {% endif %}
-</section>
 
 <!-- Crop modal -->
 <dialog id="avatar-crop-modal" aria-labelledby="crop-modal-title">

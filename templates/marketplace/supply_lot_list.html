@@ -6,7 +6,9 @@
 {% block content %}
 <div class="page-header">
     <h1>{% trans "Supply Listings" %}</h1>
+    {% if page_obj %}
     <a href="{% url 'marketplace:supply_lot_create' %}" class="btn btn-primary">{% trans "Create new" %}</a>
+    {% endif %}
 </div>
 {% if page_obj %}
 <p class="listing-summary">
