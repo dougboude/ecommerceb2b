@@ -221,3 +221,51 @@ class MessagingWorkspaceTests(TestCase):
         self.assertIn("thread-pane-content", html)
         self.assertIn('data-thread-id="%s"' % thread.pk, html)
         self.assertNotIn("<nav", html.lower())
+
+    def test_inbox_preview_prefix_uses_counterparty_name_for_received_message(self):
+        listing = _make_supply(self.owner, "Preview received listing")
+        self._make_thread_with_message(
+            listing,
+            "Can you share pricing?",
+            timezone.now() - timedelta(minutes=4),
+        )
+
+        response = self.client.get(reverse("marketplace:inbox"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owner: Can you share pricing?")
+
+    def test_inbox_preview_prefix_uses_you_for_sent_message(self):
+        listing = _make_supply(self.owner, "Preview sent listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "Initial from owner",
+            timezone.now() - timedelta(minutes=8),
+        )
+        reply = Message.objects.create(
+            thread=thread,
+            sender=self.viewer,
+            body="I can take delivery Monday.",
+        )
+        Message.objects.filter(pk=reply.pk).update(created_at=timezone.now() - timedelta(minutes=2))
+
+        response = self.client.get(reverse("marketplace:inbox"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You: I can take delivery Monday.")
+
+    def test_inbox_uses_stable_tie_break_order_for_equal_last_message_time(self):
+        listing_a = _make_supply(self.owner, "Tie A")
+        listing_b = _make_supply(self.owner, "Tie B")
+        thread_a = MessageThread.objects.create(listing=listing_a, created_by_user=self.viewer)
+        thread_b = MessageThread.objects.create(listing=listing_b, created_by_user=self.viewer)
+        tie_time = timezone.now() - timedelta(minutes=30)
+        msg_a = Message.objects.create(thread=thread_a, sender=self.owner, body="alpha")
+        msg_b = Message.objects.create(thread=thread_b, sender=self.owner, body="beta")
+        Message.objects.filter(pk=msg_a.pk).update(created_at=tie_time)
+        Message.objects.filter(pk=msg_b.pk).update(created_at=tie_time)
+
+        response = self.client.get(reverse("marketplace:inbox"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        pos_b = html.find(f'data-thread-id="{thread_b.pk}"')
+        pos_a = html.find(f'data-thread-id="{thread_a.pk}"')
+        self.assertTrue(0 <= pos_b < pos_a)

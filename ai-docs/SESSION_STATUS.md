@@ -1,12 +1,34 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Layer 1 messaging workspace layout implementation completed on feature branch)
+**Last updated:** 2026-03-14 (Layer 2 messaging conversation-list IA implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 2 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-conversation-list-ia` only
+  - Updated inbox query contract in `marketplace/views.py`:
+    - Added query annotations/subqueries for last-message sender metadata:
+      - `last_message_sender_id`
+      - `last_message_sender_display`
+      - `last_message_sender_email`
+    - Enforced deterministic ordering tie-break:
+      - `order_by("-last_message_at", "-pk")`
+    - Added deterministic latest-message subquery ordering:
+      - `order_by("-created_at", "-pk")`
+  - Added sender-prefixed preview rendering:
+    - `You: ...` when current user sent the latest message
+    - `<sender display/email>: ...` when counterparty sent latest message
+    - Predictable truncation preserved at 120 chars total
+  - Added tests in `marketplace/tests/test_messaging_workspace.py`:
+    - received-message preview prefix
+    - sent-message preview prefix (`You:`)
+    - stable tie-break ordering when latest timestamps are equal
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion` (26 tests)
 
 - **Layer 1 execution started and completed on feature branch `feat/messaging-layer1-workspace-layout`**:
   - Scope implemented: `messaging-workspace-layout-and-navigation` only (no Layer 2+ behavior implemented)

@@ -1682,7 +1682,6 @@ def thread_fragment(request, pk):
 @login_required
 def inbox_view(request):
     from django.db.models import F, Subquery, OuterRef
-    from django.utils import timezone
 
     user = request.user
 
@@ -1692,11 +1691,23 @@ def inbox_view(request):
 
     last_msg_body_sq = Message.objects.filter(
         thread=OuterRef("pk"),
-    ).order_by("-created_at").values("body")[:1]
+    ).order_by("-created_at", "-pk").values("body")[:1]
+
+    last_msg_sender_id_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender_id")[:1]
+
+    last_msg_sender_display_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender__display_name")[:1]
+
+    last_msg_sender_email_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender__email")[:1]
 
     last_other_msg_sq = Message.objects.filter(
         thread=OuterRef("pk"),
-    ).exclude(sender=user).order_by("-created_at").values("created_at")[:1]
+    ).exclude(sender=user).order_by("-created_at", "-pk").values("created_at")[:1]
 
     threads = (
         MessageThread.objects.filter(
@@ -1713,9 +1724,12 @@ def inbox_view(request):
             last_other_message_at=Subquery(last_other_msg_sq),
             user_read_at=Subquery(read_at_sq),
             last_message_body=Subquery(last_msg_body_sq),
+            last_message_sender_id=Subquery(last_msg_sender_id_sq),
+            last_message_sender_display=Subquery(last_msg_sender_display_sq),
+            last_message_sender_email=Subquery(last_msg_sender_email_sq),
         )
         .filter(last_message_at__isnull=False)
-        .order_by("-last_message_at")
+        .order_by("-last_message_at", "-pk")
     )
 
     thread_list = []
@@ -1731,10 +1745,12 @@ def inbox_view(request):
             else:
                 t.listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": t.listing.pk})
                 t.listing_kind_label = _("Demand")
-        preview = (t.last_message_body or "")[:120]
-        if len(t.last_message_body or "") > 120:
-            preview += "..."
-        t.preview = preview
+        sender_label = (t.last_message_sender_display or "").strip() or (t.last_message_sender_email or "").strip() or (t.counterparty.display_name or t.counterparty.email)
+        preview_prefix = _("You") if t.last_message_sender_id == user.pk else sender_label
+        raw_preview = f"{preview_prefix}: {(t.last_message_body or '').strip()}"
+        if len(raw_preview) > 120:
+            raw_preview = f"{raw_preview[:117]}..."
+        t.preview = raw_preview
         t.is_unread = (
             t.last_other_message_at is not None
             and (t.user_read_at is None or t.last_other_message_at > t.user_read_at)
