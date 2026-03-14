@@ -281,6 +281,21 @@ input:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+    border-color: #dc2626;
+    background: #fff7f7;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus {
+    border-color: #b91c1c;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+
 textarea { min-height: 100px; resize: vertical; }
 
 select { appearance: auto; }

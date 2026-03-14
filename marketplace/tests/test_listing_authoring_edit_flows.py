@@ -299,7 +299,7 @@ class SupplyEditFlowTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Please correct the errors below.")
-        self.assertContains(response, "This field is required.")
+        self.assertContains(response, "Available until is required.")
         paused.refresh_from_db()
         self.assertIsNone(paused.expires_at)
 

@@ -113,6 +113,14 @@ class DemandPostForm(forms.ModelForm):
             self.fields["radius_km"].label = _("Search radius (km)")
         self.fields["radius_km"].help_text = _("Leave blank for worldwide")
         self.fields["unit"].label = _("Unit")
+        self._set_required_error_messages()
+
+    def _set_required_error_messages(self):
+        for field in self.fields.values():
+            if not field.required:
+                continue
+            label = str(field.label or _("This field")).rstrip(":")
+            field.error_messages["required"] = _("%s is required.") % label
 
     def clean_radius_km(self):
         value = self.cleaned_data.get("radius_km")
@@ -168,6 +176,14 @@ class SupplyLotForm(forms.ModelForm):
         self.fields["shipping_scope"].choices = ListingShippingScope.choices
         if self.instance and self.instance.pk and self.instance.expires_at:
             self.initial["expires_at"] = self.instance.expires_at.date()
+        self._set_required_error_messages()
+
+    def _set_required_error_messages(self):
+        for field in self.fields.values():
+            if not field.required:
+                continue
+            label = str(field.label or _("This field")).rstrip(":")
+            field.error_messages["required"] = _("%s is required.") % label
 
     def clean_expires_at(self):
         date_val = self.cleaned_data.get("expires_at")

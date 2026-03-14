@@ -22,7 +22,25 @@
             {% endfor %}
         </ul>
         {% endif %}
-        {{ form.as_p }}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+        {% for field in form.visible_fields %}
+        <p>
+            {{ field.label_tag }}
+            {% if field.errors %}
+            <ul class="errorlist">
+                {% for error in field.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {{ field }}
+            {% if field.help_text %}
+            <span class="helptext">{{ field.help_text }}</span>
+            {% endif %}
+        </p>
+        {% endfor %}
         <div class="actions">
             <button type="submit" class="btn btn-primary">{% if editing %}{% trans "Save changes" %}{% else %}{% trans "Create listing" %}{% endif %}</button>
             {% if editing %}
