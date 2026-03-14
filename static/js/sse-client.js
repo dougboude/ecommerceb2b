@@ -41,6 +41,16 @@ function initSSE(streamUrl) {
             updateWatchlistPage(data);
         });
 
+        source.addEventListener("listing_updated", function (e) {
+            var data;
+            try {
+                data = JSON.parse(e.data);
+            } catch (_) {
+                return;
+            }
+            refreshWatchlistPage(data);
+        });
+
         source.onerror = function () {
             source.close();
             retryCount++;
@@ -199,6 +209,53 @@ function initSSE(streamUrl) {
                 badge.appendChild(unreadSpan);
             }
         }
+    }
+
+    var watchlistRefreshInFlight = false;
+    var watchlistRefreshQueued = false;
+
+    function refreshWatchlistPage(_data) {
+        if (!document.getElementById("sse-watchlist-page")) return;
+        if (watchlistRefreshInFlight) {
+            watchlistRefreshQueued = true;
+            return;
+        }
+
+        var existingContent = document.getElementById("watchlist-content");
+        if (!existingContent) return;
+        var archivedDetails = existingContent.querySelector(".watchlist-archived");
+        var archivedOpen = !!(archivedDetails && archivedDetails.open);
+
+        watchlistRefreshInFlight = true;
+        var url = window.location.pathname + window.location.search;
+        fetch(url, {
+            credentials: "same-origin",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        })
+            .then(function (resp) { return resp.text(); })
+            .then(function (html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, "text/html");
+                var nextContent = doc.getElementById("watchlist-content");
+                var currentContent = document.getElementById("watchlist-content");
+                if (!nextContent || !currentContent) return;
+
+                currentContent.replaceWith(nextContent);
+                if (archivedOpen) {
+                    var newArchived = document.querySelector("#watchlist-content .watchlist-archived");
+                    if (newArchived) newArchived.open = true;
+                }
+            })
+            .catch(function () {})
+            .finally(function () {
+                watchlistRefreshInFlight = false;
+                if (watchlistRefreshQueued) {
+                    watchlistRefreshQueued = false;
+                    refreshWatchlistPage();
+                }
+            });
     }
 
     connect();

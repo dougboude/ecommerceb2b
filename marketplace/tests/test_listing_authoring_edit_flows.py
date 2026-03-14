@@ -134,8 +134,8 @@ class SupplyCreateFlowTests(TestCase):
 
     def test_invalid_post_shows_error_banner(self):
         future = (timezone.now() + timedelta(days=30)).date()
-        # Provide expires_at to avoid unhandled None in clean_expires_at; leave
-        # other required fields blank to trigger validation errors.
+        # Provide expires_at and leave other required fields blank to trigger
+        # validation errors.
         data = {
             "title": "",
             "category": "",
@@ -246,7 +246,7 @@ class SupplyEditFlowTests(TestCase):
     def test_invalid_edit_post_shows_error_banner(self):
         future = (timezone.now() + timedelta(days=30)).date()
         # Leave required fields blank (title, unit) to trigger validation errors;
-        # include expires_at to avoid an unhandled None in clean_expires_at.
+        # include expires_at to keep focus on other required field errors.
         data = {
             "title": "",
             "category": "",
@@ -265,6 +265,81 @@ class SupplyEditFlowTests(TestCase):
         response = self.client.post(self._edit_url(), data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Please correct the errors below.")
+
+    def test_paused_listing_edit_requires_expires_at(self):
+        paused = Listing.objects.create(
+            type=ListingType.SUPPLY,
+            created_by_user=self.user,
+            title="Paused listing",
+            status=ListingStatus.PAUSED,
+            location_country="US",
+            shipping_scope=ListingShippingScope.DOMESTIC,
+            created_at=timezone.now(),
+            expires_at=None,
+        )
+        data = {
+            "title": "Paused listing updated",
+            "category": "food_fresh",
+            "quantity": "50",
+            "unit": "kg",
+            "expires_at": "",
+            "location_country": "US",
+            "location_locality": "",
+            "location_region": "",
+            "location_postal_code": "",
+            "shipping_scope": ListingShippingScope.DOMESTIC,
+            "price_value": "3.00",
+            "price_unit": "kg",
+            "description": "",
+        }
+
+        response = self.client.post(
+            reverse("marketplace:supply_lot_edit", kwargs={"pk": paused.pk}),
+            data,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Please correct the errors below.")
+        self.assertContains(response, "This field is required.")
+        paused.refresh_from_db()
+        self.assertIsNone(paused.expires_at)
+
+    def test_expired_supply_edit_with_future_date_reactivates_listing(self):
+        expired = Listing.objects.create(
+            type=ListingType.SUPPLY,
+            created_by_user=self.user,
+            title="Expired listing",
+            status=ListingStatus.EXPIRED,
+            location_country="US",
+            shipping_scope=ListingShippingScope.DOMESTIC,
+            created_at=timezone.now(),
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        future = (timezone.now() + timedelta(days=30)).date()
+        data = {
+            "title": "Expired listing updated",
+            "category": "food_fresh",
+            "quantity": "50",
+            "unit": "kg",
+            "expires_at": future.isoformat(),
+            "location_country": "US",
+            "location_locality": "",
+            "location_region": "",
+            "location_postal_code": "",
+            "shipping_scope": ListingShippingScope.DOMESTIC,
+            "price_value": "3.00",
+            "price_unit": "kg",
+            "description": "",
+        }
+
+        response = self.client.post(
+            reverse("marketplace:supply_lot_edit", kwargs={"pk": expired.pk}),
+            data,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, ListingStatus.ACTIVE)
+        self.assertContains(response, "reactivated with a new availability date")
 
     def test_non_owner_cannot_edit(self):
         other = _make_user("other.supply@test.test")

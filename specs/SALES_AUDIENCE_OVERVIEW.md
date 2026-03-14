@@ -52,7 +52,7 @@ Users can create and manage two listing types:
 - **Demand listings:** what a business needs to source
 - **Supply listings:** what a business has available
 
-Both include quantity, category, location, notes, and lifecycle statuses (active, paused, withdrawn/fulfilled, expired).
+Both include quantity, category, location, notes, and lifecycle statuses (active, paused, fulfilled, expired).
 
 ### 2) Discover Search
 
@@ -65,7 +65,7 @@ Discover supports semantic search (meaning-based), keyword fallback, useful sort
 
 ### 3) Suggestions and Watchlist
 
-The system surfaces likely matches and lets users save listings into a watchlist for follow-up and prioritization.
+The system surfaces likely matches and lets users save listings into a watchlist for follow-up and prioritization. Watchlist items update in real time as listing states change (for example paused/unpaused/expired), so users always see current listing state without manual refresh.
 
 ### 4) Private Messaging + Inbox
 
@@ -76,6 +76,7 @@ Users can initiate listing-centric private conversations, manage all threads in 
 - account signup + email verification
 - login-protected marketplace
 - ownership-based permissions that prevent cross-account editing
+- baseline session and login hardening (inactivity timeout + failed-attempt lockout)
 
 ### 6) Profile Personalization
 
@@ -125,4 +126,3 @@ Outcome to emphasize: the platform moves users from “I need/have this item” 
 ## Positioning Statement
 
 NicheMarket is a private B2B matching and communication platform for specialized supply-demand markets, helping professional buyers and suppliers find each other and start qualified conversations faster.
-

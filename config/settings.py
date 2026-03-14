@@ -131,6 +131,18 @@ AUTH_PASSWORD_VALIDATORS = [
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+SESSION_COOKIE_AGE = int(os.environ.get("SESSION_COOKIE_AGE", "1800"))  # 30 minutes
+SESSION_SAVE_EVERY_REQUEST = os.environ.get(
+    "SESSION_SAVE_EVERY_REQUEST", "true",
+).lower() in ("true", "1", "yes")
+SESSION_EXPIRE_AT_BROWSER_CLOSE = os.environ.get(
+    "SESSION_EXPIRE_AT_BROWSER_CLOSE", "false",
+).lower() in ("true", "1", "yes")
+
+# Login hardening (failed-attempt lockout)
+LOGIN_FAILED_ATTEMPTS_LIMIT = int(os.environ.get("LOGIN_FAILED_ATTEMPTS_LIMIT", "5"))
+LOGIN_FAILED_WINDOW_SECONDS = int(os.environ.get("LOGIN_FAILED_WINDOW_SECONDS", "900"))
+LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900"))
 
 # ---------------------------------------------------------------------------
 # Internationalization

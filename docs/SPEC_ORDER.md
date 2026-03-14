@@ -71,3 +71,10 @@ Ordering logic:
 - Generate specs in this same order (requirements -> design -> tasks per feature).
 - Keep each feature as a vertical slice (templates + view behavior + interaction + validation/tests).
 - Treat accessibility and stable UI test selectors as required acceptance criteria in each spec, not as separate standalone specs.
+
+## Non-UI Production Hardening Queue
+
+11. **Security Cache Hardening (Redis for Lockout/Rate Limits/Sessions)**
+   - Why: security controls are currently cache-backed and must be consistent across workers/instances before production.
+   - Status: `PLANNED`
+   - Depends on: deployment/runtime architecture decision for managed Redis

@@ -159,6 +159,7 @@ class SupplyLotForm(forms.ModelForm):
         self.fields["title"].label = _("Item description")
         self.fields["expires_at"].label = _("Available until")
         self.fields["expires_at"].widget = forms.DateInput(attrs={"type": "date"})
+        self.fields["expires_at"].required = True
         self.fields["price_value"].label = _("Asking price")
         self.fields["description"].label = _("Notes")
         self.fields["description"].required = False
@@ -169,8 +170,13 @@ class SupplyLotForm(forms.ModelForm):
             self.initial["expires_at"] = self.instance.expires_at.date()
 
     def clean_expires_at(self):
-        date_val = self.cleaned_data["expires_at"]
-        return timezone.make_aware(datetime.combine(date_val, time(23, 59, 59)))
+        date_val = self.cleaned_data.get("expires_at")
+        if not date_val:
+            raise forms.ValidationError(_("Available until is required."))
+        expires_at = timezone.make_aware(datetime.combine(date_val, time(23, 59, 59)))
+        if expires_at <= timezone.now():
+            raise forms.ValidationError(_("Available until must be today or a future date."))
+        return expires_at
 
     def save(self, commit=True):
         listing = super().save(commit=False)

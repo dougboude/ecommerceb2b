@@ -13,6 +13,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils.timezone import now as timezone_now
@@ -197,6 +198,9 @@ class VerifyEmailConfirmTests(TestCase):
 @override_settings(STORAGES=_STATIC_TEST_SETTINGS, EMAIL_BACKEND=_LOCMEM_EMAIL)
 @tag("email_verification")
 class LoginGateTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_login_blocked_for_unverified_user(self):
         user = _make_user(email="unverified@example.com", verified=False)
         response = self.client.post(
@@ -227,6 +231,56 @@ class LoginGateTests(TestCase):
         )
         self.assertRedirects(response, reverse("marketplace:dashboard"))
         self.assertIn("_auth_user_id", self.client.session)
+
+    def test_failed_login_emits_security_log_with_request_context(self):
+        user = _make_user(email="logfail@example.com", verified=True)
+        with self.assertLogs("marketplace.views", level="WARNING") as logs:
+            response = self.client.post(
+                reverse("marketplace:login"),
+                {"username": user.email, "password": "wrong-pass"},
+                HTTP_USER_AGENT="SecurityTest/1.0",
+                HTTP_REFERER="https://example.com/login",
+                HTTP_ORIGIN="https://example.com",
+                HTTP_X_FORWARDED_FOR="203.0.113.5",
+                HTTP_X_REAL_IP="203.0.113.6",
+            )
+        self.assertEqual(response.status_code, 200)
+        rendered = "\n".join(logs.output)
+        self.assertIn("auth.login_failed", rendered)
+        self.assertIn("username=logfail@example.com", rendered)
+        self.assertIn("ip=203.0.113.5", rendered)
+        self.assertIn("referer=https://example.com/login", rendered)
+        self.assertIn("origin=https://example.com", rendered)
+        self.assertIn("ua=SecurityTest/1.0", rendered)
+
+    @override_settings(
+        LOGIN_FAILED_ATTEMPTS_LIMIT=3,
+        LOGIN_FAILED_WINDOW_SECONDS=300,
+        LOGIN_LOCKOUT_SECONDS=300,
+    )
+    def test_failed_login_attempts_trigger_lockout(self):
+        user = _make_user(email="lockout@example.com", verified=True)
+        for _ in range(3):
+            response = self.client.post(
+                reverse("marketplace:login"),
+                {"username": user.email, "password": "wrong-pass"},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        with self.assertLogs("marketplace.views", level="WARNING") as logs:
+            locked_response = self.client.post(
+                reverse("marketplace:login"),
+                {"username": user.email, "password": "testpass123"},
+            )
+        self.assertEqual(locked_response.status_code, 200)
+        self.assertContains(
+            locked_response,
+            "Too many failed login attempts. Please wait and try again.",
+        )
+        self.assertNotIn("_auth_user_id", self.client.session)
+        rendered = "\n".join(logs.output)
+        self.assertIn("auth.login_blocked_locked_out", rendered)
+        self.assertIn("username=lockout@example.com", rendered)
 
 
 @override_settings(STORAGES=_STATIC_TEST_SETTINGS, EMAIL_BACKEND=_LOCMEM_EMAIL)
@@ -303,4 +357,3 @@ class ResendVerificationTests(TestCase):
         response = self.client.get(reverse("marketplace:resend_verification"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("marketplace:verify_email"))
-

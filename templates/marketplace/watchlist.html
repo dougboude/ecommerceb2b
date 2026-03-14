@@ -155,5 +155,14 @@
         closeModal();
     });
 })();
+
+(function () {
+    document.addEventListener('change', function (event) {
+        var input = event.target;
+        if (!input.matches('#watchlist-filter-form input[type="checkbox"]')) return;
+        var form = input.closest('form');
+        if (form) form.submit();
+    });
+})();
 </script>
 {% endblock %}

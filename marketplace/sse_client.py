@@ -106,3 +106,31 @@ def publish_new_message(message):
         })
     except Exception as exc:
         logger.warning("SSE publish_new_message failed: %s", exc)
+
+
+def publish_listing_updated(listing, changed_fields=None):
+    """Publish listing_updated event to users watching this listing."""
+    try:
+        from .models import WatchlistItem
+
+        watcher_ids = list(
+            WatchlistItem.objects.filter(listing=listing)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        if not watcher_ids:
+            return
+
+        payload = {
+            "listing_id": listing.pk,
+            "listing_type": listing.type,
+            "status": listing.status,
+            "is_expired": listing.is_expired,
+            "title": listing.title,
+            "changed_fields": changed_fields or [],
+            "updated_at": listing.updated_at.isoformat() if listing.updated_at else None,
+        }
+        for user_id in watcher_ids:
+            publish_event(user_id, "listing_updated", payload)
+    except Exception as exc:
+        logger.warning("SSE publish_listing_updated failed: %s", exc)

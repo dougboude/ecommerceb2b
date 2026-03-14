@@ -147,7 +147,7 @@
     {% elif post.status == "paused" %}
     <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary">{% trans "Resume" %}</button>
+        <button type="submit" class="btn btn-primary">{% trans "Unpause" %}</button>
     </form>
     {% elif post.status == "fulfilled" %}
     <form method="post" action="{% url 'marketplace:demand_post_toggle' post.pk %}">
