@@ -1019,6 +1019,53 @@ details[open].match-group > summary.match-group-header::before {
   color: var(--ink-muted);
 }
 
+.messages-workspace {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.messages-list-pane,
+.messages-thread-pane {
+  min-width: 0;
+}
+
+.messages-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.workspace-thread-link--active {
+  box-shadow: 0 0 0 2px rgba(244, 90, 58, 0.24);
+}
+
+.messages-thread-empty {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thread-pane-content h1 {
+  margin-top: 0;
+}
+
+@media (min-width: 980px) {
+  .messages-workspace {
+    grid-template-columns: minmax(320px, 430px) 1fr;
+    align-items: start;
+  }
+
+  .messages-list-pane {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+}
+
 /* =========================
    18) RESPONSIVE
    ========================= */

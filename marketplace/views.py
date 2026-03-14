@@ -1608,8 +1608,20 @@ def thread_detail(request, pk):
             return redirect("marketplace:thread_detail", pk=thread.pk)
     else:
         form = MessageForm(initial={"enter_to_send": request.user.enter_to_send})
+    return render(request, "marketplace/thread_detail.html", _build_thread_context(
+        thread=thread,
+        user=request.user,
+        form=form,
+        back_to_messages_url=reverse("marketplace:inbox"),
+        workspace_mode=False,
+    ))
+
+
+def _build_thread_context(thread, user, form, back_to_messages_url, workspace_mode):
+    listing = thread.get_listing()
+    listing_deleted = listing is None or listing.status == "deleted"
     msgs = thread.messages.select_related("sender").all()
-    counterparty = thread.counterparty_for(request.user)
+    counterparty = thread.counterparty_for(user)
     listing_detail_url = ""
     listing_kind_label = ""
     if listing is not None:
@@ -1619,7 +1631,7 @@ def thread_detail(request, pk):
         else:
             listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": listing.pk})
             listing_kind_label = _("Demand listing")
-    return render(request, "marketplace/thread_detail.html", {
+    return {
         "thread": thread,
         "messages_list": msgs,
         "form": form,
@@ -1629,7 +1641,38 @@ def thread_detail(request, pk):
         "listing_kind_label": listing_kind_label,
         "is_supply": thread.is_supply_thread(),
         "listing_deleted": listing_deleted,
-    })
+        "thread_post_url": reverse("marketplace:thread_detail", kwargs={"pk": thread.pk}),
+        "back_to_messages_url": back_to_messages_url,
+        "workspace_mode": workspace_mode,
+    }
+
+
+@login_required
+def thread_fragment(request, pk):
+    if request.headers.get("HX-Request") != "true":
+        return redirect("marketplace:thread_detail", pk=pk)
+    thread = get_object_or_404(
+        MessageThread.objects.select_related(
+            "listing",
+            "listing__created_by_user",
+            "created_by_user",
+        ),
+        pk=pk,
+    )
+    permission_service.authorize_thread_access(request.user.pk, thread, "access").deny_if_not_allowed()
+    from django.utils import timezone
+    ThreadReadState.objects.update_or_create(
+        thread=thread, user=request.user,
+        defaults={"last_read_at": timezone.now()},
+    )
+    form = MessageForm(initial={"enter_to_send": request.user.enter_to_send})
+    return render(request, "marketplace/thread_detail_fragment.html", _build_thread_context(
+        thread=thread,
+        user=request.user,
+        form=form,
+        back_to_messages_url=f"{reverse('marketplace:inbox')}?thread={thread.pk}",
+        workspace_mode=True,
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -1699,9 +1742,36 @@ def inbox_view(request):
         thread_list.append(t)
     unread_threads = sum(1 for t in thread_list if t.is_unread)
 
+    selected_thread = None
+    selected_thread_context = None
+    selected_thread_param = request.GET.get("thread")
+    if selected_thread_param:
+        try:
+            selected_pk = int(selected_thread_param)
+        except (TypeError, ValueError):
+            selected_pk = None
+        if selected_pk is not None:
+            selected_thread = next((t for t in thread_list if t.pk == selected_pk), None)
+
+    if selected_thread is not None:
+        from django.utils import timezone
+        ThreadReadState.objects.update_or_create(
+            thread=selected_thread, user=user,
+            defaults={"last_read_at": timezone.now()},
+        )
+        selected_thread_context = _build_thread_context(
+            thread=selected_thread,
+            user=user,
+            form=MessageForm(initial={"enter_to_send": user.enter_to_send}),
+            back_to_messages_url=reverse("marketplace:inbox"),
+            workspace_mode=True,
+        )
+
     return render(request, "marketplace/inbox.html", {
         "threads": thread_list,
         "unread_threads": unread_threads,
+        "selected_thread": selected_thread,
+        "selected_thread_context": selected_thread_context,
     })
 
 

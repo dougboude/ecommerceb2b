@@ -52,5 +52,6 @@ urlpatterns = [
     path("suggestions/message/", views.suggestion_message, name="suggestion_message"),
     # Messaging
     path("messages/", views.inbox_view, name="inbox"),
+    path("messages/thread/<int:pk>/fragment/", views.thread_fragment, name="thread_fragment"),
     path("threads/<int:pk>/", views.thread_detail, name="thread_detail"),
 ]

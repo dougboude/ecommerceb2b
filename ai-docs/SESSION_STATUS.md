@@ -1,12 +1,38 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Messaging re-architecture planning switched to layered spec series)
+**Last updated:** 2026-03-14 (Layer 1 messaging workspace layout implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 1 execution started and completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-workspace-layout-and-navigation` only (no Layer 2+ behavior implemented)
+  - Added messaging thread fragment endpoint:
+    - `marketplace/urls.py` route: `messages/thread/<int:pk>/fragment/`
+    - `marketplace/views.py` view: `thread_fragment` (`HX-Request` required; redirects to full thread page otherwise)
+  - Added shared thread content partial to prevent markup drift:
+    - `templates/marketplace/_thread_detail_content.html`
+    - full page `templates/marketplace/thread_detail.html` now includes shared partial
+    - fragment template `templates/marketplace/thread_detail_fragment.html` renders shared partial only
+  - Added reusable thread context builder in view layer:
+    - `marketplace/views.py` helper: `_build_thread_context(...)`
+    - used by both full thread view and fragment endpoint
+  - Upgraded inbox to hybrid workspace shell:
+    - `templates/marketplace/inbox.html` now renders left conversation list + right thread pane container (`#messages-thread-pane`)
+    - supports selected thread via querystring (`/messages/?thread=<id>`)
+    - desktop HTMX behavior enabled on row links (`hx-get` fragment + pane swap + `hx-push-url`), mobile fallback to regular navigation
+  - Added split-pane styling parity across both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+    - new workspace classes include `.messages-workspace`, `.messages-list-pane`, `.messages-thread-pane`, `.messages-list-rows`, `.workspace-thread-link--active`, `.messages-thread-empty`
+  - Added/updated tests:
+    - `marketplace/tests/test_messaging_workspace.py`
+    - verifies workspace shell markers, thread selection via query param, fragment endpoint redirect for non-HX, and fragment partial response for HX requests
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion` (23 tests)
 
 - **Messaging re-architecture planning refactor (monolithic -> layered spec series)**:
   - Stopped monolithic spec generation and removed interim folder:

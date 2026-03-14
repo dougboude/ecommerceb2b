@@ -7,40 +7,123 @@
 <h1>{% trans "Messages" %}</h1>
 
 <div id="sse-inbox-page" style="display:none;"></div>
-{% if threads %}
-<p class="tile-meta">{% blocktrans with total=threads|length unread=unread_threads %}{{ total }} conversations, {{ unread }} unread.{% endblocktrans %}</p>
-{% for thread in threads %}
-<a href="{% url 'marketplace:thread_detail' thread.pk %}" data-thread-id="{{ thread.pk }}" class="match-card{% if thread.is_unread %} thread-unread{% endif %}" style="text-decoration:none; color:inherit;">
-    <div class="match-card-details">
-        <div class="listing-owner" style="margin-bottom:0.25rem;">
-            {% if thread.counterparty.has_custom_profile_image %}
-            <img src="{{ thread.counterparty.profile_image_url }}"
-                 alt="{{ thread.counterparty.display_name|default:thread.counterparty.email }}"
-                 class="avatar avatar-xs"
-                 width="32" height="32">
-            {% else %}
-            <span class="avatar avatar-xs avatar-fallback"
-                  aria-label="{{ thread.counterparty.display_name|default:thread.counterparty.email }}">{{ thread.counterparty.avatar_initials }}</span>
-            {% endif %}
-            <strong>{{ thread.counterparty.display_name|default:thread.counterparty.email }}</strong>
+<div class="messages-workspace" data-view-mode="flat">
+    <section class="messages-list-pane">
+        {% if threads %}
+        <p class="tile-meta">{% blocktrans with total=threads|length unread=unread_threads %}{{ total }} conversations, {{ unread }} unread.{% endblocktrans %}</p>
+        <div class="messages-list-rows">
+            {% for thread in threads %}
+            <a href="{% url 'marketplace:inbox' %}?thread={{ thread.pk }}"
+               data-thread-id="{{ thread.pk }}"
+               data-thread-fragment-url="{% url 'marketplace:thread_fragment' thread.pk %}"
+               class="match-card workspace-thread-link{% if thread.is_unread %} thread-unread{% endif %}{% if selected_thread and selected_thread.pk == thread.pk %} workspace-thread-link--active{% endif %}"
+               style="text-decoration:none; color:inherit;">
+                <div class="match-card-details">
+                    <div class="listing-owner" style="margin-bottom:0.25rem;">
+                        {% if thread.counterparty.has_custom_profile_image %}
+                        <img src="{{ thread.counterparty.profile_image_url }}"
+                             alt="{{ thread.counterparty.display_name|default:thread.counterparty.email }}"
+                             class="avatar avatar-xs"
+                             width="32" height="32">
+                        {% else %}
+                        <span class="avatar avatar-xs avatar-fallback"
+                              aria-label="{{ thread.counterparty.display_name|default:thread.counterparty.email }}">{{ thread.counterparty.avatar_initials }}</span>
+                        {% endif %}
+                        <strong>{{ thread.counterparty.display_name|default:thread.counterparty.email }}</strong>
+                    </div>
+                    {% if thread.listing %}
+                    <span class="tile-meta">{{ thread.listing_kind_label }}: {{ thread.listing.item_text|truncatechars:60 }}</span>
+                    {% if thread.listing_detail_url %}<span class="tile-meta"><a href="{{ thread.listing_detail_url }}">{% trans "Open listing" %}</a></span>{% endif %}
+                    {% endif %}
+                    <span class="thread-preview">{{ thread.preview }}</span>
+                </div>
+                <div data-badge-container style="text-align:right; white-space:nowrap;">
+                    {% if thread.is_unread %}<span class="nav-badge">{% trans "New" %}</span>{% endif %}
+                    <span class="tile-meta">{{ thread.last_message_at|timesince }} {% trans "ago" %}</span>
+                </div>
+            </a>
+            {% endfor %}
         </div>
-        {% if thread.listing %}
-        <span class="tile-meta">{{ thread.listing_kind_label }}: {{ thread.listing.item_text|truncatechars:60 }}</span>
-        {% if thread.listing_detail_url %}<span class="tile-meta"><a href="{{ thread.listing_detail_url }}">{% trans "Open listing" %}</a></span>{% endif %}
+        {% else %}
+        <p class="empty-state">{% trans "No conversations yet. Use Discover or your Watchlist to start messaging." %}</p>
+        <div class="actions">
+            <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover listings" %}</a>
+            <a href="{% url 'marketplace:watchlist' %}" class="btn btn-secondary">{% trans "Open watchlist" %}</a>
+        </div>
         {% endif %}
-        <span class="thread-preview">{{ thread.preview }}</span>
-    </div>
-    <div data-badge-container style="text-align:right; white-space:nowrap;">
-        {% if thread.is_unread %}<span class="nav-badge">{% trans "New" %}</span>{% endif %}
-        <span class="tile-meta">{{ thread.last_message_at|timesince }} {% trans "ago" %}</span>
-    </div>
-</a>
-{% endfor %}
-{% else %}
-<p class="empty-state">{% trans "No conversations yet. Use Discover or your Watchlist to start messaging." %}</p>
-<div class="actions">
-    <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover listings" %}</a>
-    <a href="{% url 'marketplace:watchlist' %}" class="btn btn-secondary">{% trans "Open watchlist" %}</a>
+    </section>
+
+    <section class="messages-thread-pane" id="messages-thread-pane">
+        {% if selected_thread_context %}
+            {% include "marketplace/_thread_detail_content.html" with thread=selected_thread_context.thread messages_list=selected_thread_context.messages_list form=selected_thread_context.form counterparty=selected_thread_context.counterparty listing=selected_thread_context.listing listing_detail_url=selected_thread_context.listing_detail_url listing_kind_label=selected_thread_context.listing_kind_label is_supply=selected_thread_context.is_supply listing_deleted=selected_thread_context.listing_deleted thread_post_url=selected_thread_context.thread_post_url back_to_messages_url=selected_thread_context.back_to_messages_url workspace_mode=selected_thread_context.workspace_mode %}
+        {% else %}
+            <div class="card messages-thread-empty">
+                <p class="empty-state">{% trans "Select a conversation to open it here." %}</p>
+            </div>
+        {% endif %}
+    </section>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var query = window.matchMedia('(min-width: 980px)');
+    function syncThreadLinksForViewport() {
+        var links = document.querySelectorAll('.workspace-thread-link');
+        links.forEach(function (link) {
+            var paneUrl = link.getAttribute('data-thread-fragment-url');
+            if (!paneUrl) return;
+            if (query.matches) {
+                link.setAttribute('hx-get', paneUrl);
+                link.setAttribute('hx-target', '#messages-thread-pane');
+                link.setAttribute('hx-swap', 'innerHTML');
+                link.setAttribute('hx-push-url', link.getAttribute('href'));
+            } else {
+                link.removeAttribute('hx-get');
+                link.removeAttribute('hx-target');
+                link.removeAttribute('hx-swap');
+                link.removeAttribute('hx-push-url');
+            }
+        });
+        if (window.htmx) {
+            window.htmx.process(document.body);
+        }
+    }
+
+    syncThreadLinksForViewport();
+    if (query.addEventListener) {
+        query.addEventListener('change', syncThreadLinksForViewport);
+    } else if (query.addListener) {
+        query.addListener(syncThreadLinksForViewport);
+    }
+})();
+
+(function () {
+    function bindEnterToSend(root) {
+        var form = (root || document).querySelector('.thread-pane-content form[method="post"]');
+        if (!form) return;
+        var textarea = form.querySelector('textarea[name="body"]');
+        var enterToggle = form.querySelector('input[name="enter_to_send"]');
+        if (!textarea || !enterToggle) return;
+        textarea.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') return;
+            if (event.shiftKey) return;
+            if (!enterToggle.checked) return;
+            if (event.isComposing) return;
+            event.preventDefault();
+            if (form.requestSubmit) {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+        });
+    }
+    bindEnterToSend(document);
+    document.body.addEventListener('htmx:afterSwap', function (event) {
+        if (!event.target || event.target.id !== 'messages-thread-pane') return;
+        bindEnterToSend(event.target);
+    });
+})();
+</script>
 {% endblock %}

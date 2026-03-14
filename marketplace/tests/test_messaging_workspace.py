@@ -87,6 +87,9 @@ class MessagingWorkspaceTests(TestCase):
         self.assertTrue(0 <= first_pos < second_pos)
         self.assertContains(response, "conversations,")
         self.assertContains(response, "unread.")
+        self.assertContains(response, 'class="messages-workspace"')
+        self.assertContains(response, 'id="messages-thread-pane"')
+        self.assertContains(response, "data-thread-fragment-url")
 
     def test_thread_context_shows_counterparty_and_listing_link(self):
         listing = _make_supply(self.owner, "Context listing")
@@ -174,3 +177,47 @@ class MessagingWorkspaceTests(TestCase):
         self.assertContains(response, "About:")
         self.assertContains(response, "Back to messages")
         self.assertContains(response, "viewer reply")
+
+    def test_inbox_thread_query_renders_selected_thread_in_workspace_pane(self):
+        listing = _make_supply(self.owner, "Workspace selection listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "workspace hello",
+            timezone.now() - timedelta(minutes=10),
+        )
+
+        response = self.client.get(reverse("marketplace:inbox"), {"thread": thread.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "thread-pane-content")
+        self.assertContains(response, 'data-thread-id="%s"' % thread.pk)
+        self.assertContains(response, "workspace-thread-link--active")
+
+    def test_thread_fragment_requires_hx_request_header(self):
+        listing = _make_supply(self.owner, "Fragment fallback listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "fragment hello",
+            timezone.now() - timedelta(minutes=9),
+        )
+
+        response = self.client.get(reverse("marketplace:thread_fragment", kwargs={"pk": thread.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("marketplace:thread_detail", kwargs={"pk": thread.pk}), response["Location"])
+
+    def test_thread_fragment_returns_partial_for_hx_request(self):
+        listing = _make_supply(self.owner, "Fragment listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "fragment content",
+            timezone.now() - timedelta(minutes=8),
+        )
+
+        response = self.client.get(
+            reverse("marketplace:thread_fragment", kwargs={"pk": thread.pk}),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("thread-pane-content", html)
+        self.assertIn('data-thread-id="%s"' % thread.pk, html)
+        self.assertNotIn("<nav", html.lower())
