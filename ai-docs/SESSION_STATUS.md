@@ -1,12 +1,36 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Layer 3 messaging thread-pane redesign implementation completed on feature branch)
+**Last updated:** 2026-03-14 (Layer 4 messaging SSE event contract expansion implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 4 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-sse-event-contract-expansion` only
+  - Expanded `new_message` payload contract in `marketplace/sse_client.py` (`publish_new_message`):
+    - Added fields:
+      - `listing_id`
+      - `listing_type`
+      - `listing_title`
+      - `counterparty_name`
+      - `message_preview`
+      - `timestamp`
+    - Preserved legacy compatibility fields:
+      - `message_body`
+      - `listing_item_text`
+  - Implemented recipient-relative semantics at publish time:
+    - `counterparty_name` computed per recipient stream user
+    - `message_preview` prefixed per recipient semantics and truncated predictably
+  - Added new tests:
+    - `marketplace/tests/test_sse_client.py`
+      - verifies expanded payload presence and values
+      - verifies legacy field continuity
+      - verifies prefixed preview truncation behavior
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_sse_client marketplace.tests.test_messaging_workspace marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion` (31 tests)
 
 - **Layer 3 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
   - Scope implemented: `messaging-thread-pane-redesign` only

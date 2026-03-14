@@ -95,13 +95,34 @@ def publish_new_message(message):
         if listing is None:
             return
 
+        # Recipient-relative fields for workspace row/group creation.
+        counterparty = thread.counterparty_for(recipient)
+        sender_name = sender.display_name or sender.email
+        counterparty_name = (
+            (counterparty.display_name or counterparty.email)
+            if counterparty is not None
+            else sender_name
+        )
+        preview_prefix = "You" if recipient.pk == sender.pk else sender_name
+        preview = f"{preview_prefix}: {(message.body or '').strip()}"
+        if len(preview) > 120:
+            preview = f"{preview[:117]}..."
+        message_ts = message.created_at.isoformat()
+
         publish_event(recipient.pk, "new_message", {
             "thread_id": thread.pk,
-            "sender_name": sender.display_name or sender.email,
+            "listing_id": listing.pk,
+            "listing_type": listing.type,
+            "listing_title": listing.item_text[:60],
+            "counterparty_name": counterparty_name,
+            "sender_name": sender_name,
+            "message_preview": preview,
             "message_body": message.body,
-            "message_created_at": message.created_at.isoformat(),
+            "message_created_at": message_ts,
+            "timestamp": message_ts,
             "unread_count": unread_count,
             "thread_unread_count": thread_unread_count,
+            # Legacy key retained for compatibility with existing consumers.
             "listing_item_text": listing.item_text[:60],
         })
     except Exception as exc:
