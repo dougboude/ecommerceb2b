@@ -1,12 +1,29 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Listing badge copy clarified: "new" -> "suggestion(s)")
+**Last updated:** 2026-03-14 (Messaging re-architecture planning switched to layered spec series)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Messaging re-architecture planning refactor (monolithic -> layered spec series)**:
+  - Stopped monolithic spec generation and removed interim folder:
+    - `specs/messaging-workspace-re-architecture/`
+  - Added series-level planning docs for multi-agent collaboration:
+    - `specs/MESSAGING_WORKSPACE_REARCHITECTURE_SPEC_SERIES.md`
+    - `specs/MESSAGING_WORKSPACE_REARCHITECTURE_FEATURE_PLAN.md`
+  - Added six standalone, dependency-ordered feature spec sets (`requirements/design/tasks` in each):
+    - `specs/messaging-workspace-layout-and-navigation/`
+    - `specs/messaging-conversation-list-ia/`
+    - `specs/messaging-thread-pane-redesign/`
+    - `specs/messaging-sse-event-contract-expansion/`
+    - `specs/messaging-realtime-workspace-orchestration/`
+    - `specs/messaging-listing-grouped-conversations/`
+  - Updated canonical spec execution order:
+    - `specs/SPEC_ORDER.md` now includes Features 15–20 for the messaging UI/UX re-architecture series
+    - Added pointers to series map + feature plan + `messaging_feature_guide.md` source of truth
 
 - **Listing tile badge copy clarification (`new` -> `suggestion(s)`)**:
   - Updated unsaved match badge wording on both listing management pages:

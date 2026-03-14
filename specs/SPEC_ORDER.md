@@ -100,6 +100,48 @@ Rules:
    - Status: `EXEC`
    - Path: n/a (no spec docs — transport swap only, no behavior change)
 
+15. **messaging-workspace-layout-and-navigation**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `listing-centric-messaging-and-watchlist-decoupling`, `messaging-workspace-conversation-context`, `navigation-ia-unification`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-workspace-layout-and-navigation/`
+
+16. **messaging-conversation-list-ia**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `messaging-workspace-layout-and-navigation`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-conversation-list-ia/`
+
+17. **messaging-thread-pane-redesign**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `messaging-workspace-layout-and-navigation`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-thread-pane-redesign/`
+
+18. **messaging-sse-event-contract-expansion**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `messaging-conversation-list-ia`, `messaging-thread-pane-redesign`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-sse-event-contract-expansion/`
+
+19. **messaging-realtime-workspace-orchestration**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `messaging-sse-event-contract-expansion`, `messaging-workspace-layout-and-navigation`, `messaging-conversation-list-ia`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-realtime-workspace-orchestration/`
+
+20. **messaging-listing-grouped-conversations**
+   - Phase: UI/UX RE-ARCHITECTURE
+   - Depends on: `messaging-conversation-list-ia`, `messaging-realtime-workspace-orchestration`
+   - Status: `REQ, DES, TASK`
+   - Path: `specs/messaging-listing-grouped-conversations/`
+
+## Messaging Series Guide
+
+- Series map: `specs/MESSAGING_WORKSPACE_REARCHITECTURE_SPEC_SERIES.md`
+- Feature plan: `specs/MESSAGING_WORKSPACE_REARCHITECTURE_FEATURE_PLAN.md`
+- Architectural source of truth: `specs/messaging_feature_guide.md`
+
 ## Maintenance Workflow
 
 When creating a new spec:
