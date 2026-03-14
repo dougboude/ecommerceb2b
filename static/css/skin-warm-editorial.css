@@ -1051,6 +1051,47 @@ details[open].match-group > summary.match-group-header::before {
   margin-top: 0;
 }
 
+.thread-pane-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.thread-context-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.thread-context-header .listing-owner {
+  margin-bottom: 0;
+}
+
+.thread-listing-summary {
+  margin: 0;
+  padding: 0.85rem 1rem;
+}
+
+.thread-listing-summary .helptext {
+  display: block;
+  margin: 0;
+}
+
+.thread-listing-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.thread-stream {
+  margin: 0;
+}
+
+.thread-composer {
+  margin: 0;
+}
+
 @media (min-width: 980px) {
   .messages-workspace {
     grid-template-columns: minmax(320px, 430px) 1fr;
@@ -1063,6 +1104,31 @@ details[open].match-group > summary.match-group-header::before {
     max-height: calc(100vh - 2rem);
     overflow-y: auto;
     padding-right: 0.25rem;
+  }
+
+  .messages-thread-pane {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 2rem);
+    min-height: calc(100vh - 2rem);
+  }
+
+  .messages-thread-pane .thread-pane-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .messages-thread-pane .thread-stream {
+    min-height: 0;
+    overflow-y: auto;
+    flex: 1 1 auto;
+  }
+
+  .messages-thread-pane .thread-composer {
+    margin-top: auto;
   }
 }
 

@@ -1,12 +1,35 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Layer 2 messaging conversation-list IA implementation completed on feature branch)
+**Last updated:** 2026-03-14 (Layer 3 messaging thread-pane redesign implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 3 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-thread-pane-redesign` only
+  - Updated shared thread pane markup:
+    - `templates/marketplace/_thread_detail_content.html`
+    - added explicit regions:
+      - `.thread-context-header`
+      - `.thread-listing-summary` with `.thread-listing-meta`
+      - `.thread-stream`
+      - `.thread-composer`
+    - kept listing context persistent while making summary compact in thread header area
+    - preserved listing-deleted closed-composer state (`.thread-composer--closed`)
+  - Added thread-pane layout support classes to both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+    - ensures split-pane thread column has scrollable stream + anchored composer region on desktop workspace
+  - Added Layer 3-focused tests in `marketplace/tests/test_messaging_workspace.py`:
+    - thread context summary/meta presence
+    - chronological message render order in thread view
+    - workspace thread hides full-page back-to-messages action
+    - actionable workspace thread renders composer region
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_profile_trust_surfaces marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion` (50 tests)
 
 - **Layer 2 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
   - Scope implemented: `messaging-conversation-list-ia` only

@@ -105,6 +105,8 @@ class MessagingWorkspaceTests(TestCase):
         self.assertContains(response, "About:")
         self.assertContains(response, "Supply listing")
         self.assertContains(response, reverse("marketplace:supply_lot_detail", kwargs={"pk": listing.pk}))
+        self.assertContains(response, "thread-listing-summary")
+        self.assertContains(response, "thread-listing-meta")
         self.assertContains(response, "Back to messages")
         self.assertContains(response, "Back to listing")
         self.assertContains(response, 'name="body"')
@@ -269,3 +271,43 @@ class MessagingWorkspaceTests(TestCase):
         pos_b = html.find(f'data-thread-id="{thread_b.pk}"')
         pos_a = html.find(f'data-thread-id="{thread_a.pk}"')
         self.assertTrue(0 <= pos_b < pos_a)
+
+    def test_thread_messages_render_in_chronological_order(self):
+        listing = _make_supply(self.owner, "Chronology listing")
+        thread = MessageThread.objects.create(listing=listing, created_by_user=self.viewer)
+        older = Message.objects.create(thread=thread, sender=self.owner, body="first message")
+        newer = Message.objects.create(thread=thread, sender=self.viewer, body="second message")
+        older_time = timezone.now() - timedelta(minutes=9)
+        newer_time = timezone.now() - timedelta(minutes=3)
+        Message.objects.filter(pk=older.pk).update(created_at=older_time)
+        Message.objects.filter(pk=newer.pk).update(created_at=newer_time)
+
+        response = self.client.get(reverse("marketplace:thread_detail", kwargs={"pk": thread.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertTrue(html.find("first message") < html.find("second message"))
+
+    def test_workspace_thread_hides_back_to_messages_link(self):
+        listing = _make_supply(self.owner, "Workspace back-link listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "workspace back-link",
+            timezone.now() - timedelta(minutes=6),
+        )
+        response = self.client.get(reverse("marketplace:inbox"), {"thread": thread.pk})
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("thread-pane-content", html)
+        self.assertNotIn("Back to messages", html)
+
+    def test_workspace_thread_shows_composer_region_when_actionable(self):
+        listing = _make_supply(self.owner, "Composer ready listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "composer ready",
+            timezone.now() - timedelta(minutes=7),
+        )
+        response = self.client.get(reverse("marketplace:inbox"), {"thread": thread.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "thread-composer")
+        self.assertContains(response, 'name="body"')

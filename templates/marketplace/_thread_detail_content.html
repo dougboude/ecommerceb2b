@@ -1,48 +1,46 @@
 {% load i18n %}
 <div class="thread-pane-content" data-thread-id="{{ thread.pk }}">
-    <h1>{% trans "Conversation" %}</h1>
-    <div class="listing-owner">
-        {% if counterparty.has_custom_profile_image %}
-        <img src="{{ counterparty.profile_image_url }}"
-             alt="{{ counterparty.display_name|default:counterparty.email }}"
-             class="avatar avatar-sm"
-             width="48" height="48">
-        {% else %}
-        <span class="avatar avatar-sm avatar-fallback"
-              aria-label="{{ counterparty.display_name|default:counterparty.email }}">{{ counterparty.avatar_initials }}</span>
-        {% endif %}
-        <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong>
+    <div class="thread-context-header">
+        <h1>{% trans "Conversation" %}</h1>
+        <div class="listing-owner">
+            {% if counterparty.has_custom_profile_image %}
+            <img src="{{ counterparty.profile_image_url }}"
+                 alt="{{ counterparty.display_name|default:counterparty.email }}"
+                 class="avatar avatar-sm"
+                 width="48" height="48">
+            {% else %}
+            <span class="avatar avatar-sm avatar-fallback"
+                  aria-label="{{ counterparty.display_name|default:counterparty.email }}">{{ counterparty.avatar_initials }}</span>
+            {% endif %}
+            <strong>{{ counterparty.display_name|default:counterparty.email|default:"-" }}</strong>
+        </div>
     </div>
+
     {% if listing %}
-    <p class="helptext">
-        {% trans "About:" %}
-        {% if listing_deleted %}
-            <strong>{{ listing.item_text }}</strong>
-        {% else %}
-            <a href="{{ listing_detail_url }}"><strong>{{ listing.item_text }}</strong></a>
-        {% endif %}
-        <span class="tile-meta">({{ listing_kind_label }})</span>
-    </p>
+    <section class="card thread-listing-summary">
+        <p class="helptext">
+            {% trans "About:" %}
+            {% if listing_deleted %}
+                <strong>{{ listing.item_text }}</strong>
+            {% else %}
+                <a href="{{ listing_detail_url }}"><strong>{{ listing.item_text }}</strong></a>
+            {% endif %}
+            <span class="tile-meta">({{ listing_kind_label }})</span>
+        </p>
+        <div class="thread-listing-meta">
+            {% if listing.quantity_value %}<span class="tile-meta">{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</span>{% endif %}
+            <span class="tile-meta">{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</span>
+            {% if is_supply %}
+                {% if listing.asking_price %}<span class="tile-meta">${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</span>{% endif %}
+                <span class="tile-meta">{{ listing.get_shipping_scope_display }}</span>
+            {% else %}
+                {% if listing.frequency %}<span class="tile-meta">{{ listing.get_frequency_display }}</span>{% endif %}
+            {% endif %}
+        </div>
+    </section>
     {% endif %}
 
-    <section>
-        <h2>{% trans "Item details" %}</h2>
-        <dl>
-            {% if is_supply %}
-            <dt>{% trans "Supply" %}</dt><dd>{{ listing.item_text }}</dd>
-            {% if listing.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</dd>{% endif %}
-            <dt>{% trans "Location" %}</dt><dd>{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</dd>
-            {% if listing.asking_price %}<dt>{% trans "Asking price" %}</dt><dd>${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</dd>{% endif %}
-            <dt>{% trans "Shipping" %}</dt><dd>{{ listing.get_shipping_scope_display }}</dd>
-            {% else %}
-            <dt>{% trans "Demand" %}</dt><dd>{{ listing.item_text }}</dd>
-            {% if listing.quantity_value %}<dt>{% trans "Quantity" %}</dt><dd>{{ listing.quantity_value }} {{ listing.get_quantity_unit_display }}</dd>{% endif %}
-            <dt>{% trans "Location" %}</dt><dd>{{ listing.location_country }}{% if listing.location_locality %}, {{ listing.location_locality }}{% endif %}</dd>
-            {% endif %}
-        </dl>
-    </section>
-
-    <div class="messages-list" id="sse-messages-list" data-thread-id="{{ thread.pk }}">
+    <div class="messages-list thread-stream" id="sse-messages-list" data-thread-id="{{ thread.pk }}">
         {% for msg in messages_list %}
         <div class="message {% if msg.sender == user %}sent{% else %}received{% endif %}" data-message-ts="{{ msg.created_at|date:'U' }}">
             {% if msg.sender.has_custom_profile_image %}
@@ -64,11 +62,11 @@
     </div>
 
     {% if listing_deleted %}
-    <div class="card">
+    <div class="card thread-composer thread-composer--closed">
         <p class="empty-state">{% trans "This listing has been deleted. Messaging is closed." %}</p>
     </div>
     {% else %}
-    <div class="card">
+    <div class="card thread-composer">
         <form method="post" action="{{ thread_post_url }}">
             {% csrf_token %}
             {{ form.as_p }}
