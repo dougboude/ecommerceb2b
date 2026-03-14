@@ -1684,6 +1684,8 @@ def inbox_view(request):
     user = request.user
     thread_list = _build_inbox_threads_for_user(user)
     unread_threads = sum(1 for t in thread_list if t.is_unread)
+    view_mode = _parse_inbox_view_mode(request)
+    grouped_threads = _build_grouped_inbox_threads(thread_list) if view_mode == "grouped" else []
 
     selected_thread = None
     selected_thread_context = None
@@ -1710,12 +1712,54 @@ def inbox_view(request):
             workspace_mode=True,
         )
 
+    toggle_params = {"thread": selected_thread.pk} if selected_thread is not None else {}
+    if view_mode == "grouped":
+        toggle_params["view"] = "flat"
+        toggle_label = _("All conversations")
+    else:
+        toggle_params["view"] = "grouped"
+        toggle_label = _("Group by listing")
+    toggle_url = reverse("marketplace:inbox")
+    if toggle_params:
+        toggle_url = f"{toggle_url}?{urlencode(toggle_params)}"
+
     return render(request, "marketplace/inbox.html", {
         "threads": thread_list,
+        "grouped_threads": grouped_threads,
+        "view_mode": view_mode,
+        "toggle_label": toggle_label,
+        "toggle_url": toggle_url,
         "unread_threads": unread_threads,
         "selected_thread": selected_thread,
         "selected_thread_context": selected_thread_context,
     })
+
+
+def _parse_inbox_view_mode(request):
+    mode = (request.GET.get("view") or "").strip().lower()
+    return "grouped" if mode == "grouped" else "flat"
+
+
+def _build_grouped_inbox_threads(thread_list):
+    groups = []
+    by_listing = {}
+    for thread in thread_list:
+        if thread.listing is not None:
+            listing_key = str(thread.listing.pk)
+            listing_title = thread.listing.item_text
+        else:
+            listing_key = f"missing-{thread.pk}"
+            listing_title = _("Listing unavailable")
+        if listing_key not in by_listing:
+            group = {
+                "listing_key": listing_key,
+                "listing_title": listing_title,
+                "rows": [],
+            }
+            by_listing[listing_key] = group
+            groups.append(group)
+        by_listing[listing_key]["rows"].append(thread)
+    return groups
 
 
 def _build_inbox_threads_for_user(user):

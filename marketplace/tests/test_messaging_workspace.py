@@ -93,6 +93,55 @@ class MessagingWorkspaceTests(TestCase):
         self.assertContains(response, 'id="messages-list-rows"')
         self.assertContains(response, 'id="messages-list-empty-state" hidden')
 
+    def test_inbox_defaults_to_flat_mode_with_group_toggle(self):
+        listing = _make_supply(self.owner, "Flat default listing")
+        self._make_thread_with_message(
+            listing,
+            "flat mode message",
+            timezone.now() - timedelta(minutes=7),
+        )
+
+        response = self.client.get(reverse("marketplace:inbox"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-view-mode="flat"')
+        self.assertContains(response, "Group by listing")
+        self.assertContains(response, '?view=grouped')
+
+    def test_inbox_grouped_mode_renders_listing_groups_and_order(self):
+        buyer_two = _make_user("buyer2@msg.test", "Buyer Two")
+        self.client.force_login(self.owner)
+        listing_a = _make_supply(self.owner, "Grouped A")
+        listing_b = _make_supply(self.owner, "Grouped B")
+        thread_a_older = MessageThread.objects.create(listing=listing_a, created_by_user=self.viewer)
+        msg_a_older = Message.objects.create(thread=thread_a_older, sender=self.viewer, body="a older")
+        Message.objects.filter(pk=msg_a_older.pk).update(created_at=timezone.now() - timedelta(hours=2))
+        thread_a_newer = MessageThread.objects.create(listing=listing_a, created_by_user=buyer_two)
+        msg_a_newer = Message.objects.create(thread=thread_a_newer, sender=buyer_two, body="a newer")
+        Message.objects.filter(pk=msg_a_newer.pk).update(created_at=timezone.now() - timedelta(hours=1))
+        thread_b = MessageThread.objects.create(listing=listing_b, created_by_user=self.viewer)
+        msg_b = Message.objects.create(thread=thread_b, sender=self.viewer, body="b newest")
+        Message.objects.filter(pk=msg_b.pk).update(created_at=timezone.now() - timedelta(minutes=30))
+
+        response = self.client.get(reverse("marketplace:inbox"), {"view": "grouped"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-view-mode="grouped"')
+        self.assertContains(response, 'id="messages-list-groups"')
+        self.assertContains(response, f'data-listing-group-id="{listing_b.pk}"')
+        self.assertContains(response, f'data-listing-group-id="{listing_a.pk}"')
+        self.assertContains(response, "All conversations")
+        self.assertContains(response, "?view=flat")
+        self.assertContains(response, 'id="messages-list-rows" hidden')
+
+        html = response.content.decode("utf-8")
+        group_b_pos = html.find(f'data-listing-group-id="{listing_b.pk}"')
+        group_a_pos = html.find(f'data-listing-group-id="{listing_a.pk}"')
+        self.assertTrue(0 <= group_b_pos < group_a_pos)
+
+        thread_a_new_pos = html.find(f'data-thread-id="{thread_a_newer.pk}"')
+        thread_a_old_pos = html.find(f'data-thread-id="{thread_a_older.pk}"')
+        thread_b_pos = html.find(f'data-thread-id="{thread_b.pk}"')
+        self.assertTrue(0 <= thread_b_pos < thread_a_new_pos < thread_a_old_pos)
+
     def test_thread_context_shows_counterparty_and_listing_link(self):
         listing = _make_supply(self.owner, "Context listing")
         thread = self._make_thread_with_message(

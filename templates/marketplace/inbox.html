@@ -7,14 +7,33 @@
 <h1>{% trans "Messages" %}</h1>
 
 <div id="sse-inbox-page" style="display:none;"></div>
-<div class="messages-workspace" data-view-mode="flat">
+<div class="messages-workspace" data-view-mode="{{ view_mode }}">
     <section class="messages-list-pane">
-        <p class="tile-meta">{% blocktrans with total=threads|length unread=unread_threads %}{{ total }} conversations, {{ unread }} unread.{% endblocktrans %}</p>
-        <div class="messages-list-rows" id="messages-list-rows">
-            {% for thread in threads %}
-                {% include "marketplace/_inbox_thread_row.html" with selected_thread_pk=selected_thread.pk %}
-            {% endfor %}
+        <div class="messages-list-header">
+            <p class="tile-meta">{% blocktrans with total=threads|length unread=unread_threads %}{{ total }} conversations, {{ unread }} unread.{% endblocktrans %}</p>
+            <a href="{{ toggle_url }}" class="messages-view-toggle">{{ toggle_label }}</a>
         </div>
+        {% if view_mode == "grouped" %}
+            <div class="messages-list-groups" id="messages-list-groups">
+                {% for group in grouped_threads %}
+                    <section class="messages-list-group" data-listing-group-id="{{ group.listing_key }}">
+                        <h3 class="messages-list-group-title">{{ group.listing_title|truncatechars:60 }}</h3>
+                        <div class="messages-list-group-rows">
+                            {% for thread in group.rows %}
+                                {% include "marketplace/_inbox_thread_row.html" with selected_thread_pk=selected_thread.pk %}
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
+            <div class="messages-list-rows" id="messages-list-rows" hidden></div>
+        {% else %}
+            <div class="messages-list-rows" id="messages-list-rows">
+                {% for thread in threads %}
+                    {% include "marketplace/_inbox_thread_row.html" with selected_thread_pk=selected_thread.pk %}
+                {% endfor %}
+            </div>
+        {% endif %}
         <div id="messages-list-empty-state" {% if threads %}hidden{% endif %}>
             <p class="empty-state">{% trans "No conversations yet. Use Discover or your Watchlist to start messaging." %}</p>
             <div class="actions">

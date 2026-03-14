@@ -874,6 +874,29 @@ details[open].match-group > summary.match-group-header::before {
     min-width: 0;
 }
 
+.messages-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.messages-list-header .tile-meta {
+    margin: 0;
+}
+
+.messages-view-toggle {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--color-primary);
+}
+
+.messages-view-toggle:hover {
+    text-decoration: underline;
+}
+
 .messages-list-rows {
     display: flex;
     flex-direction: column;

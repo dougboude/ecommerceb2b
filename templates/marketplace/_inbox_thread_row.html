@@ -1,7 +1,7 @@
 {% load i18n %}
 <a href="{% url 'marketplace:inbox' %}?thread={{ thread.pk }}"
    data-thread-id="{{ thread.pk }}"
-   data-listing-id="{{ thread.listing.pk }}"
+   data-listing-id="{{ thread.listing_id|default_if_none:'' }}"
    data-thread-fragment-url="{% url 'marketplace:thread_fragment' thread.pk %}"
    data-row-fragment-url="{% url 'marketplace:inbox_thread_row_fragment' thread.pk %}"
    class="match-card workspace-thread-link{% if thread.is_unread %} thread-unread{% endif %}{% if selected_thread_pk and selected_thread_pk == thread.pk %} workspace-thread-link--active{% endif %}"

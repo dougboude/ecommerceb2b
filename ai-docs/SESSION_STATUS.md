@@ -1,12 +1,40 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Layer 5 messaging realtime workspace orchestration implementation completed on feature branch)
+**Last updated:** 2026-03-14 (Layer 6 messaging listing-grouped conversations implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 6 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-listing-grouped-conversations` only
+  - Added grouped/flat mode contract in inbox controller:
+    - `marketplace/views.py`
+      - `inbox_view` now parses query-param mode (`view=grouped|flat`, default flat)
+      - server-side grouped data builder added (`_build_grouped_inbox_threads`)
+      - compact toggle control context added (`toggle_label`, `toggle_url`) with request-cycle navigation
+  - Added grouped conversation-list rendering and toggle UI:
+    - `templates/marketplace/inbox.html`
+      - workspace mode signal now rendered dynamically (`data-view-mode="{{ view_mode }}"`)
+      - compact header toggle link (`Group by listing` / `All conversations`)
+      - grouped container markup added (`#messages-list-groups`, `.messages-list-group`, `.messages-list-group-rows`)
+      - grouped mode preserves canonical row partial usage and keeps flat rows container hidden for realtime fallbacks
+  - Hardened row fragment listing-key attribute:
+    - `templates/marketplace/_inbox_thread_row.html`
+    - switched row `data-listing-id` to `thread.listing_id` (null-safe)
+  - Added grouped-mode header/toggle styles in both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+    - classes: `.messages-list-header`, `.messages-view-toggle`
+  - Added Layer 6 test coverage in `marketplace/tests/test_messaging_workspace.py`:
+    - default flat mode + grouped toggle contract
+    - grouped-mode rendering with listing group sections
+    - deterministic group ordering and row ordering assertions
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_sse_client` (20 tests)
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_profile_trust_surfaces marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion marketplace.tests.test_sse_client` (56 tests)
 
 - **Layer 5 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
   - Scope implemented: `messaging-realtime-workspace-orchestration` only
