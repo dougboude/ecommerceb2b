@@ -672,6 +672,53 @@ dd { font-size: 0.9rem; }
     gap: 0.5rem;
 }
 
+.watchlist-filter-bar {
+    margin-bottom: 0.75rem;
+}
+
+.watchlist-grid {
+    margin-bottom: 1rem;
+}
+
+.watchlist-grid--single {
+    grid-template-columns: minmax(260px, 520px);
+    justify-content: center;
+}
+
+.watchlist-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.watchlist-tile--inactive {
+    opacity: 0.72;
+}
+
+.watchlist-tile-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.watchlist-tile-actions {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.watchlist-tile-actions-left,
+.watchlist-tile-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
 /* --- Responsive --- */
 @media (max-width: 600px) {
     main { padding: 0 0.75rem; margin: 1rem auto; }
@@ -685,6 +732,10 @@ dd { font-size: 0.9rem; }
     dt { margin-bottom: 0; }
     .auth-form { padding: 1.25rem; margin: 1rem; }
     .card-grid { grid-template-columns: 1fr; }
+    .watchlist-tile-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 /* --- Match badge --- */

@@ -150,6 +150,55 @@ class WatchlistWorkflowTests(TestCase):
         self.assertContains(response, "in conversation")
         self.assertContains(response, "with unread messages")
 
+    def test_watchlist_uses_compact_tile_grid_and_filter_checkboxes(self):
+        listing = _make_supply(self.owner, "Grid listing")
+        WatchlistItem.objects.create(
+            user=self.user,
+            listing=listing,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.WATCHING,
+        )
+
+        response = self.client.get(reverse("marketplace:watchlist"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="watchlist-filter-form"')
+        self.assertContains(response, 'name="show_starred"')
+        self.assertContains(response, 'name="show_watching"')
+        self.assertContains(response, 'name="show_archived"')
+        self.assertContains(response, 'name="conversation_only"')
+        self.assertContains(response, "card-grid watchlist-grid")
+        self.assertContains(response, "tile watchlist-tile")
+        self.assertContains(response, f'data-listing-id="{listing.pk}"')
+
+    def test_watchlist_can_filter_to_active_conversations_only(self):
+        with_thread = _make_supply(self.owner, "Has thread")
+        without_thread = _make_supply(self.owner, "No thread")
+        item_with_thread = WatchlistItem.objects.create(
+            user=self.user,
+            listing=with_thread,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.WATCHING,
+        )
+        WatchlistItem.objects.create(
+            user=self.user,
+            listing=without_thread,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.WATCHING,
+        )
+        MessageThread.objects.create(listing=with_thread, created_by_user=self.user)
+
+        response = self.client.get(
+            reverse("marketplace:watchlist"),
+            {"show_watching": "1", "conversation_only": "1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Has thread")
+        self.assertNotContains(response, "No thread")
+        self.assertContains(
+            response,
+            reverse("marketplace:watchlist_star", kwargs={"pk": item_with_thread.pk}) + "?show_watching=1&amp;conversation_only=1",
+        )
+
     def test_htmx_star_toggle_returns_reordered_watchlist_content_fragment(self):
         starred_listing = _make_supply(self.owner, "Already starred")
         watching_listing = _make_supply(self.owner, "To be starred")
@@ -175,3 +224,25 @@ class WatchlistWorkflowTests(TestCase):
         self.assertContains(response, "Starred (2)")
         self.assertContains(response, "Watching (0)")
         self.assertContains(response, "To be starred")
+
+    def test_paused_listing_remains_visible_in_watchlist_with_status_label(self):
+        listing = _make_supply(self.owner, "Pause visibility")
+        WatchlistItem.objects.create(
+            user=self.user,
+            listing=listing,
+            source=WatchlistSource.DIRECT,
+            status=WatchlistStatus.WATCHING,
+        )
+
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse("marketplace:supply_lot_toggle", kwargs={"pk": listing.pk}),
+            follow=True,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("marketplace:watchlist"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pause visibility")
+        self.assertContains(response, "Listing paused")
+        self.assertContains(response, "Watching (1)")

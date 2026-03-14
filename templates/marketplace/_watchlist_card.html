@@ -1,13 +1,15 @@
 {% load i18n %}
 {% with listing=item.resolved_listing|default:item.listing %}
-<div id="watchlist-card-{{ item.pk }}" class="match-card match-card--watchlist{% if inactive %} match-card-inactive{% endif %}"{% if listing %} data-href="{% if listing.type == 'supply' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}"{% endif %}{% if item.thread %} data-thread-id="{{ item.thread.pk }}"{% endif %}>
-    <div class="match-card-details">
+<article id="watchlist-card-{{ item.pk }}" class="tile watchlist-tile{% if inactive %} watchlist-tile--inactive{% endif %}"{% if listing %} data-listing-id="{{ listing.pk }}" data-href="{% if listing.type == 'supply' %}{% url 'marketplace:supply_lot_detail' listing.pk %}{% else %}{% url 'marketplace:demand_post_detail' listing.pk %}{% endif %}"{% endif %}{% if item.thread %} data-thread-id="{{ item.thread.pk }}"{% endif %}>
+    <div class="watchlist-tile-body">
         {% if not listing %}
-            <strong>{% trans "Listing unavailable" %}</strong>
+            <div class="tile-title">{% trans "Listing unavailable" %}</div>
         {% elif listing.type == "supply" %}
-            <strong><a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }}</a></strong>
+            <div class="tile-title"><a href="{% url 'marketplace:supply_lot_detail' listing.pk %}">{{ listing.item_text }}</a></div>
             {% if listing.status == "deleted" %}<span class="status status-deleted">{% trans "Listing deleted" %}</span>
-            {% elif listing.status == "withdrawn" %}<span class="status status-withdrawn">{% trans "Listing withdrawn" %}</span>
+            {% elif listing.status == "withdrawn" %}<span class="status status-paused">{% trans "Listing paused" %}</span>
+            {% elif listing.status == "expired" or listing.is_expired %}<span class="status status-expired">{% trans "Listing expired" %}</span>
+            {% else %}<span class="status status-{{ listing.status }}">{{ listing.get_status_display }}</span>
             {% endif %}
             {% if item.thread %}<span class="match-badge match-badge-saved" id="watchlist-badge-{{ item.thread.pk }}">{% trans "In conversation" %}{% if item.unread_count %}<span class="watchlist-unread-count"> &middot; {{ item.unread_count }} {% trans "unread" %}</span>{% endif %}</span>{% endif %}
             {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
@@ -17,10 +19,11 @@
             {% if listing.asking_price %}<span class="tile-meta">${{ listing.asking_price }}/{{ listing.get_price_unit_display }}</span>{% endif %}
             <span class="tile-meta">{{ listing.get_shipping_scope_display }}</span>
         {% else %}
-            <strong><a href="{% url 'marketplace:demand_post_detail' listing.pk %}">{% trans "Looking for:" %} {{ listing.item_text }}</a></strong>
+            <div class="tile-title"><a href="{% url 'marketplace:demand_post_detail' listing.pk %}">{% trans "Looking for:" %} {{ listing.item_text }}</a></div>
             {% if listing.status == "deleted" %}<span class="status status-deleted">{% trans "Listing deleted" %}</span>
             {% elif listing.status == "paused" %}<span class="status status-paused">{% trans "Listing paused" %}</span>
-            {% elif listing.status == "expired" %}<span class="status status-expired">{% trans "Listing expired" %}</span>
+            {% elif listing.status == "expired" or listing.is_expired %}<span class="status status-expired">{% trans "Listing expired" %}</span>
+            {% else %}<span class="status status-{{ listing.status }}">{{ listing.get_status_display }}</span>
             {% endif %}
             {% if item.thread %}<span class="match-badge match-badge-saved" id="watchlist-badge-{{ item.thread.pk }}">{% trans "In conversation" %}{% if item.unread_count %}<span class="watchlist-unread-count"> &middot; {{ item.unread_count }} {% trans "unread" %}</span>{% endif %}</span>{% endif %}
             {% if listing.created_by.display_name %}<span class="tile-meta">{% trans "From:" %} {{ listing.created_by.display_name }}</span>{% endif %}
@@ -30,22 +33,22 @@
             {% if listing.frequency %}<span class="tile-meta">{{ listing.get_frequency_display }}</span>{% endif %}
         {% endif %}
     </div>
-    <div class="match-card-actions">
-        <div class="match-card-actions-left">
+    <div class="watchlist-tile-actions">
+        <div class="watchlist-tile-actions-left">
             {% if show_star %}
             <button type="button" class="star-toggle" title="{% trans 'Star' %}"
-                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
+                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}{% if filters_querystring %}?{{ filters_querystring }}{% endif %}"
                     hx-target="#watchlist-content"
                     hx-swap="outerHTML">&#9734;</button>
             {% endif %}
             {% if show_unstar %}
             <button type="button" class="star-toggle star-toggle--active" title="{% trans 'Unstar' %}"
-                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}"
+                    hx-post="{% url 'marketplace:watchlist_star' item.pk %}{% if filters_querystring %}?{{ filters_querystring }}{% endif %}"
                     hx-target="#watchlist-content"
                     hx-swap="outerHTML">&#9733;</button>
             {% endif %}
         </div>
-        <div class="match-card-actions-right">
+        <div class="watchlist-tile-actions-right">
             {% if show_archive %}
             <form method="post" action="{% url 'marketplace:watchlist_archive' item.pk %}" style="display:inline;">
                 {% csrf_token %}
@@ -77,5 +80,5 @@
             {% endif %}
         </div>
     </div>
-</div>
+</article>
 {% endwith %}

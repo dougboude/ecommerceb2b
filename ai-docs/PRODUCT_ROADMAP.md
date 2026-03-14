@@ -26,6 +26,33 @@ Long‑term, optional marketplace capabilities (payments, escrow, logistics) may
 
 ---
 
+# Production Security Hardening Backlog
+
+## Shared Cache for Security Controls (Pre-Production Required)
+
+Before production launch, security-critical cache-backed controls must move off `LocMemCache` to a shared cache backend (Redis recommended).
+
+### Why
+
+- `LocMemCache` is process-local and non-persistent.
+- Lockout/rate-limit counters can diverge across workers/instances.
+- Restart/deploy clears counters, weakening enforcement.
+
+### Scope
+
+- Replace Django default cache backend with Redis.
+- Keep lockout and ratelimit counters in shared cache.
+- Validate consistent behavior across multi-worker/multi-instance runtime.
+- Add operational guidance for cache availability/failure handling.
+
+### Acceptance Criteria
+
+- Failed-login lockout remains consistent regardless of which app instance handles the request.
+- Rate limits apply uniformly across all running app instances.
+- Security counters survive individual worker restarts.
+
+---
+
 # 2. Core Product Model
 
 The platform operates on a **Supply ↔ Demand model**.

@@ -4,7 +4,7 @@ NicheMarket connects buyers who need hard-to-find goods with suppliers who have 
 privately, efficiently, and without a public storefront.
 
 > **Looking for a product overview rather than technical docs?**
-> See [PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) — written for consultants and product reviewers,
+> See [SALES_AUDIENCE_OVERVIEW.md](specs/SALES_AUDIENCE_OVERVIEW.md) — written for consultants and product reviewers,
 > covering user flows, feature details, known gaps, and deliberate exclusions.
 
 ---
@@ -101,6 +101,8 @@ about, or receive a suggestion for ends up here.
   conversations are still accessible
 - Visual indicator when a watchlist item has an active conversation in progress
 - Unread message count shown directly on the watchlist card
+- Real-time updates when watched listings change status (for example paused/unpaused/expired),
+  so saved items do not silently disappear
 - Star/unstar, archive/restore, and remove actions per item
 
 ### Private Messaging
@@ -118,11 +120,11 @@ listing. There is no shared forum or public comment section — every conversati
 
 ### Listing Management
 
-- Create, edit, pause, and close your own listings
+- Create, edit, pause/unpause, and close your own listings
 - Instant typeahead filter bar on the listing list pages — type to narrow down
   your listings by name, with live match counter
 - Listing tiles show how many new suggestions and saved matches each listing has
-- Status badges (active, paused, expired, withdrawn, fulfilled) visible at a glance
+- Status badges (active, paused, expired, fulfilled) visible at a glance
 - Cancel button on create and edit forms returns you to the appropriate page
 
 ### Themes
@@ -163,7 +165,7 @@ The application runs as three coordinated processes:
 | Service | Purpose | Transport |
 |---------|---------|-----------|
 | Django (`manage.py runserver`) | Main application | TCP :8000 |
-| Embedding sidecar (`services/embedding/`) | Semantic search via SentenceTransformers + ChromaDB | Unix socket |
+| Embedding sidecar (`services/embedding/`) | Semantic search via SentenceTransformers + ChromaDB | TCP :8002 |
 | SSE relay sidecar (`services/sse/`) | Real-time message delivery to browsers | TCP :8001 |
 
 **Starting the full ecosystem:**
@@ -191,6 +193,16 @@ Stops everything, whether started via `start.sh` or manually.
 - The relay fans the event out to the recipient's connected browser(s)
 - Updates: thread view (new message inserted), inbox (thread marked unread, preview updated),
   navbar badge (total unread count), watchlist (per-thread unread count on card)
+- Listing lifecycle events (pause/unpause/expire/delete/edit) also publish real-time updates
+  so watchlist tiles refresh in-place across active sessions
+
+### Session and Login Security Baseline
+- Sliding inactivity timeout is enabled by default (30 minutes).
+- Failed login attempts are tracked and temporarily locked out after repeated failures.
+- Failed and lockout-blocked attempts are logged with request context (IP chain, user-agent,
+  referrer/origin, username submitted).
+- Before production scale-out, migrate cache-backed security counters from `LocMemCache` to a
+  shared cache backend (Redis recommended).
 
 ### Running Tests
 ```bash
@@ -221,8 +233,10 @@ posting, discovering, suggesting, watchlisting, and messaging — are implemente
 - Start/stop ecosystem scripts (`start.sh`, `stop.sh`)
 - Watchlist "In conversation" badge with live unread count
 - Real-time watchlist unread count updates via SSE
+- Real-time cross-session watchlist tile refresh when listing status/details change
 - Cancel buttons on create/edit listing forms
 - Shutdown now waits for processes to actually exit before reporting done
+- Session timeout + failed-login lockout baseline with structured security logging
 
 ---
 

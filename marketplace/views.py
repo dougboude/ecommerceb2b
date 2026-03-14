@@ -9,6 +9,7 @@ from django.contrib import messages as django_messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
@@ -21,8 +22,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
+from django.utils.timezone import now as timezone_now
 from django.views.decorators.http import require_POST
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ from .models import (
     WatchlistStatus,
 )
 from .notifications import send_new_message_notification
+from .sse_client import publish_listing_updated
 
 PAGE_SIZE = 25
 SKIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -276,8 +278,97 @@ class MarketplaceLoginView(LoginView):
     template_name = "registration/login.html"
     redirect_authenticated_user = True
 
+    @staticmethod
+    def _auth_request_metadata(request):
+        username = (request.POST.get("username") or "").strip()
+        user_agent = (request.META.get("HTTP_USER_AGENT") or "")[:512]
+        referer = (request.META.get("HTTP_REFERER") or "")[:512]
+        origin = (request.META.get("HTTP_ORIGIN") or "")[:256]
+        forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "")[:256]
+        return {
+            "username": username,
+            "ip": (
+                forwarded_for.split(",")[0].strip()
+                or request.META.get("REMOTE_ADDR", "")
+                or "unknown"
+            ),
+            "x_forwarded_for": forwarded_for,
+            "x_real_ip": (request.META.get("HTTP_X_REAL_IP") or "")[:128],
+            "referer": referer,
+            "origin": origin,
+            "user_agent": user_agent,
+            "path": request.path,
+            "method": request.method,
+            "accept_language": (request.META.get("HTTP_ACCEPT_LANGUAGE") or "")[:256],
+            "session_key": request.session.session_key or "",
+        }
+
+    @staticmethod
+    def _lockout_cache_key(request):
+        meta = MarketplaceLoginView._auth_request_metadata(request)
+        username = meta["username"].lower()
+        ip = meta["ip"]
+        return f"login_lockout:{ip}:{username}"
+
+    def _is_login_locked_out(self, request):
+        state = cache.get(self._lockout_cache_key(request))
+        if not state:
+            return False
+        return int(timezone_now().timestamp()) < int(state.get("locked_until", 0))
+
+    def _record_failed_login(self, request):
+        now_ts = int(timezone_now().timestamp())
+        key = self._lockout_cache_key(request)
+        limit = int(getattr(django_settings, "LOGIN_FAILED_ATTEMPTS_LIMIT", 5))
+        window = int(getattr(django_settings, "LOGIN_FAILED_WINDOW_SECONDS", 900))
+        lockout_seconds = int(getattr(django_settings, "LOGIN_LOCKOUT_SECONDS", 900))
+
+        state = cache.get(key) or {"count": 0, "first_failed_at": now_ts, "locked_until": 0}
+        first_failed_at = int(state.get("first_failed_at", now_ts))
+        if now_ts - first_failed_at > window:
+            state = {"count": 0, "first_failed_at": now_ts, "locked_until": 0}
+
+        state["count"] = int(state.get("count", 0)) + 1
+        if state["count"] >= limit:
+            state["locked_until"] = now_ts + lockout_seconds
+
+        cache_ttl = max(window, lockout_seconds) + 60
+        cache.set(key, state, timeout=cache_ttl)
+        return state
+
+    def _clear_failed_login(self, request):
+        cache.delete(self._lockout_cache_key(request))
+
+    def post(self, request, *args, **kwargs):
+        if self._is_login_locked_out(request):
+            meta = self._auth_request_metadata(request)
+            form = self.get_form()
+            form.add_error(
+                None,
+                _(
+                    "Too many failed login attempts. Please wait and try again."
+                ),
+            )
+            logger.warning(
+                "auth.login_blocked_locked_out username=%s ip=%s xff=%s x_real_ip=%s "
+                "referer=%s origin=%s ua=%s path=%s method=%s accept_language=%s",
+                meta["username"],
+                meta["ip"],
+                meta["x_forwarded_for"],
+                meta["x_real_ip"],
+                meta["referer"],
+                meta["origin"],
+                meta["user_agent"],
+                meta["path"],
+                meta["method"],
+                meta["accept_language"],
+            )
+            return self.form_invalid(form)
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         user = form.get_user()
+        self._clear_failed_login(self.request)
         if not user.email_verified:
             resend_url = "{}?{}".format(
                 reverse("marketplace:resend_verification"),
@@ -295,6 +386,36 @@ class MarketplaceLoginView(LoginView):
             return self.form_invalid(form)
         response = super().form_valid(form)
         return _set_skin_cookie(response, user.skin)
+
+    def form_invalid(self, form):
+        if self.request.method == "POST":
+            state = self._record_failed_login(self.request)
+            meta = self._auth_request_metadata(self.request)
+            logger.warning(
+                "auth.login_failed username=%s ip=%s xff=%s x_real_ip=%s "
+                "referer=%s origin=%s ua=%s path=%s method=%s "
+                "attempt_count=%s first_failed_at=%s locked_until=%s",
+                meta["username"],
+                meta["ip"],
+                meta["x_forwarded_for"],
+                meta["x_real_ip"],
+                meta["referer"],
+                meta["origin"],
+                meta["user_agent"],
+                meta["path"],
+                meta["method"],
+                int(state.get("count", 0)),
+                int(state.get("first_failed_at", 0)),
+                int(state.get("locked_until", 0)),
+            )
+            if int(state.get("locked_until", 0)) > int(timezone_now().timestamp()):
+                form.add_error(
+                    None,
+                    _(
+                        "Too many failed login attempts. Please wait and try again."
+                    ),
+                )
+        return super().form_invalid(form)
 
 
 class MarketplaceLogoutView(LogoutView):
@@ -621,6 +742,7 @@ def demand_post_create(request):
             post.created_at = timezone_now()
             post.save()
             _sync_listing_to_vector_index(post)
+            publish_listing_updated(post, changed_fields=["create"])
             django_messages.success(request, _("Demand listing created."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
@@ -637,6 +759,7 @@ def demand_post_edit(request, pk):
         if form.is_valid():
             post = form.save()
             _sync_listing_to_vector_index(post)
+            publish_listing_updated(post, changed_fields=["edit"])
             django_messages.success(request, _("Demand listing updated."))
             return redirect("marketplace:demand_post_detail", pk=post.pk)
     else:
@@ -651,6 +774,7 @@ def demand_post_detail(request, pk):
         post.status = ListingStatus.EXPIRED
         post.save(update_fields=["status"])
         _remove_listing_from_vector_index(post)
+        publish_listing_updated(post, changed_fields=["status"])
     is_owner = post.created_by_user == request.user
     is_watchlisted = False
     can_convert = False
@@ -709,11 +833,10 @@ def demand_post_toggle(request, pk):
         post.status = ListingStatus.ACTIVE
     post.save(update_fields=["status"])
     _sync_listing_to_vector_index(post)
+    publish_listing_updated(post, changed_fields=["status"])
     if post.status == ListingStatus.ACTIVE:
-        _restore_watchlist_items_for_listing(post)
         django_messages.success(request, _("Demand listing resumed."))
     else:
-        _archive_watchlist_items_for_listing(post)
         django_messages.success(request, _("Demand listing paused."))
     return redirect("marketplace:demand_post_detail", pk=post.pk)
 
@@ -727,6 +850,7 @@ def demand_post_delete(request, pk):
         post.save(update_fields=["status"])
         _archive_watchlist_items_for_listing(post)
         _remove_listing_from_vector_index(post)
+        publish_listing_updated(post, changed_fields=["status", "delete"])
         django_messages.success(request, _("Demand listing deleted."))
         return redirect("marketplace:demand_post_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
@@ -768,6 +892,7 @@ def supply_lot_create(request):
             lot.created_at = timezone_now()
             lot.save()
             _sync_listing_to_vector_index(lot)
+            publish_listing_updated(lot, changed_fields=["create"])
             django_messages.success(request, _("Supply listing created."))
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
@@ -782,9 +907,17 @@ def supply_lot_edit(request, pk):
     if request.method == "POST":
         form = SupplyLotForm(request.POST, instance=lot)
         if form.is_valid():
+            was_expired = lot.status == ListingStatus.EXPIRED
             lot = form.save()
+            # Allow owners to reactivate expired supply listings by setting a new future date.
+            if was_expired and lot.expires_at and lot.expires_at > timezone_now():
+                lot.status = ListingStatus.ACTIVE
+                lot.save(update_fields=["status"])
+                django_messages.success(request, _("Supply listing reactivated with a new availability date."))
+            else:
+                django_messages.success(request, _("Supply listing updated."))
             _sync_listing_to_vector_index(lot)
-            django_messages.success(request, _("Supply listing updated."))
+            publish_listing_updated(lot, changed_fields=["edit", "status"])
             return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     else:
         form = SupplyLotForm(instance=lot)
@@ -798,6 +931,7 @@ def supply_lot_detail(request, pk):
         lot.status = ListingStatus.EXPIRED
         lot.save(update_fields=["status"])
         _remove_listing_from_vector_index(lot)
+        publish_listing_updated(lot, changed_fields=["status"])
     is_owner = lot.created_by_user == request.user
     is_watchlisted = False
     can_convert = False
@@ -850,18 +984,31 @@ def supply_lot_detail(request, pk):
 def supply_lot_toggle(request, pk):
     lot = _get_listing_or_404(pk, ListingType.SUPPLY)
     permission_service.authorize_listing_mutation(request.user.pk, lot, "toggle").deny_if_not_allowed()
+    previous_status = lot.status
+    now = timezone_now()
     if lot.status == ListingStatus.ACTIVE:
         lot.status = ListingStatus.WITHDRAWN
-    elif lot.status == ListingStatus.WITHDRAWN:
+    elif lot.status in (ListingStatus.WITHDRAWN, ListingStatus.PAUSED):
+        if lot.expires_at is None or lot.expires_at <= now:
+            lot.status = ListingStatus.EXPIRED
+            lot.save(update_fields=["status"])
+            _remove_listing_from_vector_index(lot)
+            publish_listing_updated(lot, changed_fields=["status"])
+            django_messages.warning(
+                request,
+                _("Supply listing is expired. Update Available until to a future date to reactivate."),
+            )
+            return redirect("marketplace:supply_lot_detail", pk=lot.pk)
         lot.status = ListingStatus.ACTIVE
+    if lot.status == previous_status:
+        return redirect("marketplace:supply_lot_detail", pk=lot.pk)
     lot.save(update_fields=["status"])
     _sync_listing_to_vector_index(lot)
+    publish_listing_updated(lot, changed_fields=["status"])
     if lot.status == ListingStatus.ACTIVE:
-        _restore_watchlist_items_for_listing(lot)
-        django_messages.success(request, _("Supply listing reactivated."))
+        django_messages.success(request, _("Supply listing unpaused."))
     else:
-        _archive_watchlist_items_for_listing(lot)
-        django_messages.success(request, _("Supply listing withdrawn."))
+        django_messages.success(request, _("Supply listing paused."))
     return redirect("marketplace:supply_lot_detail", pk=lot.pk)
 
 
@@ -874,6 +1021,7 @@ def supply_lot_delete(request, pk):
         lot.save(update_fields=["status"])
         _archive_watchlist_items_for_listing(lot)
         _remove_listing_from_vector_index(lot)
+        publish_listing_updated(lot, changed_fields=["status", "delete"])
         django_messages.success(request, _("Supply listing deleted."))
         return redirect("marketplace:supply_lot_list")
     return render(request, "marketplace/listing_delete_confirm.html", {
@@ -1178,11 +1326,26 @@ def watchlist_view(request):
     return render(
         request,
         "marketplace/watchlist.html",
-        _build_watchlist_context(request.user),
+        _build_watchlist_context(request.user, request.GET),
     )
 
 
-def _build_watchlist_context(user):
+def _build_watchlist_context(user, params=None):
+    params = params or {}
+    has_explicit_status_filters = any(
+        key in params for key in ("show_starred", "show_watching", "show_archived")
+    )
+    show_starred = (
+        params.get("show_starred") == "1" if has_explicit_status_filters else True
+    )
+    show_watching = (
+        params.get("show_watching") == "1" if has_explicit_status_filters else True
+    )
+    show_archived = (
+        params.get("show_archived") == "1" if has_explicit_status_filters else True
+    )
+    conversations_only = params.get("conversation_only") == "1"
+
     qs = WatchlistItem.objects.filter(user=user).select_related(
         "listing",
         "listing__created_by_user",
@@ -1198,10 +1361,39 @@ def _build_watchlist_context(user):
     _attach_unread_counts(user, starred)
     _attach_unread_counts(user, watching)
     _attach_unread_counts(user, archived)
+
+    if conversations_only:
+        starred = [item for item in starred if item.thread]
+        watching = [item for item in watching if item.thread]
+        archived = [item for item in archived if item.thread]
+
+    if not show_starred:
+        starred = []
+    if not show_watching:
+        watching = []
+    if not show_archived:
+        archived = []
+
     active_items = starred + watching
     active_count = len(active_items)
     conversation_count = sum(1 for item in active_items if item.thread)
     unread_conversation_count = sum(1 for item in active_items if getattr(item, "unread_count", 0) > 0)
+
+    filters = {
+        "show_starred": show_starred,
+        "show_watching": show_watching,
+        "show_archived": show_archived,
+        "conversation_only": conversations_only,
+    }
+    filters_query_parts = []
+    if show_starred:
+        filters_query_parts.append("show_starred=1")
+    if show_watching:
+        filters_query_parts.append("show_watching=1")
+    if show_archived:
+        filters_query_parts.append("show_archived=1")
+    if conversations_only:
+        filters_query_parts.append("conversation_only=1")
 
     return {
         "starred": starred,
@@ -1210,6 +1402,8 @@ def _build_watchlist_context(user):
         "active_count": active_count,
         "conversation_count": conversation_count,
         "unread_conversation_count": unread_conversation_count,
+        "watchlist_filters": filters,
+        "filters_querystring": "&".join(filters_query_parts),
     }
 
 
@@ -1227,7 +1421,7 @@ def watchlist_star(request, pk):
         return render(
             request,
             "marketplace/_watchlist_content.html",
-            _build_watchlist_context(request.user),
+            _build_watchlist_context(request.user, request.GET),
         )
     if item.status == WatchlistStatus.STARRED:
         django_messages.success(request, _("Added to starred items."))

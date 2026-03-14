@@ -1,22 +1,46 @@
 {% load i18n %}
 <div id="watchlist-content">
-    <p class="tile-meta">{% blocktrans with active=active_count conversations=conversation_count unread=unread_conversation_count %}{{ active }} active items, {{ conversations }} in conversation ({{ unread }} with unread messages).{% endblocktrans %}</p>
+    <form method="get" class="listing-filter-bar watchlist-filter-bar" id="watchlist-filter-form">
+        <label class="listing-status-check">
+            <input type="checkbox" name="show_starred" value="1" {% if watchlist_filters.show_starred %}checked{% endif %}>
+            {% trans "Starred" %}
+        </label>
+        <label class="listing-status-check">
+            <input type="checkbox" name="show_watching" value="1" {% if watchlist_filters.show_watching %}checked{% endif %}>
+            {% trans "Watching" %}
+        </label>
+        <label class="listing-status-check">
+            <input type="checkbox" name="show_archived" value="1" {% if watchlist_filters.show_archived %}checked{% endif %}>
+            {% trans "Archived" %}
+        </label>
+        <label class="listing-status-check">
+            <input type="checkbox" name="conversation_only" value="1" {% if watchlist_filters.conversation_only %}checked{% endif %}>
+            {% trans "Active conversations" %}
+        </label>
+        <a href="{% url 'marketplace:watchlist' %}" class="btn btn-secondary btn-small">{% trans "Reset" %}</a>
+    </form>
+
+    <p class="listing-summary">{% blocktrans with active=active_count conversations=conversation_count unread=unread_conversation_count %}{{ active }} active items, {{ conversations }} in conversation ({{ unread }} with unread messages).{% endblocktrans %}</p>
 
     {% if starred %}
     <section>
         <h2>{% trans "Starred" %} ({{ starred|length }})</h2>
-        {% for item in starred %}
-            {% include "marketplace/_watchlist_card.html" with item=item show_unstar=True show_archive=True show_remove=True %}
-        {% endfor %}
+        <div class="card-grid watchlist-grid{% if starred|length == 1 %} watchlist-grid--single{% endif %}">
+            {% for item in starred %}
+                {% include "marketplace/_watchlist_card.html" with item=item show_unstar=True show_archive=True show_remove=True %}
+            {% endfor %}
+        </div>
     </section>
     {% endif %}
 
     <section>
         <h2>{% trans "Watching" %} ({{ watching|length }})</h2>
         {% if watching %}
-        {% for item in watching %}
-            {% include "marketplace/_watchlist_card.html" with item=item show_star=True show_archive=True show_remove=True %}
-        {% endfor %}
+        <div class="card-grid watchlist-grid{% if watching|length == 1 %} watchlist-grid--single{% endif %}">
+            {% for item in watching %}
+                {% include "marketplace/_watchlist_card.html" with item=item show_star=True show_archive=True show_remove=True %}
+            {% endfor %}
+        </div>
         {% else %}
         <p class="empty-state">{% trans "No items being watched." %}</p>
         {% if not starred %}
@@ -28,11 +52,13 @@
     </section>
 
     {% if archived %}
-    <details>
+    <details class="watchlist-archived">
         <summary style="cursor:pointer; font-weight:600; margin-bottom:0.5rem;">{% trans "Archived" %} ({{ archived|length }})</summary>
-        {% for item in archived %}
-        {% include "marketplace/_watchlist_card.html" with item=item show_unarchive=True inactive=True %}
-        {% endfor %}
+        <div class="card-grid watchlist-grid{% if archived|length == 1 %} watchlist-grid--single{% endif %}">
+            {% for item in archived %}
+                {% include "marketplace/_watchlist_card.html" with item=item show_unarchive=True inactive=True %}
+            {% endfor %}
+        </div>
     </details>
     {% endif %}
 
@@ -40,5 +66,7 @@
     <div class="actions" style="margin-top:1.5rem;">
         <a href="{% url 'marketplace:discover' %}" class="btn btn-primary">{% trans "Discover more" %}</a>
     </div>
+    {% elif watchlist_filters.show_starred or watchlist_filters.show_watching or watchlist_filters.show_archived %}
+    <p class="empty-state">{% trans "No watchlist items match your current filters." %}</p>
     {% endif %}
 </div>

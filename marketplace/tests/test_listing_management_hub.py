@@ -102,7 +102,7 @@ class SupplyListPageTests(TestCase):
         response = self.client.get(reverse("marketplace:supply_lot_list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "status-active")
-        self.assertContains(response, "status-withdrawn")
+        self.assertContains(response, "status-paused")
 
     def test_supply_list_shows_listing_count_summary(self):
         _make_supply(self.user, "Active lot")
@@ -269,6 +269,29 @@ class ListDetailActionTransitionTests(TestCase):
         lot.refresh_from_db()
         self.assertEqual(lot.status, ListingStatus.WITHDRAWN)
 
+    def test_supply_toggle_resumes_paused_and_redirects_to_detail(self):
+        lot = _make_supply(self.user, "Paused supply", status=ListingStatus.PAUSED)
+        response = self.client.post(
+            reverse("marketplace:supply_lot_toggle", kwargs={"pk": lot.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        lot.refresh_from_db()
+        self.assertEqual(lot.status, ListingStatus.ACTIVE)
+
+    def test_supply_toggle_from_paused_with_past_expiry_marks_expired(self):
+        lot = _make_supply(self.user, "Paused expired supply", status=ListingStatus.PAUSED)
+        lot.expires_at = timezone.now() - timedelta(days=1)
+        lot.save(update_fields=["expires_at"])
+        response = self.client.post(
+            reverse("marketplace:supply_lot_toggle", kwargs={"pk": lot.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        lot.refresh_from_db()
+        self.assertEqual(lot.status, ListingStatus.EXPIRED)
+        self.assertContains(response, "Update Available until to a future date to reactivate.")
+
     def test_demand_toggle_pauses_and_redirects_to_detail(self):
         post = _make_demand(self.user, "Toggle demand", status=ListingStatus.ACTIVE)
         response = self.client.post(
@@ -285,6 +308,14 @@ class ListDetailActionTransitionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("marketplace:supply_lot_edit", kwargs={"pk": lot.pk}))
 
+    def test_supply_detail_shows_edit_link_for_expired(self):
+        lot = _make_supply(self.user, "Expired supply", status=ListingStatus.EXPIRED)
+        lot.expires_at = timezone.now() - timedelta(days=1)
+        lot.save(update_fields=["expires_at"])
+        response = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": lot.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("marketplace:supply_lot_edit", kwargs={"pk": lot.pk}))
+
     def test_demand_detail_shows_edit_link_for_active(self):
         post = _make_demand(self.user, "Editable demand", status=ListingStatus.ACTIVE)
         response = self.client.get(reverse("marketplace:demand_post_detail", kwargs={"pk": post.pk}))
@@ -295,7 +326,7 @@ class ListDetailActionTransitionTests(TestCase):
         lot = _make_supply(self.user, "Withdrawable supply", status=ListingStatus.ACTIVE)
         response = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": lot.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Withdraw")
+        self.assertContains(response, "Pause")
 
     def test_demand_detail_shows_pause_action_for_active(self):
         post = _make_demand(self.user, "Pausable demand", status=ListingStatus.ACTIVE)
@@ -303,17 +334,23 @@ class ListDetailActionTransitionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pause")
 
-    def test_supply_detail_shows_reactivate_for_withdrawn(self):
+    def test_supply_detail_shows_unpause_for_withdrawn(self):
         lot = _make_supply(self.user, "Withdrawn supply", status=ListingStatus.WITHDRAWN)
         response = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": lot.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Reactivate")
+        self.assertContains(response, "Unpause")
 
-    def test_demand_detail_shows_resume_for_paused(self):
+    def test_supply_detail_shows_unpause_for_paused(self):
+        lot = _make_supply(self.user, "Paused supply", status=ListingStatus.PAUSED)
+        response = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": lot.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unpause")
+
+    def test_demand_detail_shows_unpause_for_paused(self):
         post = _make_demand(self.user, "Paused demand", status=ListingStatus.PAUSED)
         response = self.client.get(reverse("marketplace:demand_post_detail", kwargs={"pk": post.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Resume")
+        self.assertContains(response, "Unpause")
 
     def test_non_owner_cannot_see_management_actions(self):
         other = _make_user("other@hub.test", "Other")
@@ -321,7 +358,7 @@ class ListDetailActionTransitionTests(TestCase):
         response = self.client.get(reverse("marketplace:supply_lot_detail", kwargs={"pk": lot.pk}))
         self.assertEqual(response.status_code, 200)
         # Owner-only action buttons should not appear
-        self.assertNotContains(response, "Withdraw")
+        self.assertNotContains(response, "Pause")
         self.assertNotContains(response, "Back to list")
         self.assertNotContains(response, reverse("marketplace:supply_lot_edit", kwargs={"pk": lot.pk}))
 

@@ -1,12 +1,228 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-13 (`available_until` runtime alias removed; canonical `expires_at` normalized)
+**Last updated:** 2026-03-14 (Overview docs updated for security + real-time watchlist changes)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Overview documentation alignment update (README + sales overview)**:
+  - Updated `README.md`:
+    - fixed broken product-overview link (`PRODUCT_BRIEF.md` -> `specs/SALES_AUDIENCE_OVERVIEW.md`)
+    - corrected embedding sidecar transport from `Unix socket` to `TCP :8002`
+    - documented real-time watchlist tile refresh on listing status/detail changes
+    - documented session/login security baseline (inactivity timeout, failed-attempt lockout, security logging)
+    - refreshed recent additions list with real-time watchlist status updates and auth security controls
+    - normalized user-facing listing lifecycle wording to pause/unpause terminology
+  - Updated `specs/SALES_AUDIENCE_OVERVIEW.md`:
+    - lifecycle wording aligned to active/paused/fulfilled/expired
+    - added real-time watchlist state update mention
+    - added baseline security posture mention (session timeout + lockout)
+
+- **Feature planning capture: Redis-backed security cache migration (pre-production)**:
+  - Added explicit production-hardening backlog item in `ai-docs/PRODUCT_ROADMAP.md`:
+    - section: `Production Security Hardening Backlog`
+    - item: `Shared Cache for Security Controls (Pre-Production Required)`
+    - rationale, scope, and acceptance criteria documented
+  - Added planning visibility in `docs/SPEC_ORDER.md`:
+    - `Non-UI Production Hardening Queue`
+    - item: `Security Cache Hardening (Redis for Lockout/Rate Limits/Sessions)`
+    - status set to `PLANNED`
+
+- **Failed-login security logging (pre-admin observability baseline)**:
+  - Added structured warning logs for auth failures in `MarketplaceLoginView` (`marketplace/views.py`):
+    - `auth.login_failed` on each invalid POST login
+    - `auth.login_blocked_locked_out` when lockout pre-check blocks login
+  - Captured context fields per attempt where available:
+    - submitted username
+    - derived client IP
+    - `X-Forwarded-For` and `X-Real-IP`
+    - referrer, origin
+    - user-agent
+    - request path/method
+    - accept-language
+    - lockout counters/timestamps (`attempt_count`, `first_failed_at`, `locked_until`)
+  - Added tests in `marketplace/tests/test_email_verification.py`:
+    - `test_failed_login_emits_security_log_with_request_context`
+    - lockout test now also asserts lockout log emission
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_email_verification marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_management_hub` (77 tests)
+
+- **Auth/session security baseline (timeout + failed-login lockout)**:
+  - Added sliding inactivity session timeout configuration in `config/settings.py`:
+    - `SESSION_COOKIE_AGE` default `1800` (30 minutes)
+    - `SESSION_SAVE_EVERY_REQUEST` default `true`
+    - `SESSION_EXPIRE_AT_BROWSER_CLOSE` configurable (default `false`)
+  - Added failed-login lockout controls in `config/settings.py`:
+    - `LOGIN_FAILED_ATTEMPTS_LIMIT` default `5`
+    - `LOGIN_FAILED_WINDOW_SECONDS` default `900` (15 minutes)
+    - `LOGIN_LOCKOUT_SECONDS` default `900` (15 minutes)
+  - Implemented failure-based lockout in `MarketplaceLoginView` (`marketplace/views.py`):
+    - tracks failed attempts by `(ip, username)` in cache
+    - clears counters on successful login
+    - blocks login with explicit error message when lockout active
+  - Added environment documentation in `.env.example` for all new session/auth controls.
+  - Added test coverage in `marketplace/tests/test_email_verification.py`:
+    - `test_failed_login_attempts_trigger_lockout`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_email_verification marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_management_hub` (76 tests)
+
+- **Watchlist UX fix: keep paused/expired listings visible (no "magical disappearance")**:
+  - Removed automatic watchlist archival/restoration on pause/unpause/expire listing state changes:
+    - `marketplace/views.py`
+    - `demand_post_toggle`: no longer archives watchlist rows when paused or restores on resume
+    - `supply_lot_toggle`: no longer archives watchlist rows on pause/expire guard and no longer restores on unpause
+    - `supply_lot_edit` expired reactivation path no longer force-restores archived rows
+  - Result:
+    - watched listings stay in `Starred`/`Watching` sections and update status labels (`Listing paused` / `Listing expired`)
+    - users no longer experience tiles disappearing unexpectedly in another session
+  - Added regression test:
+    - `marketplace/tests/test_watchlist_workflow.py`
+    - `test_paused_listing_remains_visible_in_watchlist_with_status_label`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_management_hub marketplace.tests.test_listing_authoring_edit_flows` (107 tests)
+
+- **Cross-session watchlist sync for listing changes (SSE `listing_updated`)**:
+  - Added new SSE event publisher:
+    - `marketplace/sse_client.py` `publish_listing_updated(listing, changed_fields=...)`
+    - targets all users currently watching the listing
+  - Wired listing update events from listing mutation surfaces in `marketplace/views.py`:
+    - demand: create, edit, auto-expire in detail, toggle, delete
+    - supply: create, edit (including expired reactivation), auto-expire in detail, toggle, delete
+  - Updated client real-time behavior:
+    - `static/js/sse-client.js` now listens for `listing_updated`
+    - watchlist page now refreshes `#watchlist-content` fragment from server on listing updates
+    - preserves current querystring filters and archived section open state
+    - includes in-flight queue guard to avoid overlapping refreshes
+  - Added listing identity hook on watchlist cards:
+    - `templates/marketplace/_watchlist_card.html` adds `data-listing-id`
+  - Updated tests:
+    - `marketplace/tests/test_watchlist_workflow.py` asserts `data-listing-id` render
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_management_hub marketplace.tests.test_listing_detail_conversion` (56 tests)
+
+- **Supply UI terminology unification (`Pause`/`Unpause`)**:
+  - Kept backend status values intact (`withdrawn`) but standardized user-facing wording so supply + demand use the same action concept.
+  - Updated supply action labels:
+    - `templates/marketplace/supply_lot_detail.html`
+      - `Withdraw` -> `Pause`
+      - `Reactivate` -> `Unpause`
+  - Updated supply user-visible status labels for withdrawn state:
+    - `templates/marketplace/supply_lot_detail.html` status badge now shows `Paused` for `withdrawn`
+    - `templates/marketplace/supply_lot_list.html` status badge now shows `Paused` for `withdrawn`
+    - `templates/marketplace/dashboard.html` supply tile status now shows `Paused` for `withdrawn`
+    - `templates/marketplace/_watchlist_card.html` supply inactive label now shows `Listing paused`
+  - Updated supply toggle feedback messages:
+    - `marketplace/views.py`
+      - `Supply listing withdrawn.` -> `Supply listing paused.`
+      - `Supply listing reactivated.` -> `Supply listing unpaused.`
+  - Updated tests:
+    - `marketplace/tests/test_listing_management_hub.py` assertions now expect pause/unpause wording and paused badge class
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_management_hub marketplace.tests.test_listing_detail_conversion marketplace.tests.test_watchlist_workflow` (56 tests)
+
+- **Supply listing date requirement (`Available until` required)**:
+  - Prevented ambiguous state where a supply listing appears active to owner but is excluded from discover due to missing expiration.
+  - Updated `SupplyLotForm` in `marketplace/forms.py`:
+    - `expires_at` field is now required in UI/form validation
+    - validation rejects missing date (required field error)
+    - validation rejects non-future effective expiry timestamps
+  - This aligns with discover filter behavior (`status=active` + `expires_at > now`) and removes "active but undiscoverable" supply records caused by null date.
+  - Updated regression coverage:
+    - `marketplace/tests/test_listing_authoring_edit_flows.py`
+      - paused supply edit now asserts missing date is blocked with validation error
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_authoring_edit_flows marketplace.tests.test_listing_management_hub` (98 tests)
+
+- **Supply unpause/reactivate guard when `Available until` is past/missing**:
+  - Root cause addressed: discover keyword search only returns active supply with `expires_at > now`; previously a paused/withdrawn listing could be toggled active even if its date was already expired, making it appear "reactivated" but undiscoverable.
+  - Updated `marketplace/views.py` (`supply_lot_toggle`):
+    - when toggling paused/withdrawn supply to active, if `expires_at` is missing or in the past:
+      - listing is set to `EXPIRED`
+      - listing is removed from vector index
+      - watchlist items are archived
+      - user sees guidance message to update `Available until` to a future date before reactivation
+    - valid future-date paused/withdrawn listings still reactivate normally
+  - Added regression test:
+    - `marketplace/tests/test_listing_management_hub.py`
+    - `test_supply_toggle_from_paused_with_past_expiry_marks_expired`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_management_hub marketplace.tests.test_listing_authoring_edit_flows` (98 tests)
+
+- **Expired supply reactivation via edit (`Available until` extension)**:
+  - Owners can now edit expired supply listings from detail view:
+    - `templates/marketplace/supply_lot_detail.html` now keeps `Edit` available for expired supply
+  - Supply edit save now reactivates expired listings when a new future `expires_at` is provided:
+    - `marketplace/views.py` (`supply_lot_edit`)
+    - sets status `EXPIRED -> ACTIVE`, restores watchlist visibility, and shows reactivation success message
+  - Added regression coverage:
+    - `marketplace/tests/test_listing_authoring_edit_flows.py`
+      - `test_expired_supply_edit_with_future_date_reactivates_listing`
+    - `marketplace/tests/test_listing_management_hub.py`
+      - `test_supply_detail_shows_edit_link_for_expired`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_authoring_edit_flows marketplace.tests.test_listing_management_hub` (97 tests)
+
+- **Supply listing unpause/resume action (detail page, no edit required)**:
+  - Added direct resume path for paused supply listings:
+    - `marketplace/views.py` `supply_lot_toggle` now reactivates from both `WITHDRAWN` and `PAUSED`
+  - Added owner action button on supply detail:
+    - `templates/marketplace/supply_lot_detail.html` now shows `Resume` when supply status is `paused`
+  - Added regression coverage:
+    - `marketplace/tests/test_listing_management_hub.py`
+    - `test_supply_toggle_resumes_paused_and_redirects_to_detail`
+    - `test_supply_detail_shows_resume_for_paused`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_management_hub` (40 tests)
+
+- **Paused action terminology update (`Resume` -> `Unpause`)**:
+  - Updated paused-action button labels for consistency with your preference:
+    - `templates/marketplace/supply_lot_detail.html`
+    - `templates/marketplace/demand_post_detail.html`
+  - Updated assertions in:
+    - `marketplace/tests/test_listing_management_hub.py`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_management_hub` (40 tests)
+
+- **Paused supply listing edit crash fix (`clean_expires_at` null-safe)**:
+  - Fixed `TypeError` in `SupplyLotForm.clean_expires_at` when `expires_at` is blank (`None`) during edit POST:
+    - `marketplace/forms.py` now returns `None` when no date is provided, instead of calling `datetime.combine(None, ...)`
+  - Added regression test to prevent recurrence:
+    - `marketplace/tests/test_listing_authoring_edit_flows.py`
+    - `test_paused_listing_edit_allows_blank_expires_at`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_authoring_edit_flows` (55 tests)
+
+- **Watchlist layout parity + watchlist filters (branch `feat/watchlist-layout-parity`)**:
+  - Refactored watchlist presentation to match compact listing tile layout (two-column card grid on desktop, single-column on mobile):
+    - `templates/marketplace/_watchlist_content.html`
+    - `templates/marketplace/_watchlist_card.html`
+  - Preserved section model and behavior:
+    - `Starred`, `Watching`, and collapsible `Archived`
+    - retained item-level conversation badge and watchlist action controls
+  - Replaced old watchlist treatment with watchlist-specific checkbox filters:
+    - `Starred`
+    - `Watching`
+    - `Archived`
+    - `Active conversations`
+    - plus `Reset` shortcut
+  - Added server-side filtering and persisted filter state:
+    - `_build_watchlist_context(user, params)` in `marketplace/views.py`
+    - `watchlist_view` now passes `request.GET`
+    - HTMX star/unstar requests now preserve active filters via querystring
+  - Added delegated auto-submit UX for watchlist filter checkboxes in `templates/marketplace/watchlist.html`
+  - Added watchlist-specific tile/filter styling to both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+  - Added/updated tests:
+    - `marketplace/tests/test_watchlist_workflow.py`
+      - verifies filter controls render
+      - verifies compact tile grid classes render
+      - verifies conversations-only filter and preserved HTMX filter params
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_watchlist_workflow marketplace.tests.test_feedback_recovery` (15 tests)
 
 - **Expiry field normalization (`expires_at` only) (branch `feat/ui-ux-rewrite`)**:
   - Removed `Listing.available_until` compatibility property from `marketplace/models.py`
