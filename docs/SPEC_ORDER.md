@@ -78,3 +78,35 @@ Ordering logic:
    - Why: security controls are currently cache-backed and must be consistent across workers/instances before production.
    - Status: `PLANNED`
    - Depends on: deployment/runtime architecture decision for managed Redis
+
+## Messaging Workspace Re-Architecture Queue
+
+12. **messaging-workspace-layout-and-navigation**
+   - Why first: establishes the hybrid workspace shell and responsive navigation contract that all later messaging layers depend on.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `Messaging Workspace and Conversation Context`, `Navigation and Information Architecture Unification`
+
+13. **messaging-conversation-list-ia**
+   - Why second: defines row information architecture and preview semantics required before real-time and grouping behaviors can be finalized.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `messaging-workspace-layout-and-navigation`
+
+14. **messaging-thread-pane-redesign**
+   - Why third: defines the thread pane UX and dual-rendering contract required for split-pane interaction and direct navigation compatibility.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `messaging-workspace-layout-and-navigation`
+
+15. **messaging-sse-event-contract-expansion**
+   - Why fourth: expands payload contract needed for dynamic row/group creation and coherent live workspace updates.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `messaging-conversation-list-ia`, `messaging-thread-pane-redesign`
+
+16. **messaging-realtime-workspace-orchestration**
+   - Why fifth: implements client-side orchestration once event schema and workspace/list contracts are defined.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `messaging-sse-event-contract-expansion`, `messaging-workspace-layout-and-navigation`, `messaging-conversation-list-ia`
+
+17. **messaging-listing-grouped-conversations**
+   - Why sixth: adds seller-focused listing grouping after flat-list IA and realtime orchestration are stable.
+   - Status: `REQ, DES, TASK`
+   - Depends on: `messaging-conversation-list-ia`, `messaging-realtime-workspace-orchestration`

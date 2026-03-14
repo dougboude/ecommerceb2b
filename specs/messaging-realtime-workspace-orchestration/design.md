@@ -30,6 +30,14 @@ Rationale:
 - Preserves Django template ownership of presentation logic.
 - Removes the need for snapshot tests on client-constructed row HTML.
 
+## Workspace Mode Signal
+
+- Server renders workspace mode on the root workspace container via `data-view-mode` attribute.
+  - Example values: `data-view-mode="grouped"` or `data-view-mode="flat"`.
+- On SSE event handling, orchestration JS reads `data-view-mode` to decide whether grouped insertion/creation logic is required.
+- Mode signal is request-cycle derived and static for page lifetime.
+  - Grouped/flat switching is request-based (not in-page mode mutation), consistent with Layer 6.
+
 ## State and Safety
 
 - Maintain in-memory map/set keyed by thread and listing ids to prevent duplicates.

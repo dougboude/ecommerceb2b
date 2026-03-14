@@ -41,6 +41,17 @@ Persistence strategy:
 Interaction model:
 - Initial mode switching is request/navigation based (server-rendered mode switch), not a purely client-side toggle.
 
+## Toggle UI Control
+
+- Render a compact grouped/flat toggle control in the conversation list header area.
+- Flat mode control label and target:
+  - Label: `Group by listing`
+  - Navigation: `?view=grouped`
+- Grouped mode control label and target:
+  - Label: `All conversations` (or `Flat view`)
+  - Navigation: `?view=flat` (or equivalent param removal)
+- Control must remain visually lightweight and secondary to conversation list content.
+
 ## Risks and Mitigations
 
 - Risk: grouping adds cognitive overhead for low-volume users.

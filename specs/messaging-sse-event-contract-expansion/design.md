@@ -28,6 +28,11 @@ This layer formalizes an expanded SSE payload for `new_message` so the client ca
 - `message_preview` should be precomputed to match UI truncation/prefix policy where practical.
 - Timestamp format should remain sortable and parseable (ISO8601).
 - Listing fields provide group-key + group-label data.
+- `message_preview` prefixing is viewer-relative and must be computed per recipient payload:
+  - Sender-view payload: `You: {body_preview}`
+  - Recipient-view payload: `{sender_display_name}: {body_preview}`
+- Since streams are per-user, preview prefix can be computed at publish time per recipient alongside `counterparty_name`.
+- The required `publish_new_message()` publish-path update for recipient-relative counterparty resolution must also handle recipient-relative preview prefix construction.
 
 ## Recipient-Relative Counterparty Constraint
 
