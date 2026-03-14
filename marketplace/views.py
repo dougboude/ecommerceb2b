@@ -1681,81 +1681,8 @@ def thread_fragment(request, pk):
 
 @login_required
 def inbox_view(request):
-    from django.db.models import F, Subquery, OuterRef
-
     user = request.user
-
-    read_at_sq = ThreadReadState.objects.filter(
-        thread=OuterRef("pk"), user=user,
-    ).values("last_read_at")[:1]
-
-    last_msg_body_sq = Message.objects.filter(
-        thread=OuterRef("pk"),
-    ).order_by("-created_at", "-pk").values("body")[:1]
-
-    last_msg_sender_id_sq = Message.objects.filter(
-        thread=OuterRef("pk"),
-    ).order_by("-created_at", "-pk").values("sender_id")[:1]
-
-    last_msg_sender_display_sq = Message.objects.filter(
-        thread=OuterRef("pk"),
-    ).order_by("-created_at", "-pk").values("sender__display_name")[:1]
-
-    last_msg_sender_email_sq = Message.objects.filter(
-        thread=OuterRef("pk"),
-    ).order_by("-created_at", "-pk").values("sender__email")[:1]
-
-    last_other_msg_sq = Message.objects.filter(
-        thread=OuterRef("pk"),
-    ).exclude(sender=user).order_by("-created_at", "-pk").values("created_at")[:1]
-
-    threads = (
-        MessageThread.objects.filter(
-            Q(created_by_user=user)
-            | Q(listing__created_by_user=user),
-        )
-        .select_related(
-            "listing",
-            "listing__created_by_user",
-            "created_by_user",
-        )
-        .annotate(
-            last_message_at=models.Max("messages__created_at"),
-            last_other_message_at=Subquery(last_other_msg_sq),
-            user_read_at=Subquery(read_at_sq),
-            last_message_body=Subquery(last_msg_body_sq),
-            last_message_sender_id=Subquery(last_msg_sender_id_sq),
-            last_message_sender_display=Subquery(last_msg_sender_display_sq),
-            last_message_sender_email=Subquery(last_msg_sender_email_sq),
-        )
-        .filter(last_message_at__isnull=False)
-        .order_by("-last_message_at", "-pk")
-    )
-
-    thread_list = []
-    for t in threads:
-        t.counterparty = t.counterparty_for(user)
-        t.listing = t.get_listing()
-        t.listing_detail_url = ""
-        t.listing_kind_label = ""
-        if t.listing is not None:
-            if t.listing.type == ListingType.SUPPLY:
-                t.listing_detail_url = reverse("marketplace:supply_lot_detail", kwargs={"pk": t.listing.pk})
-                t.listing_kind_label = _("Supply")
-            else:
-                t.listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": t.listing.pk})
-                t.listing_kind_label = _("Demand")
-        sender_label = (t.last_message_sender_display or "").strip() or (t.last_message_sender_email or "").strip() or (t.counterparty.display_name or t.counterparty.email)
-        preview_prefix = _("You") if t.last_message_sender_id == user.pk else sender_label
-        raw_preview = f"{preview_prefix}: {(t.last_message_body or '').strip()}"
-        if len(raw_preview) > 120:
-            raw_preview = f"{raw_preview[:117]}..."
-        t.preview = raw_preview
-        t.is_unread = (
-            t.last_other_message_at is not None
-            and (t.user_read_at is None or t.last_other_message_at > t.user_read_at)
-        )
-        thread_list.append(t)
+    thread_list = _build_inbox_threads_for_user(user)
     unread_threads = sum(1 for t in thread_list if t.is_unread)
 
     selected_thread = None
@@ -1789,6 +1716,103 @@ def inbox_view(request):
         "selected_thread": selected_thread,
         "selected_thread_context": selected_thread_context,
     })
+
+
+def _build_inbox_threads_for_user(user):
+    from django.db.models import Subquery, OuterRef
+    read_at_sq = ThreadReadState.objects.filter(
+        thread=OuterRef("pk"), user=user,
+    ).values("last_read_at")[:1]
+    last_msg_body_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("body")[:1]
+    last_msg_sender_id_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender_id")[:1]
+    last_msg_sender_display_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender__display_name")[:1]
+    last_msg_sender_email_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).order_by("-created_at", "-pk").values("sender__email")[:1]
+    last_other_msg_sq = Message.objects.filter(
+        thread=OuterRef("pk"),
+    ).exclude(sender=user).order_by("-created_at", "-pk").values("created_at")[:1]
+    threads = (
+        MessageThread.objects.filter(
+            Q(created_by_user=user)
+            | Q(listing__created_by_user=user),
+        )
+        .select_related(
+            "listing",
+            "listing__created_by_user",
+            "created_by_user",
+        )
+        .annotate(
+            last_message_at=models.Max("messages__created_at"),
+            last_other_message_at=Subquery(last_other_msg_sq),
+            user_read_at=Subquery(read_at_sq),
+            last_message_body=Subquery(last_msg_body_sq),
+            last_message_sender_id=Subquery(last_msg_sender_id_sq),
+            last_message_sender_display=Subquery(last_msg_sender_display_sq),
+            last_message_sender_email=Subquery(last_msg_sender_email_sq),
+        )
+        .filter(last_message_at__isnull=False)
+        .order_by("-last_message_at", "-pk")
+    )
+    thread_list = list(threads)
+    for t in thread_list:
+        _decorate_inbox_thread_for_user(t, user)
+    return thread_list
+
+
+def _decorate_inbox_thread_for_user(thread, user):
+    thread.counterparty = thread.counterparty_for(user)
+    thread.listing = thread.get_listing()
+    thread.listing_detail_url = ""
+    thread.listing_kind_label = ""
+    if thread.listing is not None:
+        if thread.listing.type == ListingType.SUPPLY:
+            thread.listing_detail_url = reverse("marketplace:supply_lot_detail", kwargs={"pk": thread.listing.pk})
+            thread.listing_kind_label = _("Supply")
+        else:
+            thread.listing_detail_url = reverse("marketplace:demand_post_detail", kwargs={"pk": thread.listing.pk})
+            thread.listing_kind_label = _("Demand")
+    sender_label = (thread.last_message_sender_display or "").strip() or (thread.last_message_sender_email or "").strip() or (thread.counterparty.display_name or thread.counterparty.email)
+    preview_prefix = _("You") if thread.last_message_sender_id == user.pk else sender_label
+    raw_preview = f"{preview_prefix}: {(thread.last_message_body or '').strip()}"
+    if len(raw_preview) > 120:
+        raw_preview = f"{raw_preview[:117]}..."
+    thread.preview = raw_preview
+    thread.is_unread = (
+        thread.last_other_message_at is not None
+        and (thread.user_read_at is None or thread.last_other_message_at > thread.user_read_at)
+    )
+
+
+@login_required
+def inbox_thread_row_fragment(request, pk):
+    thread = get_object_or_404(
+        MessageThread.objects.select_related(
+            "listing",
+            "listing__created_by_user",
+            "created_by_user",
+        ),
+        pk=pk,
+    )
+    permission_service.authorize_thread_access(request.user.pk, thread, "access").deny_if_not_allowed()
+    hydrated = None
+    for candidate in _build_inbox_threads_for_user(request.user):
+        if candidate.pk == thread.pk:
+            hydrated = candidate
+            break
+    if hydrated is None:
+        raise Http404
+    return render(
+        request,
+        "marketplace/inbox_thread_row_fragment.html",
+        {"thread": hydrated, "selected_thread_pk": None},
+    )
 
 
 @login_required

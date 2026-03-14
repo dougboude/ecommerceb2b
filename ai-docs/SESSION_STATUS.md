@@ -1,12 +1,47 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Layer 4 messaging SSE event contract expansion implementation completed on feature branch)
+**Last updated:** 2026-03-14 (Layer 5 messaging realtime workspace orchestration implementation completed on feature branch)
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Layer 5 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
+  - Scope implemented: `messaging-realtime-workspace-orchestration` only
+  - Added server-rendered inbox row fragment path for realtime absent-row creation:
+    - route: `messages/row/<int:pk>/fragment/` in `marketplace/urls.py`
+    - view: `inbox_thread_row_fragment` in `marketplace/views.py`
+    - templates:
+      - `templates/marketplace/_inbox_thread_row.html` (canonical row markup)
+      - `templates/marketplace/inbox_thread_row_fragment.html`
+  - Refactored inbox thread hydration for reuse:
+    - `marketplace/views.py`
+      - `_build_inbox_threads_for_user(user)`
+      - `_decorate_inbox_thread_for_user(thread, user)`
+    - `inbox_view` now reuses helper path
+  - Updated inbox layout contract for realtime orchestration:
+    - `templates/marketplace/inbox.html`
+      - persistent `#messages-list-rows` container
+      - explicit `#messages-list-empty-state` region for empty-state transition
+      - row includes `data-row-fragment-url` and `data-listing-id`
+  - Implemented Layer 5 SSE inbox orchestration in `static/js/sse-client.js`:
+    - existing-row update path now uses `message_preview` fallback-safe behavior
+    - absent-row creation path fetches server-rendered row fragment endpoint
+    - empty-state replacement behavior when first row is inserted
+    - grouped-mode-ready insertion/reorder scaffolding using `data-view-mode`
+    - burst dedupe guard for concurrent row fetches (`rowFetchInFlight`)
+  - Added grouped-list support classes to both skins:
+    - `static/css/skin-simple-blue.css`
+    - `static/css/skin-warm-editorial.css`
+  - Added/updated tests:
+    - `marketplace/tests/test_messaging_workspace.py`
+      - verifies inbox row fragment endpoint payload/markup
+      - verifies non-participant denied on row-fragment endpoint
+      - verifies new inbox container/empty-state markers
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_messaging_workspace marketplace.tests.test_profile_trust_surfaces marketplace.tests.test_watchlist_workflow marketplace.tests.test_listing_detail_conversion marketplace.tests.test_sse_client` (54 tests)
 
 - **Layer 4 execution completed on feature branch `feat/messaging-layer1-workspace-layout`**:
   - Scope implemented: `messaging-sse-event-contract-expansion` only

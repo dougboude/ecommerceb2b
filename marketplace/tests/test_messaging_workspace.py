@@ -90,6 +90,8 @@ class MessagingWorkspaceTests(TestCase):
         self.assertContains(response, 'class="messages-workspace"')
         self.assertContains(response, 'id="messages-thread-pane"')
         self.assertContains(response, "data-thread-fragment-url")
+        self.assertContains(response, 'id="messages-list-rows"')
+        self.assertContains(response, 'id="messages-list-empty-state" hidden')
 
     def test_thread_context_shows_counterparty_and_listing_link(self):
         listing = _make_supply(self.owner, "Context listing")
@@ -223,6 +225,35 @@ class MessagingWorkspaceTests(TestCase):
         self.assertIn("thread-pane-content", html)
         self.assertIn('data-thread-id="%s"' % thread.pk, html)
         self.assertNotIn("<nav", html.lower())
+
+    def test_inbox_row_fragment_returns_server_rendered_row_markup(self):
+        listing = _make_supply(self.owner, "Row fragment listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "row fragment body",
+            timezone.now() - timedelta(minutes=11),
+        )
+        response = self.client.get(
+            reverse("marketplace:inbox_thread_row_fragment", kwargs={"pk": thread.pk}),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn(f'data-thread-id="{thread.pk}"', html)
+        self.assertIn(f'data-listing-id="{listing.pk}"', html)
+        self.assertIn("data-row-fragment-url", html)
+
+    def test_inbox_row_fragment_denies_non_participant(self):
+        listing = _make_supply(self.owner, "Row fragment auth listing")
+        thread = self._make_thread_with_message(
+            listing,
+            "row auth",
+            timezone.now() - timedelta(minutes=12),
+        )
+        outsider = _make_user("outsider@msg.test", "Outsider")
+        self.client.force_login(outsider)
+        response = self.client.get(reverse("marketplace:inbox_thread_row_fragment", kwargs={"pk": thread.pk}))
+        self.assertEqual(response.status_code, 403)
 
     def test_inbox_preview_prefix_uses_counterparty_name_for_received_message(self):
         listing = _make_supply(self.owner, "Preview received listing")

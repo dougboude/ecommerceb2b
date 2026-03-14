@@ -152,28 +152,69 @@ function initSSE(streamUrl) {
     }
 
     // --- Inbox page ---
+    var rowFetchInFlight = {};
+
     function updateInboxPage(data) {
         if (!document.getElementById("sse-inbox-page")) return;
 
-        var row = document.querySelector(
-            '[data-thread-id="' + data.thread_id + '"]'
-        );
-        if (!row) return;
+        var workspace = document.querySelector(".messages-workspace");
+        if (!workspace) return;
 
-        // Mark as unread
+        var mode = (workspace.getAttribute("data-view-mode") || "flat").toLowerCase();
+        var row = document.querySelector('[data-thread-id="' + data.thread_id + '"]');
+        if (row) {
+            updateInboxRow(row, data);
+            moveRowToTop(row, mode, data.listing_id);
+            return;
+        }
+
+        // Missing row path: fetch canonical server-rendered row fragment.
+        var threadKey = String(data.thread_id);
+        if (rowFetchInFlight[threadKey]) return;
+        rowFetchInFlight[threadKey] = true;
+        fetchInboxRowFragment(data.thread_id)
+            .then(function (fetchedRow) {
+                if (!fetchedRow) return;
+                removeInboxEmptyState();
+                insertInboxRow(fetchedRow, mode, data.listing_id, data.listing_title);
+                updateInboxRow(fetchedRow, data);
+                moveRowToTop(fetchedRow, mode, data.listing_id);
+                if (window.htmx) window.htmx.process(fetchedRow);
+            })
+            .catch(function () {})
+            .finally(function () {
+                delete rowFetchInFlight[threadKey];
+            });
+    }
+
+    function fetchInboxRowFragment(threadId) {
+        var url = "/messages/row/" + encodeURIComponent(threadId) + "/fragment/";
+        return fetch(url, {
+            credentials: "same-origin",
+            headers: {"X-Requested-With": "XMLHttpRequest"},
+        })
+            .then(function (resp) {
+                if (!resp.ok) return null;
+                return resp.text();
+            })
+            .then(function (html) {
+                if (!html) return null;
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, "text/html");
+                return doc.querySelector('[data-thread-id]');
+            });
+    }
+
+    function updateInboxRow(row, data) {
         if (!row.classList.contains("thread-unread")) {
             row.classList.add("thread-unread");
         }
 
-        // Update preview text
         var preview = row.querySelector(".thread-preview");
         if (preview) {
-            var text = data.message_body;
-            if (text.length > 80) text = text.substring(0, 80) + "...";
-            preview.textContent = text;
+            preview.textContent = data.message_preview || data.message_body || "";
         }
 
-        // Add "New" badge if not present
         var badgeContainer = row.querySelector("[data-badge-container]");
         if (badgeContainer && !badgeContainer.querySelector(".nav-badge")) {
             var badge = document.createElement("span");
@@ -181,12 +222,78 @@ function initSSE(streamUrl) {
             badge.textContent = "New";
             badgeContainer.insertBefore(badge, badgeContainer.firstChild);
         }
+    }
 
-        // Move thread to top of list
+    function insertInboxRow(row, mode, listingId, listingTitle) {
+        if (mode === "grouped") {
+            var groupRows = ensureListingGroupRows(listingId, listingTitle);
+            if (groupRows) {
+                groupRows.insertBefore(row, groupRows.firstChild);
+                return;
+            }
+        }
+        var container = document.getElementById("messages-list-rows");
+        if (!container) return;
+        container.insertBefore(row, container.firstChild);
+    }
+
+    function moveRowToTop(row, mode, listingId) {
+        if (mode === "grouped") {
+            var groupRows = listingId ? ensureListingGroupRows(listingId) : null;
+            if (groupRows && groupRows.firstElementChild !== row) {
+                groupRows.insertBefore(row, groupRows.firstElementChild);
+            }
+            var group = groupRows ? groupRows.closest("[data-listing-group-id]") : null;
+            var groupsRoot = document.getElementById("messages-list-groups");
+            if (group && groupsRoot && groupsRoot.firstElementChild !== group) {
+                groupsRoot.insertBefore(group, groupsRoot.firstElementChild);
+            }
+            return;
+        }
         var parent = row.parentNode;
         if (parent && parent.firstElementChild !== row) {
             parent.insertBefore(row, parent.firstElementChild);
         }
+    }
+
+    function removeInboxEmptyState() {
+        var empty = document.getElementById("messages-list-empty-state");
+        if (empty) {
+            empty.hidden = true;
+        }
+    }
+
+    function ensureListingGroupRows(listingId, listingTitle) {
+        if (!listingId) return null;
+        var groupsRoot = document.getElementById("messages-list-groups");
+        if (!groupsRoot) {
+            groupsRoot = document.createElement("div");
+            groupsRoot.id = "messages-list-groups";
+            groupsRoot.className = "messages-list-groups";
+            var listPane = document.querySelector(".messages-list-pane");
+            if (!listPane) return null;
+            var flatRows = document.getElementById("messages-list-rows");
+            if (flatRows) flatRows.hidden = true;
+            listPane.appendChild(groupsRoot);
+        }
+        var selector = '[data-listing-group-id="' + listingId + '"]';
+        var group = groupsRoot.querySelector(selector);
+        if (!group) {
+            group = document.createElement("section");
+            group.className = "messages-list-group";
+            group.setAttribute("data-listing-group-id", String(listingId));
+
+            var heading = document.createElement("h3");
+            heading.className = "messages-list-group-title";
+            heading.textContent = listingTitle || "Listing";
+            group.appendChild(heading);
+
+            var rows = document.createElement("div");
+            rows.className = "messages-list-group-rows";
+            group.appendChild(rows);
+            groupsRoot.insertBefore(group, groupsRoot.firstElementChild);
+        }
+        return group.querySelector(".messages-list-group-rows");
     }
 
     // --- Watchlist page ---
