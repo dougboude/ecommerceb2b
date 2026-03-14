@@ -1,12 +1,22 @@
 # Session Status — Resume Point (Canonical)
 
-**Last updated:** 2026-03-14 (Overview docs updated for security + real-time watchlist changes)
+**Last updated:** 2026-03-14 (Listing badge copy clarified: "new" -> "suggestion(s)")
 
 This is the **single canonical handoff file** for all AI sessions.
 If you did work in this repo, update this file at the end of the session.
 Do not create new per-version status files.
 
 ## What was completed
+
+- **Listing tile badge copy clarification (`new` -> `suggestion(s)`)**:
+  - Updated unsaved match badge wording on both listing management pages:
+    - `templates/marketplace/supply_lot_list.html`
+    - `templates/marketplace/demand_post_list.html`
+  - Replaced ambiguous `N new` with count-aware wording:
+    - `1 suggestion`
+    - `N suggestions`
+  - Validation:
+    - PASS `.venv/bin/python manage.py test --keepdb marketplace.tests.test_listing_management_hub` (42 tests)
 
 - **Overview documentation alignment update (README + sales overview)**:
   - Updated `README.md`:

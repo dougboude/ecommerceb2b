@@ -25,7 +25,7 @@
         <div class="tile-meta">{{ lot.get_location_country_display|default:lot.location_country }}{% if lot.location_locality %}, {{ lot.location_locality }}{% endif %}</div>
         {% if lot.unsaved_count or lot.saved_count %}
         <div class="tile-match-counts">
-            {% if lot.unsaved_count %}<span class="match-badge match-badge-unsaved">{{ lot.unsaved_count }} {% trans "new" %}</span>{% endif %}
+            {% if lot.unsaved_count %}<span class="match-badge match-badge-unsaved">{% blocktrans count count=lot.unsaved_count %}{{ count }} suggestion{% plural %}{{ count }} suggestions{% endblocktrans %}</span>{% endif %}
             {% if lot.saved_count %}<span class="match-badge match-badge-saved">{{ lot.saved_count }} {% trans "saved" %}</span>{% endif %}
         </div>
         {% endif %}
